@@ -30,6 +30,8 @@ export class QueryInventoryText {
         input.workspaceId,
       );
 
+    console.log("QUERY PROPOSAL", proposal);
+
     if (
       proposal.intent === null
       || proposal.productName === null
