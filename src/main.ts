@@ -10,6 +10,7 @@ import { PostgresUnitConversionResolver } from "./infrastructure/postgres/postgr
 
 import { GetInventory } from "./application/get-inventory.js";
 import { QueryInventoryText } from "./application/query-inventory-text.js";
+import { AnswerInventoryText } from "./application/answer-inventory-text.js";
 import { GetKnowledgeDocuments } from "./application/get-knowledge-documents.js";
 import { LifeOsModuleRouter } from "./application/life-os-module-router.js";
 import { PostgresInventoryEventStore } from "./infrastructure/postgres/postgres-inventory-event-store.js";
@@ -141,10 +142,16 @@ const queryInventoryText =
     getInventory,
   );
 
+const answerInventoryText =
+  new AnswerInventoryText(
+    queryInventoryText,
+  );
+
 const inventoryCapability =
   new InventoryCapability(
     executeInventoryText,
     queryInventoryText,
+    answerInventoryText,
   );
 
 const inventoryAssistantHandler =
