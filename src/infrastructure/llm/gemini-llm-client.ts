@@ -22,7 +22,7 @@ export class GeminiLlmClient
   ) {}
 
   async generate(
-    input: string,
+    prompt: string,
   ): Promise<string> {
     const url =
       `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
@@ -41,7 +41,7 @@ export class GeminiLlmClient
                 parts: [
                   {
                     text:
-                      this.buildPrompt(input),
+                      this.buildPrompt(prompt),
                   },
                 ],
               },
@@ -77,7 +77,7 @@ export class GeminiLlmClient
   }
 
   private buildPrompt(
-    input: string,
+    prompt: string,
   ): string {
     return `
 Convert the user's inventory command into JSON.
@@ -108,7 +108,7 @@ Schema:
 }
 
 User input:
-${input}
+${prompt}
 `;
   }
 }

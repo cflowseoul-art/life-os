@@ -1,5 +1,5 @@
 export interface LlmClient {
   generate(
-    input: string,
+    prompt: string,
   ): Promise<string>;
 }
