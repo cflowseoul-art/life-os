@@ -34,6 +34,7 @@ export type CommandProposal = {
 export type InventoryQueryProposal = {
   intent:
     | "inventory_query"
+    | "inventory_list"
     | null;
   targetPlugin: "household-supplies";
   workspaceId: string;

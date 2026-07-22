@@ -34,7 +34,6 @@ export class QueryInventoryText {
 
     if (
       proposal.intent === null
-      || proposal.productName === null
     ) {
       return null;
     }
@@ -43,6 +42,18 @@ export class QueryInventoryText {
       await this.getInventory.execute(
         input.workspaceId,
       );
+
+    if (
+      proposal.intent === "inventory_list"
+    ) {
+      return inventory;
+    }
+
+    if (
+      proposal.productName === null
+    ) {
+      return null;
+    }
 
     return inventory.filter(
       (item) =>

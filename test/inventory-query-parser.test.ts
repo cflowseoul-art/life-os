@@ -24,6 +24,37 @@ describe("InventoryQueryParser", () => {
       });
   });
 
+  it("parses inventory list query text", () => {
+    const result =
+      parser.parse(
+        "냉장고 뭐 있어?",
+        workspaceId,
+      );
+
+    expect(result)
+      .toMatchObject({
+        intent: "inventory_list",
+        productName: null,
+        requiresClarification: false,
+      });
+  });
+
+  it("parses remaining ingredient list query text", () => {
+    const result =
+      parser.parse(
+        "남은 재료 알려줘",
+        workspaceId,
+      );
+
+    expect(result)
+      .toMatchObject({
+        intent: "inventory_list",
+        productName: null,
+        requiresClarification: false,
+      });
+  });
+
+
   it("requires clarification for unsupported query", () => {
     const result =
       parser.parse(

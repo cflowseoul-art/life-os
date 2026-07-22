@@ -78,4 +78,66 @@ describe("QueryInventoryText", () => {
     expect(result)
       .toEqual([]);
   });
+  it("returns all inventory for inventory list query", async () => {
+    const getInventory = {
+      execute: vi.fn().mockResolvedValue([
+        {
+          workspaceId: "workspace-1",
+          canonicalProductId: "product-1",
+          canonicalName: "계란",
+          quantity: 57,
+          unit: "개",
+          lastVerifiedAt:
+            "2026-07-22T00:00:00.000Z",
+          sourceType: "explicit_text",
+          valueType: "explicit_quantity",
+          freshnessStatus: "fresh",
+          lastSeq: 1,
+        },
+        {
+          workspaceId: "workspace-1",
+          canonicalProductId: "product-2",
+          canonicalName: "우유",
+          quantity: 2,
+          unit: "개",
+          lastVerifiedAt:
+            "2026-07-22T00:00:00.000Z",
+          sourceType: "explicit_text",
+          valueType: "explicit_quantity",
+          freshnessStatus: "fresh",
+          lastSeq: 2,
+        },
+      ]),
+    } as unknown as GetInventory;
+
+    const service =
+      new QueryInventoryText(
+        getInventory,
+      );
+
+    const result =
+      await service.execute({
+        text: "냉장고 뭐 있어?",
+        workspaceId: "workspace-1",
+      });
+
+    expect(result)
+      .toHaveLength(2);
+
+    expect(result)
+      .toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            canonicalName: "계란",
+            quantity: 57,
+          }),
+          expect.objectContaining({
+            canonicalName: "우유",
+            quantity: 2,
+          }),
+        ]),
+      );
+  });
+
+
 });
