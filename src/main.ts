@@ -4,10 +4,12 @@ import { ExecuteInventoryCommand } from "./application/execute-inventory-command
 import { ExecuteInventoryText } from "./application/execute-inventory-text.js";
 import { RuleInventoryCommandParser } from "./household-supplies/parser/rule-inventory-command-parser.js";
 import { LlmInventoryCommandParser } from "./household-supplies/parser/llm-inventory-command-parser.js";
+import { InventoryCommandParserRouter } from "./household-supplies/parser/inventory-command-parser-router.js";
 import { PostgresProductResolver } from "./infrastructure/postgres/postgres-product-resolver.js";
 import { PostgresUnitConversionResolver } from "./infrastructure/postgres/postgres-unit-conversion-resolver.js";
 
 import { GetInventory } from "./application/get-inventory.js";
+import { QueryInventoryText } from "./application/query-inventory-text.js";
 import { GetKnowledgeDocuments } from "./application/get-knowledge-documents.js";
 import { LifeOsModuleRouter } from "./application/life-os-module-router.js";
 import { PostgresInventoryEventStore } from "./infrastructure/postgres/postgres-inventory-event-store.js";
@@ -19,6 +21,10 @@ import { PostgresUnitOfWork } from "./infrastructure/postgres/postgres-unit-of-w
 import { LifeOsHttpHandler } from "./interfaces/http/life-os-http-handler.js";
 import { startNodeHttpServer } from "./interfaces/http/node-http-server.js";
 import { GeminiLlmClient } from "./infrastructure/llm/gemini-llm-client.js";
+import { InventoryCapability } from "./application/capabilities/inventory-capability.js";
+import { AssistantService } from "./application/assistant/assistant-service.js";
+import { InventoryAssistantHandler } from "./application/assistant/inventory-assistant-handler.js";
+
 
 const databaseUrl =
   process.env.DATABASE_URL;
@@ -90,9 +96,18 @@ const geminiClient =
       "gemini-2.5-flash",
   );
 
-const inventoryCommandParser =
+const ruleInventoryCommandParser =
+  new RuleInventoryCommandParser();
+
+const llmInventoryCommandParser =
   new LlmInventoryCommandParser(
     geminiClient,
+  );
+
+const inventoryCommandParser =
+  new InventoryCommandParserRouter(
+    ruleInventoryCommandParser,
+    llmInventoryCommandParser,
   );
 
 const productResolver =
@@ -121,6 +136,27 @@ const getInventory =
     inventoryQueryStore,
   );
 
+const queryInventoryText =
+  new QueryInventoryText(
+    getInventory,
+  );
+
+const inventoryCapability =
+  new InventoryCapability(
+    executeInventoryText,
+    queryInventoryText,
+  );
+
+const inventoryAssistantHandler =
+  new InventoryAssistantHandler(
+    inventoryCapability,
+  );
+
+const assistantService =
+  new AssistantService(
+    inventoryAssistantHandler,
+  );
+
 const getKnowledgeDocuments =
   new GetKnowledgeDocuments(
     unitOfWork,
@@ -138,6 +174,8 @@ const httpHandler =
     moduleRouter,
     executeInventoryCommand,
     executeInventoryText,
+    undefined,
+    assistantService,
   );
 
 const server =

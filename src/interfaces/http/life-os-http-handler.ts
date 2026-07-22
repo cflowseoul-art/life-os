@@ -13,6 +13,10 @@ import type {
 } from "../../application/execute-inventory-text.js";
 
 import type {
+  AssistantService,
+} from "../../application/assistant/assistant-service.js";
+
+import type {
   QueryInventoryText,
 } from "../../application/query-inventory-text.js";
 export type HttpRequest = {
@@ -62,6 +66,10 @@ type MatchedRoute =
       workspaceId: string;
     }
   | {
+      kind: "assistant-text";
+      workspaceId: string;
+    }
+  | {
       kind: "inventory-query";
       workspaceId: string;
     }
@@ -84,6 +92,7 @@ export class LifeOsHttpHandler {
       },
     private readonly executeInventoryText?: ExecuteInventoryText,
     private readonly queryInventoryText?: InventoryTextQueryExecutor,
+    private readonly assistantService?: AssistantService,
   ) {}
 
   async handle(
@@ -131,6 +140,58 @@ export class LifeOsHttpHandler {
         return this.handleError(error);
       }
     }
+    if (route.kind === "assistant-text") {
+      if (method !== "POST") {
+        return this.methodNotAllowed();
+      }
+
+      if (!this.assistantService) {
+        return this.json(500, {
+          error: {
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              "Assistant service is not configured",
+          },
+        });
+      }
+
+      try {
+        const body =
+          this.parseJsonObject(
+            request.body,
+          );
+
+        const result =
+          await this.assistantService.handle({
+            text:
+              this.requireString(
+                body,
+                "text",
+              ),
+            workspaceId:
+              route.workspaceId,
+            householdId:
+              this.requireString(
+                body,
+                "householdId",
+              ),
+            actorId:
+              this.requireString(
+                body,
+                "actorId",
+              ),
+          });
+
+        return this.json(200, {
+          module: "assistant",
+          action: "text",
+          data: result,
+        });
+      } catch (error) {
+        return this.handleError(error);
+      }
+    }
+
     if (route.kind === "inventory-text") {
   if (method !== "POST") {
     return this.methodNotAllowed();
@@ -289,6 +350,24 @@ export class LifeOsHttpHandler {
         kind: "health",
       };
     }
+    const assistantTextMatch = url.pathname.match(
+      /^\/api\/workspaces\/([^/]+)\/assistant\/text\/?$/,
+    );
+
+    if (assistantTextMatch) {
+      const workspaceId =
+        this.decodeWorkspaceId(assistantTextMatch[1]);
+
+      return workspaceId === null
+        ? {
+            kind: "not-found",
+          }
+        : {
+            kind: "assistant-text",
+            workspaceId,
+          };
+    }
+
     const textMatch = url.pathname.match(
       /^\/api\/workspaces\/([^/]+)\/inventory\/text\/?$/,
     );
@@ -638,6 +717,8 @@ export class LifeOsHttpHandler {
   private handleError(
     error: unknown,
   ): HttpResponse {
+    console.error(error);
+
     if (
       error instanceof InvalidRequestError
       || (
