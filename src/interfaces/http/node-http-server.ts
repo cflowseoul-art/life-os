@@ -51,6 +51,17 @@ export async function startNodeHttpServer(
 ): Promise<Server> {
   const server = createServer(
     async (request, response) => {
+      if (request.method === "OPTIONS") {
+        response.writeHead(204, {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "GET,POST,OPTIONS",
+          "access-control-allow-headers": "Content-Type",
+        });
+
+        response.end();
+        return;
+      }
+
       try {
         const body =
           await readRequestBody(request);
@@ -68,7 +79,12 @@ export async function startNodeHttpServer(
 
         response.writeHead(
           result.statusCode,
-          result.headers,
+          {
+            ...result.headers,
+            "access-control-allow-origin": "*",
+            "access-control-allow-methods": "GET,POST,OPTIONS",
+            "access-control-allow-headers": "Content-Type",
+          },
         );
 
         response.end(result.body);

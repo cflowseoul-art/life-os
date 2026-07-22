@@ -2,20 +2,25 @@ import type {
   InventoryQueryProposal,
 } from "../types.js";
 
+import {
+  QueryLanguageAnalyzer,
+} from "./language/query-language-analyzer.js";
+
+
 export class InventoryQueryParser {
+  private readonly languageAnalyzer =
+    new QueryLanguageAnalyzer();
+
   parse(
     text: string,
     workspaceId: string,
   ): InventoryQueryProposal {
-    const normalized =
-      text.trim();
-
-    const isQuery =
-      /(있어|남았어|남아|몇 개|얼마나|뭐 있어|무엇|알려줘)/.test(
-        normalized,
+    const analysis =
+      this.languageAnalyzer.analyze(
+        text,
       );
 
-    if (!isQuery) {
+    if (!analysis.isQuery) {
       return {
         intent: null,
         targetPlugin:
@@ -23,15 +28,16 @@ export class InventoryQueryParser {
         workspaceId,
         productName: null,
         confidence: 0,
-        requiresClarification: true,
+        requiresClarification: false,
         unsupportedReason:
           "unsupported_intent",
       };
     }
 
+
     const isListQuery =
       /(냉장고|뭐 있어|무엇|남은 재료|재료 알려줘|남은 것|남은거)/.test(
-        normalized,
+        analysis.normalizedText,
       );
 
     if (isListQuery) {
@@ -46,13 +52,15 @@ export class InventoryQueryParser {
       };
     }
 
+
     const productName =
-      normalized
+      analysis.cleanedText
         .replace(
-          /(몇 개|얼마나|있어|남았어|남아|뭐 있어|무엇|알려줘|은|는|이|가|을|를|\?)/g,
+          /(은|는|이|가|을|를)$/g,
           "",
         )
         .trim();
+
 
     if (!productName) {
       return {
@@ -67,6 +75,7 @@ export class InventoryQueryParser {
           "ambiguous_quantity",
       };
     }
+
 
     return {
       intent: "inventory_query",
