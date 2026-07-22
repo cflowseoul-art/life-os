@@ -1,0 +1,28 @@
+{
+  "name": "life-os",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Life OS — AI-based personal and household operating system",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "dev": "bash scripts/dev.sh",
+    "start": "tsx src/main.ts",
+    "db:schema": "bash scripts/db-schema.sh",
+    "db:seed": "bash scripts/db-seed.sh"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -2,7 +2,10 @@
 
 ## Goal
 
-Validate the architecture end to end with Inventory and Shopping before expanding the platform.
+Validate the architecture end to end with the Household Supplies plugin
+(Inventory + Shopping) before expanding the platform. The first slice must
+exercise both **Korean input parsing** and the **command → event → synchronous
+projection** path together — not one without the other.
 
 ## First vertical slice
 
@@ -11,13 +14,14 @@ Google sign-in
 → create household
 → add wife and husband
 → create shared workspace
-→ enter purchase through text
-→ append purchase event
-→ update inventory projection
-→ enter consumption through text
-→ append consumption event
-→ query current inventory
-→ suggest shopping when low
+→ enter purchase through Korean text
+→ AI parse → typed command proposal
+→ action policy decision
+→ append purchase event + update inventory projection (one transaction)
+→ enter consumption through Korean text
+→ append consumption event + update projection (one transaction)
+→ query current inventory (freshness-aware)
+→ suggest shopping when low (hardcoded automation rule)
 → show history
 → undo through compensating event
 ```
@@ -26,27 +30,31 @@ Then add:
 
 ```text
 receipt upload
+→ store raw image in ObjectStorage
 → OCR candidates
 → normalization
 → user confirmation
-→ purchase events
-→ shopping completion
+→ Application orchestrates: purchase events + shopping completion (+ proposed expense)
 ```
 
-Voice input comes after the text command flow is stable; it should reuse the same command contract.
+Voice input comes after the text command flow is stable; it should reuse the same
+command contract and the same `idempotencyKey` deduplication.
 
 ## MVP plugins
 
-- Identity foundation
-- Inventory
-- Shopping
+- Identity foundation (CRUD)
+- Household Supplies (Inventory + Shopping capabilities)
 
-Do not begin Finance, Travel, Resume, or Relationship implementation until the first vertical slice proves:
+Do not begin Finance, Travel, Resume, or Relationship implementation until the
+first vertical slice proves:
 
+- command idempotency (commandId + idempotencyKey)
 - event append
-- projection rebuild
+- synchronous projection update
+- projection rebuild from history
 - permissions
-- AI command proposal validation
+- AI command proposal validation and the confidence action policy
+- Korean golden-dataset parsing accuracy
 - undo
 - freshness-aware query
 - plugin boundary
@@ -60,4 +68,5 @@ A non-technical household member can:
 - add something to shopping,
 - correct a mistake,
 
-without understanding the underlying data model.
+without understanding the underlying data model — and the AI parsing meets the
+golden-dataset accuracy bar before the flow is trusted.

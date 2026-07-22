@@ -1,0 +1,24 @@
+# Local PostgreSQL for Life OS development and integration tests.
+# NOT started yet — a container runtime (Docker/compatible) must be installed first.
+# Start with: docker compose up -d
+services:
+  postgres:
+    image: postgres:16
+    container_name: lifeos-postgres
+    environment:
+      POSTGRES_USER: lifeos
+      POSTGRES_PASSWORD: lifeos
+      POSTGRES_DB: lifeos
+    ports:
+      # host 5433 -> container 5432, to avoid clashing with a local 5432 install
+      - "5433:5432"
+    volumes:
+      - lifeos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifeos -d lifeos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lifeos_pgdata:

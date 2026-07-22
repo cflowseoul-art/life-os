@@ -28,6 +28,18 @@ Household
 
 All major records must be scoped by household/workspace and protected by permissions.
 
+## Permission assumptions (MVP)
+
+The MVP uses a small, fixed model — not enterprise RBAC (ADR-010):
+
+- Wife and husband belong to the same household.
+- Shared assets and household supplies are visible and editable by both.
+- Every record and event retains actor ownership and actor attribution (`actorId`).
+- Administrative actions (managing membership, product catalog, normalization
+  rules, and automation configuration) are limited to the admin role (wife).
+- Some personal domains may later support private workspaces; the MVP scopes by
+  workspace but does not yet enforce hard privacy walls.
+
 ## Product principles
 
 1. Do not build a feature without a trustworthy data source.
