@@ -9,6 +9,10 @@ import type {
   LifeOsModuleRequest,
   LifeOsModuleResult,
 } from "../src/application/life-os-module-router.js";
+import type {
+  ExecutedResult,
+  InventoryCommand,
+} from "../src/household-supplies/types.js";
 import { LifeOsHttpHandler } from "../src/interfaces/http/life-os-http-handler.js";
 
 function createRouter() {
@@ -18,6 +22,39 @@ function createRouter() {
         request: LifeOsModuleRequest,
       ) => Promise<LifeOsModuleResult>
     >(),
+  };
+}
+
+function createExecutor() {
+  return {
+    execute: vi.fn<
+      (
+        command: InventoryCommand,
+      ) => Promise<ExecutedResult>
+    >(),
+  };
+}
+
+function createPurchaseCommand(
+  workspaceId = "workspace-001",
+): InventoryCommand {
+  return {
+    type: "PurchaseInventory",
+    commandId: "command-001",
+    idempotencyKey: "idempotency-001",
+    correlationId: "correlation-001",
+    householdId: "household-001",
+    workspaceId,
+    actorId: "actor-001",
+    items: [
+      {
+        canonicalProductId: "product-egg",
+        canonicalName: "계란",
+        quantity: 30,
+        unit: "개",
+        rawName: "계란 한 판",
+      },
+    ],
   };
 }
 
@@ -182,5 +219,114 @@ describe("LifeOsHttpHandler", () => {
     expect(response.body).not.toContain(
       "database password",
     );
+  });
+  it("executes an inventory purchase command", async () => {
+    const router = createRouter();
+    const executor = createExecutor();
+    const command = createPurchaseCommand();
+
+    const result: ExecutedResult = {
+      status: "executed",
+      intent: "purchase_inventory",
+      eventId: "event-001",
+      items: command.items,
+    };
+
+    executor.execute.mockResolvedValue(result);
+
+    const handler =
+      new LifeOsHttpHandler(
+        router,
+        executor,
+      );
+
+    const response = await handler.handle({
+      method: "POST",
+      url:
+        "/api/workspaces/workspace-001/inventory/commands",
+      body: JSON.stringify(command),
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    expect(executor.execute).toHaveBeenCalledWith(
+      command,
+    );
+
+    expect(
+      JSON.parse(response.body),
+    ).toEqual({
+      module: "inventory",
+      action: "execute",
+      data: result,
+    });
+
+    expect(router.route).not.toHaveBeenCalled();
+  });
+
+  it("rejects a workspaceId that does not match the URL", async () => {
+    const router = createRouter();
+    const executor = createExecutor();
+
+    const handler =
+      new LifeOsHttpHandler(
+        router,
+        executor,
+      );
+
+    const response = await handler.handle({
+      method: "POST",
+      url:
+        "/api/workspaces/workspace-001/inventory/commands",
+      body: JSON.stringify(
+        createPurchaseCommand("workspace-002"),
+      ),
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    expect(
+      JSON.parse(response.body),
+    ).toEqual({
+      error: {
+        code: "INVALID_REQUEST",
+        message:
+          "workspaceId must match the URL workspaceId",
+      },
+    });
+
+    expect(executor.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid JSON for inventory commands", async () => {
+    const router = createRouter();
+    const executor = createExecutor();
+
+    const handler =
+      new LifeOsHttpHandler(
+        router,
+        executor,
+      );
+
+    const response = await handler.handle({
+      method: "POST",
+      url:
+        "/api/workspaces/workspace-001/inventory/commands",
+      body: "{invalid-json",
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    expect(
+      JSON.parse(response.body),
+    ).toEqual({
+      error: {
+        code: "INVALID_REQUEST",
+        message:
+          "Request body must be valid JSON",
+      },
+    });
+
+    expect(executor.execute).not.toHaveBeenCalled();
   });
 });

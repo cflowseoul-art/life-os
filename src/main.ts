@@ -1,11 +1,18 @@
 import { Pool } from "pg";
 
+import { ExecuteInventoryCommand } from "./application/execute-inventory-command.js";
+import { ExecuteInventoryText } from "./application/execute-inventory-text.js";
 import { GetInventory } from "./application/get-inventory.js";
 import { GetKnowledgeDocuments } from "./application/get-knowledge-documents.js";
 import { LifeOsModuleRouter } from "./application/life-os-module-router.js";
+import { PostgresInventoryEventStore } from "./infrastructure/postgres/postgres-inventory-event-store.js";
+import { PostgresInventoryProjector } from "./infrastructure/postgres/postgres-inventory-projector.js";
 import { PostgresInventoryQueryStore } from "./infrastructure/postgres/postgres-inventory-query-store.js";
 import { PostgresKnowledgeDocumentStore } from "./infrastructure/postgres/postgres-knowledge-document-store.js";
+import { PostgresProcessedCommandStore } from "./infrastructure/postgres/postgres-processed-command-store.js";
 import { PostgresUnitOfWork } from "./infrastructure/postgres/postgres-unit-of-work.js";
+import { PostgresProductResolver } from "./infrastructure/postgres/postgres-product-resolver.js";
+import { PostgresUnitConversionResolver } from "./infrastructure/postgres/postgres-unit-conversion-resolver.js";
 import { LifeOsHttpHandler } from "./interfaces/http/life-os-http-handler.js";
 import { startNodeHttpServer } from "./interfaces/http/node-http-server.js";
 
@@ -46,6 +53,36 @@ const pool = new Pool({
 const unitOfWork =
   new PostgresUnitOfWork(pool);
 
+const inventoryEventStore =
+  new PostgresInventoryEventStore();
+
+const inventoryProjector =
+  new PostgresInventoryProjector();
+
+const processedCommandStore =
+  new PostgresProcessedCommandStore();
+
+const executeInventoryCommand =
+  new ExecuteInventoryCommand(
+    unitOfWork,
+    inventoryEventStore,
+    inventoryProjector,
+    processedCommandStore,
+  );
+
+const productResolver =
+  new PostgresProductResolver(pool);
+
+const unitConversionResolver =
+  new PostgresUnitConversionResolver(pool);
+
+const executeInventoryText =
+  new ExecuteInventoryText(
+    productResolver,
+    unitConversionResolver,
+    executeInventoryCommand,
+  );
+
 const inventoryQueryStore =
   new PostgresInventoryQueryStore();
 
@@ -71,7 +108,11 @@ const moduleRouter =
   );
 
 const httpHandler =
-  new LifeOsHttpHandler(moduleRouter);
+  new LifeOsHttpHandler(
+    moduleRouter,
+    executeInventoryCommand,
+    executeInventoryText,
+  );
 
 const server =
   await startNodeHttpServer(
