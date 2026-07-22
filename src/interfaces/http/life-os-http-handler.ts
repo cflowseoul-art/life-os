@@ -32,6 +32,13 @@ type ModuleRouter = Pick<
   "route"
 >;
 
+type InventoryTextQueryExecutor = {
+  execute(input: {
+    text: string;
+    workspaceId: string;
+  }): Promise<unknown>;
+};
+
 export interface InventoryCommandExecutor {
   execute(
     command: InventoryCommand,
@@ -76,7 +83,7 @@ export class LifeOsHttpHandler {
         },
       },
     private readonly executeInventoryText?: ExecuteInventoryText,
-    private readonly queryInventoryText?: QueryInventoryText,
+    private readonly queryInventoryText?: InventoryTextQueryExecutor,
   ) {}
 
   async handle(

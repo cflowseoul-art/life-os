@@ -2,7 +2,7 @@ import type {
   ExecutedResult,
 } from "../household-supplies/types.js";
 
-import { InventoryTextParser } from "../household-supplies/parser/inventory-text-parser.js";
+import type { InventoryCommandParser } from "../household-supplies/parser/inventory-command-parser.js";
 
 import type {
   ProductResolver,
@@ -21,12 +21,10 @@ import type {
 } from "./execute-inventory-command.js";
 
 export class ExecuteInventoryText {
-  private readonly parser =
-    new InventoryTextParser();
-
   private readonly resolver;
 
   constructor(
+    private readonly parser: InventoryCommandParser,
     private readonly productResolver: ProductResolver,
     private readonly unitConversionResolver: UnitConversionResolver,
     private readonly executeInventoryCommand: ExecuteInventoryCommand,
@@ -47,7 +45,7 @@ export class ExecuteInventoryText {
     },
   ): Promise<ExecutedResult | null> {
     const proposal =
-      this.parser.parse(
+      await this.parser.parse(
         input.text,
         input.workspaceId,
       );

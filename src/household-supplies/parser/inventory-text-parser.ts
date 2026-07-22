@@ -4,16 +4,20 @@ import type {
   ProposedItem,
 } from "../types.js";
 
+import type {
+  InventoryCommandParser,
+} from "./inventory-command-parser.js";
+
 import { KoreanNumberNormalizer } from "./normalizers/korean-number-normalizer.js";
 
-export class InventoryTextParser {
+export class RuleInventoryCommandParser implements InventoryCommandParser {
   private readonly normalizer =
     new KoreanNumberNormalizer();
 
-  parse(
+  async parse(
     text: string,
     workspaceId: string,
-  ): CommandProposal {
+  ): Promise<CommandProposal> {
     const normalized =
       this.normalizer.normalize(text);
 
@@ -105,3 +109,7 @@ export class InventoryTextParser {
     };
   }
 }
+
+export {
+  RuleInventoryCommandParser as InventoryTextParser,
+};

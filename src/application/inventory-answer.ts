@@ -22,6 +22,14 @@ export class InventoryAnswerGenerator {
     if (items.length === 1) {
       const item = items[0];
 
+      if (!item) {
+        return {
+          message:
+            "확인되는 재고가 없어요.",
+          items,
+        };
+      }
+
       return {
         message:
           `${item.canonicalName} ${item.quantity}${item.unit} 있어요.`,

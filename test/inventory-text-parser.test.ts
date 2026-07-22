@@ -9,9 +9,9 @@ describe("InventoryTextParser", () => {
   const parser =
     new InventoryTextParser();
 
-  it("parses purchase inventory text", () => {
+  it("parses purchase inventory text", async () => {
     const result =
-      parser.parse(
+      await parser.parse(
         "계란 한 판 샀어",
         workspaceId,
       );
@@ -34,9 +34,9 @@ describe("InventoryTextParser", () => {
   });
 
 
-  it("parses consume inventory text", () => {
+  it("parses consume inventory text", async () => {
     const result =
-      parser.parse(
+      await parser.parse(
         "계란 2개 먹었어",
         workspaceId,
       );
@@ -56,9 +56,9 @@ describe("InventoryTextParser", () => {
   });
 
 
-  it("requires clarification for unsupported text", () => {
+  it("requires clarification for unsupported text", async () => {
     const result =
-      parser.parse(
+      await parser.parse(
         "오늘 날씨 좋아",
         workspaceId,
       );
