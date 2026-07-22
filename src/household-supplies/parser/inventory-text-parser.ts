@@ -4,13 +4,18 @@ import type {
   ProposedItem,
 } from "../types.js";
 
+import { KoreanNumberNormalizer } from "./normalizers/korean-number-normalizer.js";
+
 export class InventoryTextParser {
+  private readonly normalizer =
+    new KoreanNumberNormalizer();
+
   parse(
     text: string,
     workspaceId: string,
   ): CommandProposal {
     const normalized =
-      text.trim();
+      this.normalizer.normalize(text);
 
     const intent =
       this.detectIntent(normalized);
@@ -82,7 +87,7 @@ export class InventoryTextParser {
           "",
         )
         .replace(
-          /(한|두|세|개|판)/g,
+          /(개|판)/g,
           "",
         )
         .trim();
