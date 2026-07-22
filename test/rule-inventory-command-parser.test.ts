@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { InventoryTextParser } from "../src/household-supplies/parser/inventory-text-parser.js";
+import { RuleInventoryCommandParser } from "../src/household-supplies/parser/rule-inventory-command-parser.js";
 
 const workspaceId =
   "22222222-2222-4222-8222-222222222222";
 
-describe("InventoryTextParser", () => {
+describe("RuleInventoryCommandParser", () => {
   const parser =
-    new InventoryTextParser();
+    new RuleInventoryCommandParser();
 
   it("parses purchase inventory text", async () => {
     const result =

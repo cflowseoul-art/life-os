@@ -8,9 +8,7 @@ export type IntentName = "purchase_inventory" | "consume_inventory";
 // Output of the parser: a proposal, never a state change (ADR-003).
 export type ProposedItem = {
   rawName: string;
-  canonicalProductId: string | null; // null => unresolved product
-  canonicalName: string | null;
-  quantity: number; // already converted to the product's base unit
+  quantity: number;
   unit: string;
 };
 

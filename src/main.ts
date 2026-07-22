@@ -3,7 +3,7 @@ import { Pool } from "pg";
 import { ExecuteInventoryCommand } from "./application/execute-inventory-command.js";
 import { QueryInventoryText } from "./application/query-inventory-text.js";
 import { ExecuteInventoryText } from "./application/execute-inventory-text.js";
-import { RuleInventoryCommandParser } from "./household-supplies/parser/inventory-text-parser.js";
+import { RuleInventoryCommandParser } from "./household-supplies/parser/rule-inventory-command-parser.js";
 import { GetInventory } from "./application/get-inventory.js";
 import { GetKnowledgeDocuments } from "./application/get-knowledge-documents.js";
 import { LifeOsModuleRouter } from "./application/life-os-module-router.js";

@@ -102,8 +102,6 @@ export class RuleInventoryCommandParser implements InventoryCommandParser {
 
     return {
       rawName: name,
-      canonicalProductId: null,
-      canonicalName: null,
       quantity,
       unit,
     };

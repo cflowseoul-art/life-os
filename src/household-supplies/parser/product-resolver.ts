@@ -15,26 +15,8 @@ export class SimpleProductResolver
   async resolve(
     item: ProposedItem,
   ): Promise<InventoryLine> {
-    if (
-      item.canonicalProductId === null
-      || item.canonicalName === null
-    ) {
-      throw new Error(
-        `Product not resolved: ${item.rawName}`,
-      );
-    }
-
-    return {
-      canonicalProductId:
-        item.canonicalProductId,
-      canonicalName:
-        item.canonicalName,
-      quantity:
-        item.quantity,
-      unit:
-        item.unit,
-      rawName:
-        item.rawName,
-    };
+    throw new Error(
+      `Product resolver is not configured: ${item.rawName}`,
+    );
   }
 }
