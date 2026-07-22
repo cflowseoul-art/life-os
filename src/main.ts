@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
 import { ExecuteInventoryCommand } from "./application/execute-inventory-command.js";
+import { QueryInventoryText } from "./application/query-inventory-text.js";
 import { ExecuteInventoryText } from "./application/execute-inventory-text.js";
 import { GetInventory } from "./application/get-inventory.js";
 import { GetKnowledgeDocuments } from "./application/get-knowledge-documents.js";
@@ -101,6 +102,11 @@ const getKnowledgeDocuments =
     knowledgeDocumentStore,
   );
 
+const queryInventoryText =
+  new QueryInventoryText(
+    getInventory,
+  );
+
 const moduleRouter =
   new LifeOsModuleRouter(
     getInventory,
@@ -112,6 +118,7 @@ const httpHandler =
     moduleRouter,
     executeInventoryCommand,
     executeInventoryText,
+    queryInventoryText,
   );
 
 const server =

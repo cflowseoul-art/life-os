@@ -30,6 +30,19 @@ export type CommandProposal = {
   unsupportedReason?: ClarificationReason;
 };
 
+
+export type InventoryQueryProposal = {
+  intent:
+    | "inventory_query"
+    | null;
+  targetPlugin: "household-supplies";
+  workspaceId: string;
+  productName: string | null;
+  confidence: number;
+  requiresClarification: boolean;
+  unsupportedReason?: ClarificationReason;
+};
+
 // A validated, executable inventory line (base unit, positive quantity).
 export type InventoryLine = {
   canonicalProductId: string;

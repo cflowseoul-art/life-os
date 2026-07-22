@@ -11,6 +11,10 @@ import type {
 import type {
   ExecuteInventoryText,
 } from "../../application/execute-inventory-text.js";
+
+import type {
+  QueryInventoryText,
+} from "../../application/query-inventory-text.js";
 export type HttpRequest = {
   method: string;
   url: string;
@@ -51,6 +55,10 @@ type MatchedRoute =
       workspaceId: string;
     }
   | {
+      kind: "inventory-query";
+      workspaceId: string;
+    }
+  | {
       kind: "not-found";
     };
 
@@ -68,6 +76,7 @@ export class LifeOsHttpHandler {
         },
       },
     private readonly executeInventoryText?: ExecuteInventoryText,
+    private readonly queryInventoryText?: QueryInventoryText,
   ) {}
 
   async handle(
@@ -176,6 +185,65 @@ export class LifeOsHttpHandler {
     return this.handleError(error);
   }
 }
+    if (route.kind === "inventory-query") {
+      if (method !== "GET") {
+        return this.methodNotAllowed();
+      }
+
+      if (!this.queryInventoryText) {
+        return this.json(500, {
+          error: {
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              "Inventory query executor is not configured",
+          },
+        });
+      }
+
+      const url =
+        new URL(
+          request.url,
+          "http://localhost",
+        );
+
+      const text =
+        url.searchParams.get("text");
+
+      if (!text) {
+        return this.json(400, {
+          error: {
+            code: "INVALID_REQUEST",
+            message:
+              "text query parameter is required",
+          },
+        });
+      }
+
+      const result =
+        await this.queryInventoryText.execute({
+          text,
+          workspaceId:
+            route.workspaceId,
+        });
+
+      if (!result) {
+        return this.json(400, {
+          error: {
+            code: "INVALID_REQUEST",
+            message:
+              "Could not resolve inventory query",
+          },
+        });
+      }
+
+      return this.json(200, {
+        module: "inventory",
+        action: "query",
+        data: result,
+      });
+    }
+
+
     if (method !== "POST") {
       return this.methodNotAllowed();
     }
@@ -231,6 +299,25 @@ export class LifeOsHttpHandler {
             workspaceId,
           };
     }
+
+    const queryMatch = url.pathname.match(
+      /^\/api\/workspaces\/([^/]+)\/inventory\/query\/?$/,
+    );
+
+    if (queryMatch) {
+      const workspaceId =
+        this.decodeWorkspaceId(queryMatch[1]);
+
+      return workspaceId === null
+        ? {
+            kind: "not-found",
+          }
+        : {
+            kind: "inventory-query",
+            workspaceId,
+          };
+    }
+
 
     const commandMatch = url.pathname.match(
       /^\/api\/workspaces\/([^/]+)\/inventory\/commands\/?$/,
