@@ -35,6 +35,19 @@ function createExecutor() {
   };
 }
 
+function createQueryExecutor() {
+  return {
+    execute: vi.fn()
+      .mockResolvedValue([
+        {
+          canonicalName: "계란",
+          quantity: 57,
+          unit: "개",
+        },
+      ]),
+  };
+}
+
 function createPurchaseCommand(
   workspaceId = "workspace-001",
 ): InventoryCommand {
@@ -143,6 +156,51 @@ describe("LifeOsHttpHandler", () => {
       workspaceId: "workspace-001",
     });
   });
+
+  it("queries inventory through natural language query route", async () => {
+    const router = createRouter();
+
+    const queryInventoryText =
+      createQueryExecutor();
+
+    const handler =
+      new LifeOsHttpHandler(
+        router,
+        undefined,
+        undefined,
+        queryInventoryText,
+      );
+
+    const response = await handler.handle({
+      method: "GET",
+      url:
+        "/api/workspaces/workspace-001/inventory/query?text=%EA%B3%84%EB%9E%80",
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    expect(
+      JSON.parse(response.body),
+    ).toEqual({
+      module: "inventory",
+      action: "query",
+      data: [
+        {
+          canonicalName: "계란",
+          quantity: 57,
+          unit: "개",
+        },
+      ],
+    });
+
+    expect(
+      queryInventoryText.execute,
+    ).toHaveBeenCalledWith({
+      text: "계란",
+      workspaceId: "workspace-001",
+    });
+  });
+
 
   it("returns 404 for an unknown route", async () => {
     const router = createRouter();
