@@ -1,9 +1,12 @@
 import { Pool } from "pg";
 
 import { ExecuteInventoryCommand } from "./application/execute-inventory-command.js";
-import { QueryInventoryText } from "./application/query-inventory-text.js";
 import { ExecuteInventoryText } from "./application/execute-inventory-text.js";
 import { RuleInventoryCommandParser } from "./household-supplies/parser/rule-inventory-command-parser.js";
+import { LlmInventoryCommandParser } from "./household-supplies/parser/llm-inventory-command-parser.js";
+import { PostgresProductResolver } from "./infrastructure/postgres/postgres-product-resolver.js";
+import { PostgresUnitConversionResolver } from "./infrastructure/postgres/postgres-unit-conversion-resolver.js";
+
 import { GetInventory } from "./application/get-inventory.js";
 import { GetKnowledgeDocuments } from "./application/get-knowledge-documents.js";
 import { LifeOsModuleRouter } from "./application/life-os-module-router.js";
@@ -13,10 +16,9 @@ import { PostgresInventoryQueryStore } from "./infrastructure/postgres/postgres-
 import { PostgresKnowledgeDocumentStore } from "./infrastructure/postgres/postgres-knowledge-document-store.js";
 import { PostgresProcessedCommandStore } from "./infrastructure/postgres/postgres-processed-command-store.js";
 import { PostgresUnitOfWork } from "./infrastructure/postgres/postgres-unit-of-work.js";
-import { PostgresProductResolver } from "./infrastructure/postgres/postgres-product-resolver.js";
-import { PostgresUnitConversionResolver } from "./infrastructure/postgres/postgres-unit-conversion-resolver.js";
 import { LifeOsHttpHandler } from "./interfaces/http/life-os-http-handler.js";
 import { startNodeHttpServer } from "./interfaces/http/node-http-server.js";
+import { GeminiLlmClient } from "./infrastructure/llm/gemini-llm-client.js";
 
 const databaseUrl =
   process.env.DATABASE_URL;
@@ -72,14 +74,32 @@ const executeInventoryCommand =
     processedCommandStore,
   );
 
+const geminiApiKey =
+  process.env.GEMINI_API_KEY;
+
+if (!geminiApiKey) {
+  throw new Error(
+    "GEMINI_API_KEY environment variable is required",
+  );
+}
+
+const geminiClient =
+  new GeminiLlmClient(
+    geminiApiKey,
+    process.env.GEMINI_MODEL ??
+      "gemini-2.5-flash",
+  );
+
+const inventoryCommandParser =
+  new LlmInventoryCommandParser(
+    geminiClient,
+  );
+
 const productResolver =
   new PostgresProductResolver(pool);
 
 const unitConversionResolver =
   new PostgresUnitConversionResolver(pool);
-
-const inventoryCommandParser =
-  new RuleInventoryCommandParser();
 
 const executeInventoryText =
   new ExecuteInventoryText(
@@ -107,11 +127,6 @@ const getKnowledgeDocuments =
     knowledgeDocumentStore,
   );
 
-const queryInventoryText =
-  new QueryInventoryText(
-    getInventory,
-  );
-
 const moduleRouter =
   new LifeOsModuleRouter(
     getInventory,
@@ -123,7 +138,6 @@ const httpHandler =
     moduleRouter,
     executeInventoryCommand,
     executeInventoryText,
-    queryInventoryText,
   );
 
 const server =
