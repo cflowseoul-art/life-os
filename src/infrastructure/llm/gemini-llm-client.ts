@@ -51,8 +51,11 @@ export class GeminiLlmClient
       );
 
     if (!response.ok) {
+      const errorBody =
+        await response.text();
+
       throw new Error(
-        `Gemini API error: ${response.status}`,
+        `Gemini API error: ${response.status}\n${errorBody}`,
       );
     }
 

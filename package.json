@@ -16,6 +16,7 @@
     "db:seed": "bash scripts/db-seed.sh"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "pg": "^8.13.1",
     "zod": "^4.4.3"
   },
