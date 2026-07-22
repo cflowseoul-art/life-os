@@ -39,7 +39,13 @@ export class InventoryAnswerGenerator {
 
     return {
       message:
-        `현재 ${items.length}개의 재고가 있어요.`,
+        [
+          "현재 확인되는 재고:",
+          ...items.map(
+            (item) =>
+              `- ${item.canonicalName} ${item.quantity}${item.unit}`,
+          ),
+        ].join("\\n"),
       items,
     };
   }
