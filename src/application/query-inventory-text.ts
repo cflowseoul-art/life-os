@@ -2,7 +2,7 @@ import type {
   InventoryItemState,
 } from "../household-supplies/types.js";
 
-import {
+import type {
   InventoryQueryParser,
 } from "../household-supplies/parser/inventory-query-parser.js";
 
@@ -11,11 +11,9 @@ import type {
 } from "./get-inventory.js";
 
 export class QueryInventoryText {
-  private readonly parser =
-    new InventoryQueryParser();
-
   constructor(
     private readonly getInventory: GetInventory,
+    private readonly parser: InventoryQueryParser,
   ) {}
 
   async execute(
@@ -25,7 +23,7 @@ export class QueryInventoryText {
     },
   ): Promise<InventoryItemState[] | null> {
     const proposal =
-      this.parser.parse(
+      await this.parser.parse(
         input.text,
         input.workspaceId,
       );

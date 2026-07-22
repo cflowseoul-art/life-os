@@ -26,6 +26,8 @@ import { InventoryCapability } from "./application/capabilities/inventory-capabi
 import { AssistantService } from "./application/assistant/assistant-service.js";
 import { InventoryAssistantHandler } from "./application/assistant/inventory-assistant-handler.js";
 
+import { LlmInventoryQueryParser } from "./household-supplies/parser/llm-inventory-query-parser.js";
+
 
 const databaseUrl =
   process.env.DATABASE_URL;
@@ -137,9 +139,15 @@ const getInventory =
     inventoryQueryStore,
   );
 
+const inventoryQueryParser =
+  new LlmInventoryQueryParser(
+    geminiClient,
+  );
+
 const queryInventoryText =
   new QueryInventoryText(
     getInventory,
+    inventoryQueryParser,
   );
 
 const answerInventoryText =
@@ -157,6 +165,7 @@ const inventoryCapability =
 const inventoryAssistantHandler =
   new InventoryAssistantHandler(
     inventoryCapability,
+    inventoryQueryParser,
   );
 
 const assistantService =

@@ -1,4 +1,4 @@
-import {
+import type {
   InventoryQueryParser,
 } from "../../household-supplies/parser/inventory-query-parser.js";
 
@@ -10,20 +10,20 @@ import type {
   AssistantInput,
 } from "./assistant-service.js";
 
-export class InventoryAssistantHandler {
-  private readonly queryParser =
-    new InventoryQueryParser();
 
+export class InventoryAssistantHandler {
   constructor(
     private readonly inventoryCapability:
       InventoryCapability,
+    private readonly queryParser:
+      InventoryQueryParser,
   ) {}
 
   async handle(
     input: AssistantInput,
   ): Promise<unknown> {
     const queryProposal =
-      this.queryParser.parse(
+      await this.queryParser.parse(
         input.text,
         input.workspaceId,
       );

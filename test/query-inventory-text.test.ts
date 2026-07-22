@@ -1,3 +1,7 @@
+import type {
+  InventoryQueryParser,
+} from "../src/household-supplies/parser/inventory-query-parser.js";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { QueryInventoryText } from "../src/application/query-inventory-text.js";
@@ -26,6 +30,16 @@ describe("QueryInventoryText", () => {
     const service =
       new QueryInventoryText(
         getInventory,
+        {
+          parse: vi.fn().mockResolvedValue({
+            intent: "inventory_query",
+            targetPlugin: "household-supplies",
+            workspaceId: "workspace-1",
+            productName: "계란",
+            confidence: 1,
+            requiresClarification: false,
+          }),
+        } as InventoryQueryParser,
       );
 
     const result =
@@ -67,6 +81,16 @@ describe("QueryInventoryText", () => {
     const service =
       new QueryInventoryText(
         getInventory,
+        {
+          parse: vi.fn().mockResolvedValue({
+            intent: "inventory_query",
+            targetPlugin: "household-supplies",
+            workspaceId: "workspace-1",
+            productName: "우유",
+            confidence: 1,
+            requiresClarification: false,
+          }),
+        } as InventoryQueryParser,
       );
 
     const result =
@@ -113,6 +137,16 @@ describe("QueryInventoryText", () => {
     const service =
       new QueryInventoryText(
         getInventory,
+        {
+          parse: vi.fn().mockResolvedValue({
+            intent: "inventory_list",
+            targetPlugin: "household-supplies",
+            workspaceId: "workspace-1",
+            productName: null,
+            confidence: 1,
+            requiresClarification: false,
+          }),
+        } as InventoryQueryParser,
       );
 
     const result =
