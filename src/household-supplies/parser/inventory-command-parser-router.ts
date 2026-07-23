@@ -26,17 +26,61 @@ export class InventoryCommandParserRouter
         workspaceId,
       );
 
+    console.log("[RULE_RESULT]", ruleResult);
+
     if (
       ruleResult.intent !== null &&
       ruleResult.items.length > 0 &&
-      !ruleResult.requiresClarification
+      !ruleResult.requiresClarification &&
+      this.isReliableRuleResult(ruleResult)
     ) {
       return ruleResult;
     }
 
-    return this.llmParser.parse(
-      text,
-      workspaceId,
-    );
+    console.log("[ROUTER] FALLBACK_TO_LLM");
+
+    const llmResult =
+      await this.llmParser.parse(
+        text,
+        workspaceId,
+      );
+
+    console.log("[LLM_RESULT]", llmResult);
+
+    return llmResult;
+  }
+
+  private isReliableRuleResult(
+    result: CommandProposal,
+  ): boolean {
+    // Rule parser handles only simple single-item commands.
+    if (
+      result.items.length !== 1
+    ) {
+      return false;
+    }
+
+    const item =
+      result.items[0];
+
+    if (
+      item.rawName.includes("이랑") ||
+      item.rawName.includes("랑") ||
+      item.rawName.includes("하고")
+    ) {
+      return false;
+    }
+
+    if (
+      result.intent === "consume_inventory"
+    ) {
+      return (
+        item.quantity > 0 &&
+        !item.rawName.includes("다") &&
+        !item.rawName.includes("전부")
+      );
+    }
+
+    return true;
   }
 }

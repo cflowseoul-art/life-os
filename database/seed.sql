@@ -59,6 +59,80 @@ SET
   kind = EXCLUDED.kind,
   updated_at = now();
 
+
+INSERT INTO products (
+  id,
+  canonical_name,
+  base_unit
+)
+VALUES
+(
+  '44444444-4444-4444-8444-444444444444',
+  '계란',
+  '개'
+),
+(
+  '55555555-5555-4555-8555-555555555555',
+  '우유',
+  '개'
+)
+ON CONFLICT (id) DO UPDATE
+SET
+  canonical_name = EXCLUDED.canonical_name,
+  base_unit = EXCLUDED.base_unit,
+  updated_at = now();
+
+
+INSERT INTO product_aliases (
+  alias,
+  canonical_product_id
+)
+VALUES
+(
+  '계란',
+  '44444444-4444-4444-8444-444444444444'
+),
+(
+  '달걀',
+  '44444444-4444-4444-8444-444444444444'
+),
+(
+  '특란',
+  '44444444-4444-4444-8444-444444444444'
+),
+(
+  '우유',
+  '55555555-5555-4555-8555-555555555555'
+)
+ON CONFLICT (alias) DO UPDATE
+SET
+  canonical_product_id = EXCLUDED.canonical_product_id;
+
+
+INSERT INTO unit_conversions (
+  canonical_product_id,
+  from_unit,
+  to_base_factor
+)
+VALUES
+(
+  '44444444-4444-4444-8444-444444444444',
+  '판',
+  30
+),
+(
+  '55555555-5555-4555-8555-555555555555',
+  '팩',
+  1
+)
+ON CONFLICT (
+  canonical_product_id,
+  from_unit
+)
+DO UPDATE
+SET
+  to_base_factor = EXCLUDED.to_base_factor;
+
 COMMIT;
 
 SELECT

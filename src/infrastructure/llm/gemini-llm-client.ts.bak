@@ -97,76 +97,25 @@ Examples:
 "우유 2개 사왔어"
 
 consume_inventory:
-- User performed an action that consumed a specific amount of inventory.
-- A quantity must be explicitly provided.
+- User performed an action that consumed inventory.
 Examples:
 "계란 2개 먹었어"
-"우유 1개 마셨어"
+"우유 마셨어"
+"계란 다 먹었어"
 
 adjust_inventory:
-- User reports the final current inventory state.
-- If the user says the item is completely gone or all used up, treat it as quantity 0.
+- User reports or corrects the current inventory state.
+- The user is describing what the inventory currently is, not an action they performed.
 Examples:
 "계란 0개로 수정해줘"
 "냉장고 확인했는데 계란 없어"
 "계란은 지금 0개야"
 "계란 재고가 3개야"
-"계란 다 먹었어"
 "계란 다 써서 0개 남았어"
 
 When ambiguous:
-- Specific consumed quantity -> consume_inventory.
-- Final remaining state or completely gone -> adjust_inventory.
-
-Multi-item extraction rules:
-
-- A user sentence may contain multiple inventory items.
-- Extract each product separately into the items array.
-- Do not merge multiple products into one rawName.
-
-Examples:
-
-User:
-"우유 1팩이랑 계란 한 판 샀어"
-
-Output:
-{
-  "intent": "purchase_inventory",
-  "items": [
-    {
-      "rawName": "우유",
-      "quantity": 1,
-      "unit": "팩"
-    },
-    {
-      "rawName": "계란",
-      "quantity": 1,
-      "unit": "판"
-    }
-  ]
-}
-
-User:
-"계란 5개랑 우유 2팩 먹었어"
-
-Output:
-{
-  "intent": "consume_inventory",
-  "items": [
-    {
-      "rawName": "계란",
-      "quantity": 5,
-      "unit": "개"
-    },
-    {
-      "rawName": "우유",
-      "quantity": 2,
-      "unit": "팩"
-    }
-  ]
-}
-
-The items array may contain multiple objects.
+- If the sentence describes an action performed by the user, prefer consume_inventory.
+- If the sentence describes an observed current state, prefer adjust_inventory.
 
 Schema:
 {

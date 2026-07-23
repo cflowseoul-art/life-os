@@ -80,7 +80,6 @@ export class InventoryAssistantHandler {
 
       return {
         message,
-        result: commandResult,
       };
     }
 

@@ -44,11 +44,21 @@ export class ExecuteInventoryText {
       actorId: string;
     },
   ): Promise<ExecutedResult | null> {
-    const proposal =
-      await this.parser.parse(
-        input.text,
-        input.workspaceId,
+    let proposal;
+
+    try {
+      proposal =
+        await this.parser.parse(
+          input.text,
+          input.workspaceId,
+        );
+    } catch (error) {
+      console.log(
+        "COMMAND PARSE FAILED",
+        error,
       );
+      return null;
+    }
 
     console.log("PARSER RESULT", proposal);
 
