@@ -280,3 +280,36 @@ CREATE INDEX IF NOT EXISTS knowledge_documents_content_hash_idx
   );
 
 COMMIT;
+CREATE TABLE IF NOT EXISTS assistant_interactions (
+  id UUID PRIMARY KEY,
+  workspace_id UUID NOT NULL
+    REFERENCES workspaces(id)
+    ON DELETE CASCADE,
+
+  input_text TEXT NOT NULL,
+
+  intent TEXT,
+  command_type TEXT,
+
+  success BOOLEAN NOT NULL,
+
+  response_time_ms INTEGER,
+
+  metadata JSONB,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS
+assistant_interactions_workspace_idx
+ON assistant_interactions (
+  workspace_id,
+  created_at
+);
+
+CREATE INDEX IF NOT EXISTS
+assistant_interactions_intent_idx
+ON assistant_interactions (
+  intent
+);
+

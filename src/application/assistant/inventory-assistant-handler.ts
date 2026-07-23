@@ -14,6 +14,10 @@ import type {
   AssistantInput,
 } from "./assistant-service.js";
 
+import type {
+  AssistantInteractionStore,
+} from "../assistant-interaction-store.js";
+
 
 export class InventoryAssistantHandler {
   constructor(
@@ -25,12 +29,17 @@ export class InventoryAssistantHandler {
 
     private readonly commandParser:
       InventoryCommandParser,
+
+    private readonly interactionStore:
+      AssistantInteractionStore,
   ) {}
 
 
   async handle(
     input: AssistantInput,
   ): Promise<unknown> {
+
+    const startedAt = Date.now();
 
     console.log(
       "[ASSISTANT_INPUT]",
@@ -82,6 +91,16 @@ export class InventoryAssistantHandler {
             : result.intent === "adjust_inventory"
               ? `${itemText}로 수정했어요.`
               : "재고를 변경했어요.";
+
+      await this.interactionStore.save({
+        workspaceId: input.workspaceId,
+        inputText: input.text,
+        intent: result.intent,
+        commandType: result.intent,
+        success: true,
+        responseTimeMs:
+          Date.now() - startedAt,
+      });
 
       return {
         message,

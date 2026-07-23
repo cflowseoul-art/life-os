@@ -34,6 +34,9 @@ describe("InventoryAssistantHandler", () => {
         inventoryCapability as any,
         {} as any,
         {} as any,
+        {
+          save: vi.fn(),
+        } as any,
       );
 
     const result =
@@ -44,7 +47,7 @@ describe("InventoryAssistantHandler", () => {
         actorId: "actor-1",
       });
 
-    expect(result.message)
+    expect((result as any).message)
       .toBe("계란 0개로 수정했어요.");
   });
 
@@ -85,6 +88,9 @@ describe("InventoryAssistantHandler", () => {
         inventoryCapability as any,
         queryParser as any,
         commandParser as any,
+        {
+          save: vi.fn(),
+        } as any,
       );
 
     const result =

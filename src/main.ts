@@ -25,6 +25,7 @@ import { GeminiLlmClient } from "./infrastructure/llm/gemini-llm-client.js";
 import { InventoryCapability } from "./application/capabilities/inventory-capability.js";
 import { AssistantService } from "./application/assistant/assistant-service.js";
 import { InventoryAssistantHandler } from "./application/assistant/inventory-assistant-handler.js";
+import { PostgresAssistantInteractionStore } from "./infrastructure/postgres/postgres-assistant-interaction-store.js";
 import { InventoryLanguageRouter } from "./application/assistant/inventory-language-router.js";
 import { InventoryIntentRouter } from "./application/assistant/inventory-intent-router.js";
 
@@ -164,6 +165,12 @@ const inventoryCapability =
     answerInventoryText,
   );
 
+const assistantInteractionStore =
+  new PostgresAssistantInteractionStore(
+    pool,
+  );
+
+
 const inventoryIntentRouter =
   new InventoryIntentRouter();
 
@@ -173,6 +180,7 @@ const inventoryAssistantHandler =
     inventoryCapability,
     inventoryQueryParser,
     inventoryCommandParser,
+    assistantInteractionStore,
   );
 
 const assistantService =
