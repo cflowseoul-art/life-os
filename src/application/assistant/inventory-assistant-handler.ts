@@ -61,7 +61,27 @@ export class InventoryAssistantHandler {
 
 
     if (commandResult !== null) {
-      return commandResult;
+      const itemText =
+        commandResult.items
+          .map(
+            (item) =>
+              `${item.canonicalName} ${item.quantity}${item.unit}`,
+          )
+          .join(", ");
+
+      const message =
+        commandResult.intent === "purchase_inventory"
+          ? `${itemText} 추가했어요.`
+          : commandResult.intent === "consume_inventory"
+            ? `${itemText} 사용했어요.`
+            : commandResult.intent === "adjust_inventory"
+              ? `${itemText}로 수정했어요.`
+              : "재고를 변경했어요.";
+
+      return {
+        message,
+        result: commandResult,
+      };
     }
 
 
