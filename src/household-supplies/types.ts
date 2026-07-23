@@ -3,7 +3,10 @@
 
 import type { EventEnvelope } from "../kernel/event.js";
 
-export type IntentName = "purchase_inventory" | "consume_inventory";
+export type IntentName =
+  | "purchase_inventory"
+  | "consume_inventory"
+  | "adjust_inventory";
 
 // Output of the parser: a proposal, never a state change (ADR-003).
 export type ProposedItem = {
@@ -61,13 +64,32 @@ type CommandBase = {
   items: InventoryLine[];
 };
 
-export type PurchaseInventoryCommand = CommandBase & { type: "PurchaseInventory" };
-export type ConsumeInventoryCommand = CommandBase & { type: "ConsumeInventory" };
-export type InventoryCommand = PurchaseInventoryCommand | ConsumeInventoryCommand;
+export type PurchaseInventoryCommand =
+  CommandBase & {
+    type: "PurchaseInventory";
+  };
+
+export type ConsumeInventoryCommand =
+  CommandBase & {
+    type: "ConsumeInventory";
+  };
+
+export type AdjustInventoryCommand =
+  CommandBase & {
+    type: "AdjustInventory";
+  };
+
+export type InventoryCommand =
+  | PurchaseInventoryCommand
+  | ConsumeInventoryCommand
+  | AdjustInventoryCommand;
 
 // One event per submission; the payload carries all product lines
 // (event-granularity correction to the Slice 01 design).
-export type InventoryEventType = "InventoryPurchased" | "InventoryConsumed";
+export type InventoryEventType =
+  | "InventoryPurchased"
+  | "InventoryConsumed"
+  | "InventoryAdjusted";
 export type InventoryEventPayload = { items: InventoryLine[] };
 export type InventoryEvent = EventEnvelope<InventoryEventPayload>;
 

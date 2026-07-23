@@ -90,11 +90,30 @@ export class ResolveInventoryProposal {
       });
     }
 
+    let commandType:
+      | "PurchaseInventory"
+      | "ConsumeInventory"
+      | "AdjustInventory";
+
+    switch (proposal.intent) {
+      case "purchase_inventory":
+        commandType = "PurchaseInventory";
+        break;
+
+      case "consume_inventory":
+        commandType = "ConsumeInventory";
+        break;
+
+      case "adjust_inventory":
+        commandType = "AdjustInventory";
+        break;
+
+      default:
+        return null;
+    }
+
     return {
-      type:
-        proposal.intent === "purchase_inventory"
-          ? "PurchaseInventory"
-          : "ConsumeInventory",
+      type: commandType,
       commandId: randomUUID(),
       idempotencyKey: randomUUID(),
       correlationId: randomUUID(),

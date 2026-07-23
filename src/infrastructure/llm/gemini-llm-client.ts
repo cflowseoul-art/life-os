@@ -87,10 +87,11 @@ Rules:
 - Do not include markdown.
 - Do not resolve products.
 - Do not convert units.
+- Use adjust_inventory when the user states the current inventory should be changed to a specific quantity.
 
 Schema:
 {
-  "intent": "purchase_inventory" | "consume_inventory" | null,
+  "intent": "purchase_inventory" | "consume_inventory" | "adjust_inventory" | null,
   "items": [
     {
       "rawName": string,

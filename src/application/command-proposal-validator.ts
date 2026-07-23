@@ -17,6 +17,7 @@ const commandProposalSchema =
       z.enum([
         "purchase_inventory",
         "consume_inventory",
+        "adjust_inventory",
       ])
       .nullable(),
 

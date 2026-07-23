@@ -35,6 +35,20 @@ inventoryCommandParserContract(
             requiresClarification: false,
           }),
 
+        "계란 0개로 수정해줘":
+          JSON.stringify({
+            intent: "adjust_inventory",
+            items: [
+              {
+                rawName: "계란",
+                quantity: 0,
+                unit: "개",
+              },
+            ],
+            confidence: 0.9,
+            requiresClarification: false,
+          }),
+
         "오늘 날씨 좋아":
           JSON.stringify({
             intent: null,

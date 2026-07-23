@@ -25,6 +25,8 @@ import { GeminiLlmClient } from "./infrastructure/llm/gemini-llm-client.js";
 import { InventoryCapability } from "./application/capabilities/inventory-capability.js";
 import { AssistantService } from "./application/assistant/assistant-service.js";
 import { InventoryAssistantHandler } from "./application/assistant/inventory-assistant-handler.js";
+import { InventoryLanguageRouter } from "./application/assistant/inventory-language-router.js";
+import { InventoryIntentRouter } from "./application/assistant/inventory-intent-router.js";
 
 import { LlmInventoryQueryParser } from "./household-supplies/parser/llm-inventory-query-parser.js";
 
@@ -162,10 +164,15 @@ const inventoryCapability =
     answerInventoryText,
   );
 
+const inventoryIntentRouter =
+  new InventoryIntentRouter();
+
+
 const inventoryAssistantHandler =
   new InventoryAssistantHandler(
     inventoryCapability,
     inventoryQueryParser,
+    inventoryCommandParser,
   );
 
 const assistantService =

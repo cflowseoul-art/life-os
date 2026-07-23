@@ -8,7 +8,8 @@ import { PostgresUnitOfWork } from "../src/infrastructure/postgres/postgres-unit
 function createStoredEvent(
   eventType:
     | "InventoryPurchased"
-    | "InventoryConsumed",
+    | "InventoryConsumed"
+    | "InventoryAdjusted",
 ): StoredInventoryEvent {
   return {
     seq: 42,
@@ -53,11 +54,25 @@ function createStoredEvent(
   };
 }
 
-function createMockDatabase() {
+function createMockDatabase(
+  rows: unknown[] = [],
+) {
   const query = vi.fn(
-    async (_sql: string, _parameters?: unknown[]) => ({
-      rows: [],
-    }),
+    async (sql: string, _parameters?: unknown[]) => {
+      if (
+        sql.includes(
+          "SELECT quantity",
+        )
+      ) {
+        return {
+          rows,
+        };
+      }
+
+      return {
+        rows: [],
+      };
+    },
   );
 
   const client = {
@@ -155,3 +170,40 @@ describe("PostgresInventoryProjector", () => {
     expect(parameters?.[3]).toBe(-30);
   });
 });
+  it("adjusts inventory to target quantity", async () => {
+    const database = createMockDatabase([
+      {
+        quantity: "117",
+      },
+    ]);
+
+    const unitOfWork =
+      new PostgresUnitOfWork(database.pool);
+
+    const projector =
+      new PostgresInventoryProjector();
+
+    await unitOfWork.transaction((tx) =>
+      projector.project(
+        tx,
+        createStoredEvent("InventoryAdjusted"),
+      ),
+    );
+
+    const projectionCalls =
+      database.query.mock.calls.filter(([sql]) =>
+        String(sql).includes(
+          "INSERT INTO inventory_items",
+        ),
+      );
+
+    const firstCall = projectionCalls[0];
+
+    if (!firstCall) {
+      throw new Error("Projection query not found");
+    }
+
+    const [, parameters] = firstCall;
+
+    expect(parameters?.[3]).toBe(-87);
+  });

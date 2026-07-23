@@ -101,16 +101,30 @@ export class ExecuteInventoryCommand {
   private toEventType(
     command: InventoryCommand,
   ): InventoryEventType {
-    return command.type === "PurchaseInventory"
-      ? "InventoryPurchased"
-      : "InventoryConsumed";
+    switch (command.type) {
+      case "PurchaseInventory":
+        return "InventoryPurchased";
+
+      case "ConsumeInventory":
+        return "InventoryConsumed";
+
+      case "AdjustInventory":
+        return "InventoryAdjusted";
+    }
   }
 
   private toIntent(
     command: InventoryCommand,
   ): IntentName {
-    return command.type === "PurchaseInventory"
-      ? "purchase_inventory"
-      : "consume_inventory";
+    switch (command.type) {
+      case "PurchaseInventory":
+        return "purchase_inventory";
+
+      case "ConsumeInventory":
+        return "consume_inventory";
+
+      case "AdjustInventory":
+        return "adjust_inventory";
+    }
   }
 }

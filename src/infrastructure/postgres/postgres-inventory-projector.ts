@@ -13,11 +13,44 @@ export class PostgresInventoryProjector
   ): Promise<void> {
     const client = getPostgresClient(tx);
 
-    const direction =
-      event.eventType === "InventoryPurchased" ? 1 : -1;
-
     for (const item of event.payload.items) {
-      const quantityChange = item.quantity * direction;
+      let quantityChange = 0;
+
+      switch (event.eventType) {
+        case "InventoryPurchased":
+          quantityChange = item.quantity;
+          break;
+
+        case "InventoryConsumed":
+          quantityChange = -item.quantity;
+          break;
+
+        case "InventoryAdjusted": {
+          const result =
+            await client.query(
+              `
+                SELECT quantity
+                FROM inventory_items
+                WHERE workspace_id = $1
+                  AND canonical_product_id = $2
+              `,
+              [
+                event.workspaceId,
+                item.canonicalProductId,
+              ],
+            );
+
+          const currentQuantity =
+            result.rows[0]
+              ? Number(result.rows[0].quantity)
+              : 0;
+
+          quantityChange =
+            item.quantity - currentQuantity;
+
+          break;
+        }
+      }
 
       await client.query(
         `
