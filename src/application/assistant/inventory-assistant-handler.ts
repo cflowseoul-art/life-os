@@ -60,9 +60,14 @@ export class InventoryAssistantHandler {
     );
 
 
-    if (commandResult !== null) {
+    if (
+      commandResult.status === "executed"
+    ) {
+      const result =
+        commandResult.result;
+
       const itemText =
-        commandResult.items
+        result.items
           .map(
             (item) =>
               `${item.canonicalName} ${item.quantity}${item.unit}`,
@@ -70,20 +75,19 @@ export class InventoryAssistantHandler {
           .join(", ");
 
       const message =
-        commandResult.intent === "purchase_inventory"
+        result.intent === "purchase_inventory"
           ? `${itemText} 추가했어요.`
-          : commandResult.intent === "consume_inventory"
+          : result.intent === "consume_inventory"
             ? `${itemText} 사용했어요.`
-            : commandResult.intent === "adjust_inventory"
+            : result.intent === "adjust_inventory"
               ? `${itemText}로 수정했어요.`
               : "재고를 변경했어요.";
 
       return {
         message,
+        result,
       };
     }
-
-
     const queryProposal =
       await this.queryParser.parse(
         input.text,

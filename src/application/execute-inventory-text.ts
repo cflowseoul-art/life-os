@@ -20,6 +20,20 @@ import type {
   ExecuteInventoryCommand,
 } from "./execute-inventory-command.js";
 
+type ExecuteTextResult =
+  | {
+      status: "executed";
+      result: ExecutedResult;
+    }
+  | {
+      status: "failed";
+      proposal?: unknown;
+      reason: string;
+    }
+  | {
+      status: "not_command";
+    };
+
 export class ExecuteInventoryText {
   private readonly resolver;
 
@@ -43,7 +57,7 @@ export class ExecuteInventoryText {
       householdId: string;
       actorId: string;
     },
-  ): Promise<ExecutedResult | null> {
+  ): Promise<ExecuteTextResult> {
     let proposal;
 
     try {
@@ -57,7 +71,9 @@ export class ExecuteInventoryText {
         "COMMAND PARSE FAILED",
         error,
       );
-      return null;
+      return {
+        status: "not_command",
+      };
     }
 
     console.log("PARSER RESULT", proposal);
@@ -75,13 +91,22 @@ export class ExecuteInventoryText {
 
     if (!command) {
       console.log("RESOLVE FAILED", proposal);
-      return null;
+
+      return {
+        status: "failed",
+        proposal,
+        reason: "resolve_failed",
+      };
     }
 
     console.log("COMMAND RESULT", command);
 
-    return this.executeInventoryCommand.execute(
-      command,
-    );
+    return {
+      status: "executed",
+      result:
+        await this.executeInventoryCommand.execute(
+          command,
+        ),
+    };
   }
 }

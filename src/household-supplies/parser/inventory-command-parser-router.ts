@@ -63,6 +63,10 @@ export class InventoryCommandParserRouter
     const item =
       result.items[0];
 
+    if (!item) {
+      return false;
+    }
+
     if (
       item.rawName.includes("이랑") ||
       item.rawName.includes("랑") ||

@@ -82,7 +82,8 @@ CREATE TABLE IF NOT EXISTS inventory_events (
     CHECK (
       event_type IN (
         'InventoryPurchased',
-        'InventoryConsumed'
+        'InventoryConsumed',
+        'InventoryAdjusted'
       )
     ),
   event_version INTEGER NOT NULL DEFAULT 1
