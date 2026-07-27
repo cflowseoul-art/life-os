@@ -19,6 +19,16 @@ import type {
 } from "../assistant-interaction-store.js";
 
 
+import type {
+  AssistantPatternStore,
+} from "../assistant-pattern-store.js";
+
+
+import type {
+  PatternCommandBuilder,
+} from "./pattern-command-builder.js";
+
+
 export class InventoryAssistantHandler {
   constructor(
     private readonly inventoryCapability:
@@ -32,6 +42,12 @@ export class InventoryAssistantHandler {
 
     private readonly interactionStore:
       AssistantInteractionStore,
+
+    private readonly patternStore:
+      AssistantPatternStore,
+
+    private readonly patternCommandBuilder:
+      PatternCommandBuilder,
   ) {}
 
 
@@ -40,6 +56,74 @@ export class InventoryAssistantHandler {
   ): Promise<unknown> {
 
     const startedAt = Date.now();
+
+    const pattern =
+      await this.patternStore.find({
+        workspaceId:
+          input.workspaceId,
+
+        inputText:
+          input.text,
+      });
+
+    if (
+      pattern &&
+      pattern.hitCount >= 3
+    ) {
+      console.log(
+        "[PATTERN_HIT]",
+        pattern,
+      );
+
+      console.log(
+        "[PATTERN_SCORE]",
+        pattern.hitCount,
+      );
+
+      const command =
+        this.patternCommandBuilder.build(
+          pattern,
+          {
+            workspaceId:
+              input.workspaceId,
+
+            householdId:
+              input.householdId,
+
+            actorId:
+              input.actorId,
+          },
+        );
+
+      if (command) {
+        console.log(
+          "[PATTERN_EXECUTE]",
+          command,
+        );
+
+        const executed =
+          await this.inventoryCapability.executeCommand(
+            command,
+          );
+
+        const itemText =
+          command.items
+            .map(
+              (item) =>
+                `${item.canonicalName} ${item.quantity}${item.unit}`,
+            )
+            .join(", ");
+
+        return {
+          message:
+            command.type === "AdjustInventory"
+              ? `${itemText}로 수정했어요.`
+              : `${itemText} 처리했어요.`,
+          result:
+            executed,
+        };
+      }
+    }
 
     console.log(
       "[ASSISTANT_INPUT]",
@@ -100,6 +184,42 @@ export class InventoryAssistantHandler {
         success: true,
         responseTimeMs:
           Date.now() - startedAt,
+      });
+
+      await this.patternStore.save({
+        workspaceId:
+          input.workspaceId,
+
+        inputText:
+          input.text,
+
+        intent:
+          result.intent,
+
+        commandType:
+          result.intent,
+
+        payload: {
+          intent:
+            result.intent,
+
+          items:
+            result.items.map(
+              (item) => ({
+                        rawName:
+                  item.canonicalName,
+
+                canonicalProductId:
+                  item.canonicalProductId,
+
+                quantity:
+                  item.quantity,
+
+                unit:
+                  item.unit,
+              }),
+            ),
+        },
       });
 
       return {

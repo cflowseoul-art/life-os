@@ -1,6 +1,3 @@
-import type {
-  InventoryItemState,
-} from "../household-supplies/types.js";
 
 import type {
   InventoryQueryParser,
@@ -8,6 +5,7 @@ import type {
 
 import type {
   GetInventory,
+  InventoryListItem,
 } from "./get-inventory.js";
 
 export class QueryInventoryText {
@@ -21,7 +19,7 @@ export class QueryInventoryText {
       text: string;
       workspaceId: string;
     },
-  ): Promise<InventoryItemState[] | null> {
+  ): Promise<InventoryListItem[] | null> {
     const proposal =
       await this.parser.parse(
         input.text,

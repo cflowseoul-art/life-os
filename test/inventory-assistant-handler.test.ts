@@ -37,6 +37,12 @@ describe("InventoryAssistantHandler", () => {
         {
           save: vi.fn(),
         } as any,
+        {
+          save: vi.fn(),
+        } as any,
+        {
+          build: vi.fn(),
+        } as any,
       );
 
     const result =
@@ -90,6 +96,12 @@ describe("InventoryAssistantHandler", () => {
         commandParser as any,
         {
           save: vi.fn(),
+        } as any,
+        {
+          save: vi.fn(),
+        } as any,
+        {
+          build: vi.fn(),
         } as any,
       );
 

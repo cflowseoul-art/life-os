@@ -26,8 +26,10 @@ import { InventoryCapability } from "./application/capabilities/inventory-capabi
 import { AssistantService } from "./application/assistant/assistant-service.js";
 import { InventoryAssistantHandler } from "./application/assistant/inventory-assistant-handler.js";
 import { PostgresAssistantInteractionStore } from "./infrastructure/postgres/postgres-assistant-interaction-store.js";
+import { PostgresAssistantPatternStore } from "./infrastructure/postgres/postgres-assistant-pattern-store.js";
 import { InventoryLanguageRouter } from "./application/assistant/inventory-language-router.js";
 import { InventoryIntentRouter } from "./application/assistant/inventory-intent-router.js";
+import { PatternCommandBuilder } from "./application/assistant/pattern-command-builder.js";
 
 import { LlmInventoryQueryParser } from "./household-supplies/parser/llm-inventory-query-parser.js";
 
@@ -163,12 +165,23 @@ const inventoryCapability =
     executeInventoryText,
     queryInventoryText,
     answerInventoryText,
+    executeInventoryCommand,
   );
 
 const assistantInteractionStore =
   new PostgresAssistantInteractionStore(
     pool,
   );
+
+
+const assistantPatternStore =
+  new PostgresAssistantPatternStore(
+    pool,
+  );
+
+
+const patternCommandBuilder =
+  new PatternCommandBuilder();
 
 
 const inventoryIntentRouter =
@@ -181,6 +194,8 @@ const inventoryAssistantHandler =
     inventoryQueryParser,
     inventoryCommandParser,
     assistantInteractionStore,
+    assistantPatternStore,
+    patternCommandBuilder,
   );
 
 const assistantService =

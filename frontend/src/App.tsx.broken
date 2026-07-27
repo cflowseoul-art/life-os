@@ -17,9 +17,6 @@ function App() {
   const [messages, setMessages] =
     useState<Message[]>([]);
 
-  const [isSending, setIsSending] =
-    useState(false);
-
   const suggestions = [
     {
       text: "냉장고에 뭐 있어?",
@@ -32,15 +29,17 @@ function App() {
     },
   ];
 
-  async function send(message?: string) {
-    const text =
-      message ?? input;
+  const [isSending, setIsSending] =
+    useState(false);
 
-    if (!text.trim() || isSending) {
+  async function send() {
+    if (!input.trim() || isSending) {
       return;
     }
 
     setIsSending(true);
+
+    const text = input;
 
     setMessages((prev) => [
       ...prev,
@@ -56,19 +55,14 @@ function App() {
       const result =
         await sendAssistantText(text);
 
-      console.log(
-        "ASSISTANT RESPONSE",
-        result,
-      );
-
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           text:
-            JSON.stringify(
-              result,
-            ),
+            result.data?.message ??
+            result.data?.status ??
+            "응답을 이해하지 못했습니다.",
         },
       ]);
     } finally {
@@ -91,9 +85,12 @@ function App() {
         Life OS
       </h1>
 
-      <main
+      <div
         style={{
           flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
         }}
       >
         {messages.length === 0 && (
@@ -105,12 +102,13 @@ function App() {
             <SuggestionCards
               suggestions={suggestions}
               onSelect={(text) => {
-                send(text);
+                setInput(text);
               }}
             />
           </>
         )}
 
+        <div>
         {messages.map(
           (message, index) => (
             <p key={index}>
@@ -124,7 +122,7 @@ function App() {
             </p>
           ),
         )}
-      </main>
+      </div>
 
       <div
         style={{
@@ -137,22 +135,23 @@ function App() {
           +
         </button>
 
-        <input
-          value={input}
-          onChange={(e) =>
-            setInput(e.target.value)
+      <input
+        value={input}
+        onChange={(e) =>
+          setInput(e.target.value)
+        }
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            send();
           }
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              send();
-            }
-          }}
-          placeholder="Life OS에게 말하기"
-          style={{
-            flex: 1,
-            padding: 12,
-          }}
-        />
+        }}
+        placeholder="Life OS에게 말하기"
+        style={{
+          width: "100%",
+          padding: 12,
+        }}
+      />
+
       </div>
     </div>
   );

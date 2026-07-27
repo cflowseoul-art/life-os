@@ -313,3 +313,37 @@ ON assistant_interactions (
   intent
 );
 
+
+CREATE TABLE IF NOT EXISTS assistant_patterns (
+  id UUID PRIMARY KEY,
+  workspace_id UUID NOT NULL
+    REFERENCES workspaces(id)
+    ON DELETE CASCADE,
+
+  input_text TEXT NOT NULL,
+
+  intent TEXT NOT NULL,
+  command_type TEXT NOT NULL,
+
+  payload JSONB NOT NULL,
+
+  hit_count INTEGER NOT NULL DEFAULT 1,
+
+  confidence NUMERIC NOT NULL DEFAULT 1,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (
+    workspace_id,
+    input_text
+  )
+);
+
+CREATE INDEX IF NOT EXISTS
+assistant_patterns_lookup_idx
+ON assistant_patterns (
+  workspace_id,
+  input_text
+);
+

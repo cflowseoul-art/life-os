@@ -1,4 +1,4 @@
-import type { InventoryItemState } from "../household-supplies/types.js";
+import type { InventoryListItem } from "./get-inventory.js";
 import type { KnowledgeDocument } from "../knowledge/types.js";
 
 export type LifeOsModuleRequest =
@@ -17,7 +17,7 @@ export type LifeOsModuleResult =
   | {
       module: "inventory";
       action: "list";
-      data: InventoryItemState[];
+      data: InventoryListItem[];
     }
   | {
       module: "knowledge";
@@ -28,7 +28,7 @@ export type LifeOsModuleResult =
 export interface InventoryReader {
   execute(
     workspaceId: string,
-  ): Promise<InventoryItemState[]>;
+  ): Promise<InventoryListItem[]>;
 }
 
 export interface KnowledgeDocumentReader {
