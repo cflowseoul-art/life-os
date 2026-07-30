@@ -18,6 +18,8 @@ const commandProposalSchema =
         "purchase_inventory",
         "consume_inventory",
         "adjust_inventory",
+        "clear_inventory",
+        "revert_last_receipt",
       ])
       .nullable(),
 

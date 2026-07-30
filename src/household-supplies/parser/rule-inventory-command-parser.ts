@@ -18,6 +18,7 @@ export class RuleInventoryCommandParser implements InventoryCommandParser {
     text: string,
     workspaceId: string,
   ): Promise<CommandProposal> {
+
     const normalized =
       this.normalizer.normalize(text);
 
@@ -48,6 +49,21 @@ export class RuleInventoryCommandParser implements InventoryCommandParser {
   private detectIntent(
     text: string,
   ): IntentName | null {
+
+    if (
+      /영수증/.test(text) &&
+      /(취소|되돌|잘못)/.test(text)
+    ) {
+      return "revert_last_receipt";
+    }
+
+    if (
+      /냉장고/.test(text) &&
+      /(비워|정리|다비워)/.test(text)
+    ) {
+      return "clear_inventory";
+    }
+
     if (
       /(샀|구매|사왔|구입)/.test(text)
     ) {

@@ -78,6 +78,26 @@ export class ExecuteInventoryText {
 
     console.log("PARSER RESULT", proposal);
 
+    if (
+      proposal.intent === "revert_last_receipt"
+    ) {
+      return {
+        status: "failed",
+        proposal,
+        reason: "revert_last_receipt_pending",
+      };
+    }
+
+    if (
+      proposal.intent === "clear_inventory"
+    ) {
+      return {
+        status: "failed",
+        proposal,
+        reason: "clear_inventory_pending",
+      };
+    }
+
     const command =
       await this.resolver.execute(
         proposal,

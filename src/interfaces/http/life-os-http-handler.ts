@@ -19,6 +19,13 @@ import type {
 import type {
   QueryInventoryText,
 } from "../../application/query-inventory-text.js";
+
+import type {
+  ReceiptAnalyzer,
+} from "../../application/receipt/receipt-analyzer.js";
+import type {
+  ExecuteReceiptInventory,
+} from "../../application/receipt/execute-receipt-inventory.js";
 export type HttpRequest = {
   method: string;
   url: string;
@@ -74,6 +81,10 @@ type MatchedRoute =
       workspaceId: string;
     }
   | {
+      kind: "receipt-analyze";
+      workspaceId: string;
+    }
+  | {
       kind: "not-found";
     };
 
@@ -93,6 +104,8 @@ export class LifeOsHttpHandler {
     private readonly executeInventoryText?: ExecuteInventoryText,
     private readonly queryInventoryText?: InventoryTextQueryExecutor,
     private readonly assistantService?: AssistantService,
+    private readonly receiptAnalyzer?: ReceiptAnalyzer,
+    private readonly executeReceiptInventory?: ExecuteReceiptInventory,
   ) {}
 
   async handle(
@@ -312,6 +325,78 @@ export class LifeOsHttpHandler {
     }
 
 
+    if (route.kind === "receipt-analyze") {
+      if (method !== "POST") {
+        return this.methodNotAllowed();
+      }
+
+      if (!this.receiptAnalyzer) {
+        return this.json(500, {
+          error: {
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Receipt analyzer is not configured",
+          },
+        });
+      }
+
+      const body =
+        this.parseJsonBody(request.body);
+
+      const result =
+        await this.receiptAnalyzer.analyze({
+          imageBase64: this.requireString(
+            body,
+            "imageBase64",
+          ),
+          mimeType: this.requireString(
+            body,
+            "mimeType",
+          ),
+        });
+
+
+      console.log(
+        "RECEIPT EXECUTOR?",
+        Boolean(this.executeReceiptInventory),
+      );
+
+      let inventorySaved = false;
+
+      if (this.executeReceiptInventory) {
+        try {
+          await this.executeReceiptInventory.execute({
+            items: result.items,
+            workspaceId: route.workspaceId,
+            householdId: this.requireString(
+              body,
+              "householdId",
+            ),
+            actorId: this.requireString(
+              body,
+              "actorId",
+            ),
+          });
+
+          inventorySaved = true;
+        } catch (error) {
+          console.error(
+            "RECEIPT INVENTORY SAVE FAILED",
+            error,
+          );
+        }
+      }
+
+      return this.json(200, {
+        module: "receipt",
+        action: "analyzed",
+        data: {
+          ...result,
+          inventorySaved,
+        },
+      });
+    }
+
+
     if (method !== "POST") {
       return this.methodNotAllowed();
     }
@@ -404,6 +489,22 @@ export class LifeOsHttpHandler {
           };
     }
 
+
+    const receiptMatch = url.pathname.match(
+      /^\/api\/workspaces\/([^/]+)\/receipt\/analyze\/?$/,
+    );
+
+    if (receiptMatch) {
+      const workspaceId =
+        this.decodeWorkspaceId(receiptMatch[1]);
+
+      return workspaceId === null
+        ? { kind: "not-found" }
+        : {
+            kind: "receipt-analyze",
+            workspaceId,
+          };
+    }
 
     const commandMatch = url.pathname.match(
       /^\/api\/workspaces\/([^/]+)\/inventory\/commands\/?$/,
@@ -630,6 +731,24 @@ export class LifeOsHttpHandler {
         `items[${index}]`,
       ),
     };
+  }
+
+  private parseJsonBody(
+    body?: string,
+  ): Record<string, unknown> {
+    if (!body) {
+      throw new InvalidRequestError(
+        "Request body is required",
+      );
+    }
+
+    try {
+      return JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      throw new InvalidRequestError(
+        "Request body must be valid JSON",
+      );
+    }
   }
 
   private requireString(

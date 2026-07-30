@@ -39,3 +39,33 @@ export async function sendAssistantText(
 }
 
 
+
+export async function analyzeReceipt(
+  imageBase64: string,
+  mimeType: string,
+) {
+  const response =
+    await fetch(
+      `${API_BASE_URL}/api/workspaces/${WORKSPACE_ID}/receipt/analyze`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageBase64,
+          mimeType,
+          householdId: HOUSEHOLD_ID,
+          actorId: ACTOR_ID,
+        }),
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Receipt API Error: ${response.status}`,
+    );
+  }
+
+  return response.json();
+}

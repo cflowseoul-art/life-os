@@ -48,6 +48,12 @@ export class ExecuteInventoryCommand {
         event,
       );
 
+      console.log(
+        "[PROJECT_EVENT]",
+        storedEvent.eventType,
+        storedEvent.payload,
+      );
+
       await this.inventoryProjector.project(
         tx,
         storedEvent,
@@ -92,7 +98,8 @@ export class ExecuteInventoryCommand {
         items: command.items,
       },
       metadata: {
-        source: "text",
+        source:
+          command.sourceType ?? "text",
         confidence: 1,
       },
     };
@@ -125,6 +132,9 @@ export class ExecuteInventoryCommand {
 
       case "AdjustInventory":
         return "adjust_inventory";
+
+      case "ConsumeInventory":
+        return "consume_inventory";
     }
   }
 }

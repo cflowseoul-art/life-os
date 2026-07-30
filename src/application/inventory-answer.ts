@@ -45,7 +45,7 @@ export class InventoryAnswerGenerator {
             (item) =>
               `- ${item.canonicalName} ${item.quantity}${item.unit}`,
           ),
-        ].join("\\n"),
+        ].join("\n"),
       items,
     };
   }

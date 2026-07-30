@@ -14,7 +14,7 @@ export type NodeHttpServerOptions = {
   port: number;
 };
 
-const maximumBodyBytes = 1_048_576;
+const maximumBodyBytes = 5_242_880;
 
 async function readRequestBody(
   request: IncomingMessage,
@@ -88,7 +88,9 @@ export async function startNodeHttpServer(
         );
 
         response.end(result.body);
-      } catch {
+      } catch (error) {
+        console.error(error);
+
         response.writeHead(500, {
           "content-type":
             "application/json; charset=utf-8",

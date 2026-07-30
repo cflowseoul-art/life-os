@@ -43,6 +43,7 @@ describe("LifeOsModuleRouter", () => {
         valueType:
           "explicit_quantity" as const,
         freshnessStatus: "fresh" as const,
+        label: "NEW" as const,
         lastSeq: 1,
       },
     ];

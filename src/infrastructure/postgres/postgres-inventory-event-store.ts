@@ -96,4 +96,66 @@ export class PostgresInventoryEventStore
       seq,
     };
   }
+
+  async findLatestPurchase(
+    tx: Tx,
+    workspaceId: string,
+  ): Promise<StoredInventoryEvent | null> {
+    const client = getPostgresClient(tx);
+
+    const result =
+      await client.query(
+        `
+        SELECT
+          seq,
+          event_id,
+          event_type,
+          event_version,
+          aggregate_type,
+          aggregate_id,
+          household_id,
+          workspace_id,
+          actor_id,
+          occurred_at,
+          correlation_id,
+          command_id,
+          idempotency_key,
+          payload,
+          metadata
+        FROM inventory_events
+        WHERE workspace_id = $1
+          AND event_type = 'InventoryPurchased'
+        ORDER BY seq DESC
+        LIMIT 1
+        `,
+        [
+          workspaceId,
+        ],
+      );
+
+    const row = result.rows[0];
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      seq: Number(row.seq),
+      eventId: row.event_id,
+      eventType: row.event_type,
+      eventVersion: row.event_version,
+      aggregateType: row.aggregate_type,
+      aggregateId: row.aggregate_id,
+      householdId: row.household_id,
+      workspaceId: row.workspace_id,
+      actorId: row.actor_id,
+      occurredAt: row.occurred_at,
+      correlationId: row.correlation_id,
+      commandId: row.command_id,
+      idempotencyKey: row.idempotency_key,
+      payload: row.payload,
+      metadata: row.metadata,
+    };
+  }
+
 }

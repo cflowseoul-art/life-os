@@ -84,7 +84,10 @@ describe("GetInventory", () => {
 
     const result = await service.execute(workspaceId);
 
-    expect(result).toEqual(items);
+    expect(result).toEqual([
+      { ...items[0], label: "NEW" },
+      { ...items[1], label: "NEW" },
+    ]);
 
     expect(
       dependencies.getTransactionCallCount(),

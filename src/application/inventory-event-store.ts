@@ -10,4 +10,9 @@ export interface InventoryEventStore {
     tx: Tx,
     event: InventoryEvent,
   ): Promise<StoredInventoryEvent>;
+
+  findLatestPurchase(
+    tx: Tx,
+    workspaceId: string,
+  ): Promise<StoredInventoryEvent | null>;
 }

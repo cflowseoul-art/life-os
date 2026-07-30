@@ -6,7 +6,9 @@ import type { EventEnvelope } from "../kernel/event.js";
 export type IntentName =
   | "purchase_inventory"
   | "consume_inventory"
-  | "adjust_inventory";
+  | "adjust_inventory"
+  | "clear_inventory"
+  | "revert_last_receipt";
 
 // Output of the parser: a proposal, never a state change (ADR-003).
 export type ProposedItem = {
@@ -62,6 +64,7 @@ type CommandBase = {
   workspaceId: string;
   actorId: string;
   items: InventoryLine[];
+  sourceType?: "text" | "receipt";
 };
 
 export type PurchaseInventoryCommand =

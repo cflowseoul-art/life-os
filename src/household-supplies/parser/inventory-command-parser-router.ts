@@ -29,6 +29,13 @@ export class InventoryCommandParserRouter
     console.log("[RULE_RESULT]", ruleResult);
 
     if (
+      ruleResult.intent === "revert_last_receipt" ||
+      ruleResult.intent === "clear_inventory"
+    ) {
+      return ruleResult;
+    }
+
+    if (
       ruleResult.intent !== null &&
       ruleResult.items.length > 0 &&
       !ruleResult.requiresClarification &&

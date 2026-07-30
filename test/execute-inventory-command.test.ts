@@ -79,6 +79,10 @@ function createDependencies() {
         seq: 1,
       }),
     ),
+
+    findLatestPurchase: vi.fn(
+      async () => null,
+    ),
   };
 
   const inventoryProjector: InventoryProjector = {

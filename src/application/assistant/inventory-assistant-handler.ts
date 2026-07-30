@@ -28,6 +28,10 @@ import type {
   PatternCommandBuilder,
 } from "./pattern-command-builder.js";
 
+import type {
+  RevertLastReceipt,
+} from "../revert-last-receipt.js";
+
 
 export class InventoryAssistantHandler {
   constructor(
@@ -48,6 +52,9 @@ export class InventoryAssistantHandler {
 
     private readonly patternCommandBuilder:
       PatternCommandBuilder,
+
+    private readonly revertLastReceipt:
+      RevertLastReceipt,
   ) {}
 
 
@@ -131,6 +138,7 @@ export class InventoryAssistantHandler {
     );
 
 
+
     const commandResult =
       await this.inventoryCapability.executeText({
         text:
@@ -152,6 +160,48 @@ export class InventoryAssistantHandler {
       commandResult,
     );
 
+    if (
+      commandResult.status === "failed" &&
+      commandResult.reason === "revert_last_receipt_pending"
+    ) {
+      console.log(
+        "[REVERT_HANDLER_ENTER]",
+      );
+
+      const result =
+        await this.revertLastReceipt.execute({
+          workspaceId:
+            input.workspaceId,
+
+          householdId:
+            input.householdId,
+
+          actorId:
+            input.actorId,
+        });
+
+      console.log(
+        "[REVERT_RESULT]",
+        result,
+      );
+
+      return {
+        message:
+          result.message,
+      };
+    }
+
+
+
+    if (
+      commandResult.status === "failed" &&
+      commandResult.reason === "clear_inventory_pending"
+    ) {
+      return {
+        message:
+          "냉장고 비우기 기능을 준비 중이에요.",
+      };
+    }
 
     if (
       commandResult.status === "executed"
@@ -169,7 +219,7 @@ export class InventoryAssistantHandler {
 
       const message =
         result.intent === "purchase_inventory"
-          ? `${itemText} 추가했어요.`
+          ? `${result.items.length}개의 상품이 추가되었습니다.`
           : result.intent === "consume_inventory"
             ? `${itemText} 사용했어요.`
             : result.intent === "adjust_inventory"
@@ -227,25 +277,57 @@ export class InventoryAssistantHandler {
         result,
       };
     }
-    const queryProposal =
-      await this.queryParser.parse(
-        input.text,
-        input.workspaceId,
-      );
 
+      if (
+        commandResult.status === "failed"
+      ) {
+        let earlyQueryProposal;
 
-    console.log(
-      "[QUERY_PROPOSAL]",
-      queryProposal,
-    );
+        try {
+          earlyQueryProposal =
+            await this.queryParser.parse(
+              input.text,
+              input.workspaceId,
+            );
+        } catch (error) {
+          console.log(
+            "[QUERY_PARSE_SKIPPED]",
+            error,
+          );
 
+          earlyQueryProposal = null;
+        }
 
-    return this.inventoryCapability.answerText({
-      text:
-        input.text,
+        if (
+          earlyQueryProposal &&
+          (
+            earlyQueryProposal.intent === "inventory_list" ||
+            earlyQueryProposal.intent === "inventory_query"
+          )
+        ) {
+          return this.inventoryCapability.answerText({
+            text: input.text,
+            workspaceId: input.workspaceId,
+          });
+        }
+      }
 
-      workspaceId:
-        input.workspaceId,
-    });
+      const answer =
+        await this.inventoryCapability.answerText({
+          text:
+            input.text,
+
+          workspaceId:
+            input.workspaceId,
+        });
+
+      return {
+        message:
+          answer?.message ??
+          "확인되는 재고가 없어요.",
+
+        result:
+          answer,
+      };
   }
 }

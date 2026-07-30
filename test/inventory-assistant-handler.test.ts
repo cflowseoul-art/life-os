@@ -36,12 +36,18 @@ describe("InventoryAssistantHandler", () => {
         {} as any,
         {
           save: vi.fn(),
+          find: vi.fn().mockResolvedValue(null),
         } as any,
         {
           save: vi.fn(),
+          find: vi.fn().mockResolvedValue(null),
         } as any,
         {
           build: vi.fn(),
+        } as any,
+
+        {
+          execute: vi.fn(),
         } as any,
       );
 
@@ -96,12 +102,18 @@ describe("InventoryAssistantHandler", () => {
         commandParser as any,
         {
           save: vi.fn(),
+          find: vi.fn().mockResolvedValue(null),
         } as any,
         {
           save: vi.fn(),
+          find: vi.fn().mockResolvedValue(null),
         } as any,
         {
           build: vi.fn(),
+        } as any,
+
+        {
+          execute: vi.fn(),
         } as any,
       );
 
