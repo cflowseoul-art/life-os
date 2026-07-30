@@ -7,3 +7,4 @@ dist/
 backups/
 lifeos_audit.txt
 *.log
+.vscode/
