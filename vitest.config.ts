@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 // a single shared database, so parallelism is disabled up front.
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "core/**/*.test.ts"],
     fileParallelism: false,
     sequence: { concurrent: false },
     testTimeout: 30_000,
