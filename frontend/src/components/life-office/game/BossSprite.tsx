@@ -349,7 +349,7 @@ function BossSpriteComponent({
       {!isAway && (
         <pixiContainer y={-63} scale={0.5}>
           <pixiText
-            text="Claude"
+            text="한매니저"
             anchor={0.5}
             style={{
               fontFamily: "monospace",
@@ -438,7 +438,7 @@ function MobileBossComponent({
       {/* Boss label */}
       <pixiContainer y={-63} scale={0.5}>
         <pixiText
-          text="Claude"
+          text="한매니저"
           anchor={0.5}
           style={{
             fontFamily: "monospace",

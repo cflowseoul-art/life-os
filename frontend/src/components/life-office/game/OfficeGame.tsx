@@ -316,7 +316,7 @@ export function OfficeGame(): ReactNode {
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={1}
+        minScale={0.6}
         maxScale={3}
         centerZoomedOut={false}
         limitToBounds={false}
