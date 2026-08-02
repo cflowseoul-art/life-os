@@ -21,9 +21,9 @@ const WALL_TRIM_HEIGHT = 10;
 const FLOOR_TILE_SIZE = 100;
 
 // Colors
-const FLOOR_COLOR = 0x2a2a2a;
-const WALL_COLOR = 0x3d3d3d;
-const WALL_TRIM_COLOR = 0x4a4a4a;
+const FLOOR_COLOR = 0xdedbd4; // --co-room, one shade down
+const WALL_COLOR = 0xcfcbc3;
+const WALL_TRIM_COLOR = 0xbdb8ae;
 
 // ============================================================================
 // TYPES
@@ -42,7 +42,7 @@ interface TileData {
 
 // Tint colors for checkerboard effect
 const TILE_TINT_LIGHT = 0xffffff; // No tint
-const TILE_TINT_DARK = 0xd8d8d8; // Slightly darker
+const TILE_TINT_DARK = 0xe6e4df; // Slightly darker
 
 // ============================================================================
 // DRAWING FUNCTION

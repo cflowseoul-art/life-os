@@ -20,7 +20,7 @@ export const CANVAS_WIDTH = 512;
 export const CANVAS_HEIGHT = 1536;
 
 /** Background color of the canvas (dark gray) */
-export const BACKGROUND_COLOR = 0x1a1a1a;
+export const BACKGROUND_COLOR = 0xe8e6e1; // --co-room
 
 // ============================================================================
 // WALL DECORATIONS — from `constants/positions.ts`

@@ -1,0 +1,34 @@
+/* One company, one design language.
+   Shared by the representative's computer and the office it looks into.
+   Tokens only — no component styling lives here. */
+
+:root {
+  /* Surfaces */
+  --co-paper: #ffffff;
+  --co-sunk: #f2f2f0;
+  --co-room: #e8e6e1;
+
+  /* Ink */
+  --co-ink: #1b1c1e;
+  --co-ink-2: #55585e;
+  --co-ink-3: #83868c;
+  --co-line: #e4e3e0;
+
+  /* One restrained accent, one mark for judgement */
+  --co-accent: #2f4a63;
+  --co-accent-soft: #eaeef2;
+  --co-on-accent: #ffffff;
+  --co-mark: #9a6f28;
+  --co-ok: #3d6b52;
+  --co-stop: #9c4630;
+
+  /* Type — one sans family everywhere */
+  --co-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+    "Segoe UI", Roboto, sans-serif;
+
+  /* Rhythm */
+  --co-gutter: 16px;
+  --co-radius: 8px;
+  --co-radius-pill: 20px;
+  --co-radius-pixel: 4px;
+}

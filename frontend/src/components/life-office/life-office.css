@@ -1,16 +1,19 @@
+@import "../../styles/company.css";
+
 /* Life Office control tower — plain CSS, no build plugins, no assets. */
 
 .lo-root {
-  --lo-bg: #0f1420;
-  --lo-panel: #171d2b;
-  --lo-panel-soft: #1e2536;
-  --lo-line: #2b3550;
-  --lo-text: #e8ecf6;
-  --lo-muted: #94a0bb;
-  --lo-accent: #6ea8ff;
-  --lo-ok: #4ecf9a;
-  --lo-warn: #ffc35c;
-  --lo-stop: #ff7a7a;
+  /* Same company, next room. */
+  --lo-bg: var(--co-room);
+  --lo-panel: var(--co-paper);
+  --lo-panel-soft: var(--co-sunk);
+  --lo-line: var(--co-line);
+  --lo-text: var(--co-ink);
+  --lo-muted: var(--co-ink-3);
+  --lo-accent: var(--co-accent);
+  --lo-ok: var(--co-ok);
+  --lo-warn: var(--co-mark);
+  --lo-stop: var(--co-stop);
 
   /* The host shell (#root) centers text and styles headings; neutralise that
      so the demo looks the same wherever it is mounted. */
@@ -26,7 +29,7 @@
   /* Korean copy should wrap at word boundaries, not mid-word. */
   word-break: keep-all;
   overflow-wrap: anywhere;
-  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  font-family: var(--co-font);
 }
 
 .lo-header {
@@ -62,7 +65,7 @@
   border: 1px solid var(--lo-line);
   background: var(--lo-panel-soft);
   color: var(--lo-text);
-  border-radius: 10px;
+  border-radius: var(--co-radius);
   padding: 9px 16px;
   font-size: 14px;
   font-weight: 700;
@@ -81,13 +84,13 @@
 .lo-btn-primary {
   background: var(--lo-accent);
   border-color: var(--lo-accent);
-  color: #0b1220;
+  color: var(--co-on-accent);
 }
 
 .lo-btn-approve {
   background: var(--lo-ok);
   border-color: var(--lo-ok);
-  color: #06251a;
+  color: var(--co-on-accent);
 }
 
 .lo-btn-reject {
@@ -120,7 +123,7 @@
 .lo-panel {
   background: var(--lo-panel);
   border: 1px solid var(--lo-line);
-  border-radius: 14px;
+  border-radius: var(--co-radius);
   padding: 14px;
 }
 
@@ -254,7 +257,7 @@
   font-size: 10px;
   font-weight: 700;
   color: var(--lo-muted);
-  background: #171d2b;
+  background: var(--co-paper);
   border: 1px solid var(--lo-line);
   padding: 0 5px;
 }
@@ -290,7 +293,7 @@
   text-align: center;
   font-size: 12px;
   color: var(--lo-muted);
-  background: #171d2b;
+  background: var(--co-paper);
 }
 
 .lo-zone-label {
@@ -327,7 +330,7 @@
   transform: translate(-50%, -50%);
   z-index: 3;
   background: #fff;
-  color: #10182a;
+  color: var(--co-ink);
   font-weight: 800;
   font-size: 14px;
   padding: 10px 14px;
@@ -420,7 +423,7 @@
   border-radius: 999px;
   border: 1px solid var(--lo-line);
   color: var(--lo-muted);
-  background: #171d2b;
+  background: var(--co-paper);
 }
 
 .lo-badge-walking {
@@ -432,8 +435,8 @@
   border-color: var(--lo-warn);
 }
 .lo-badge-reviewing {
-  color: #d4a5ff;
-  border-color: #d4a5ff;
+  color: var(--co-accent);
+  border-color: var(--co-accent);
 }
 .lo-badge-done {
   color: var(--lo-ok);
@@ -513,7 +516,7 @@
   display: flex;
   gap: 10px;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--co-radius);
   border: 1px solid transparent;
 }
 
@@ -558,7 +561,7 @@
 .lo-approval {
   border: 1px solid var(--lo-warn);
   background: rgba(255, 195, 92, 0.08);
-  border-radius: 14px;
+  border-radius: var(--co-radius);
   padding: 12px 14px;
   margin-bottom: 16px;
 }
@@ -605,7 +608,7 @@
   margin: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #101624;
+  background: var(--co-sunk);
   border: 1px solid var(--lo-line);
   font-size: 11px;
   color: var(--lo-muted);
@@ -628,7 +631,7 @@
 .lo-stopped {
   border: 1px solid var(--lo-stop);
   background: rgba(255, 122, 122, 0.08);
-  border-radius: 14px;
+  border-radius: var(--co-radius);
   padding: 14px;
   margin-bottom: 16px;
   font-size: 13px;
@@ -718,21 +721,22 @@
   overflow: hidden;
   background: var(--lo-bg);
   color: var(--lo-text);
-  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  font-family: var(--co-font);
   word-break: keep-all;
   overflow-wrap: anywhere;
   text-align: left;
 
-  --lo-bg: #0f1420;
-  --lo-panel: #171d2b;
-  --lo-panel-soft: #1e2536;
-  --lo-line: #2b3550;
-  --lo-text: #e8ecf6;
-  --lo-muted: #94a0bb;
-  --lo-accent: #6ea8ff;
-  --lo-ok: #4ecf9a;
-  --lo-warn: #ffc35c;
-  --lo-stop: #ff7a7a;
+  /* Same company, next room. */
+  --lo-bg: var(--co-room);
+  --lo-panel: var(--co-paper);
+  --lo-panel-soft: var(--co-sunk);
+  --lo-line: var(--co-line);
+  --lo-text: var(--co-ink);
+  --lo-muted: var(--co-ink-3);
+  --lo-accent: var(--co-accent);
+  --lo-ok: var(--co-ok);
+  --lo-warn: var(--co-mark);
+  --lo-stop: var(--co-stop);
 }
 
 /* Positioning only — the stage's inner sizing is OfficeGame's business. */
@@ -765,7 +769,7 @@
   z-index: 15;
   background: rgba(23, 29, 43, 0.94);
   border: 1px solid var(--lo-line);
-  border-radius: 14px;
+  border-radius: var(--co-radius);
   display: flex;
   flex-direction: column;
   overscroll-behavior: contain;
@@ -822,7 +826,7 @@
   padding: 12px 18px;
   font: inherit;
   font-weight: 600;
-  color: #0b1020;
+  color: var(--co-on-accent);
   background: var(--lo-accent);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   cursor: pointer;

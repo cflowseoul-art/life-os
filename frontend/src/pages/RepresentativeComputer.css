@@ -1,23 +1,26 @@
 /* Representative Computer — mobile inbox presentation.
-   One sans family, one accent, mail-row density, floating compose. */
+   One sans family, one accent, mail-row density, floating compose.
+   Palette and rhythm come from the shared company tokens. */
+
+@import "../styles/company.css";
 
 .rc {
-  --bg: #ffffff;
-  --bg-sunk: #f2f2f0;
-  --ink: #1b1c1e;
-  --ink-2: #55585e;
-  --ink-3: #83868c;
-  --line: #e4e3e0;
-  --accent: #2f4a63;
-  --accent-soft: #eaeef2;
-  --mark: #9a6f28;
+  --bg: var(--co-paper);
+  --bg-sunk: var(--co-sunk);
+  --ink: var(--co-ink);
+  --ink-2: var(--co-ink-2);
+  --ink-3: var(--co-ink-3);
+  --line: var(--co-line);
+  --accent: var(--co-accent);
+  --accent-soft: var(--co-accent-soft);
+  --mark: var(--co-mark);
 
   min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
   /* Reading always starts at the left edge. Nothing on any screen is centered. */
   text-align: left;
-  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
+  font-family: var(--co-font);
   font-size: 15px;
   line-height: 1.5;
   overflow-x: hidden;
