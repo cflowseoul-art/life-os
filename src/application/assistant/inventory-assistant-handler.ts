@@ -305,10 +305,22 @@ export class InventoryAssistantHandler {
             earlyQueryProposal.intent === "inventory_query"
           )
         ) {
-          return this.inventoryCapability.answerText({
-            text: input.text,
-            workspaceId: input.workspaceId,
-          });
+          const answer =
+            await this.inventoryCapability.answerText({
+              text: input.text,
+              workspaceId: input.workspaceId,
+            });
+
+          return {
+            message:
+              answer?.message ??
+              "확인되는 재고가 없어요.",
+
+            data: {
+              module: "inventory",
+              ...answer,
+            },
+          };
         }
       }
 

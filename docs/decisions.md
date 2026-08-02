@@ -161,3 +161,44 @@ executed as a compensating event (never history deletion).
 
 **Reason:** The compensating-event model is already established; a full undo
 history and cross-session undo are not needed to prove the architecture.
+
+## ADR-019 — Prototypes live outside the architecture
+
+**Decision:** Non-production experiments live in a top-level `prototypes/`
+directory, outside Kernel, Application, Infrastructure, and Plugins. They contain
+no TypeScript, no schema, no routes, and no plugin registration, and are excluded
+from `tsconfig.json` (`include: ["src","test"]`) and `vitest.config.ts`. The first
+is `prototypes/resume-tailoring/` — a Markdown-only Claude Code workflow for
+JD-tailored resumes.
+
+**Reason:** `04-mvp.md` defers Resume until the Household Supplies slice is
+proven, and that deferral stands. A prototype that produces no production
+artifact is requirements discovery, not implementation — it can inform a future
+Resume Plugin's source-data schema, evidence traceability, and fact-check gate
+without committing the architecture to any of them.
+
+**Caveat:** `prototypes/` is not a fifth layer. Nothing in it may be lifted into
+`src/` as-is: it has no `householdId`, `workspaceId`, or `actorId`, it uses the
+filesystem as its store, and the AI writes its outputs directly — all of which
+violate `CLAUDE.md` rules that bind real commands and events. Promotion requires
+a normal plugin design.
+
+## ADR-020 — Office Engine as a frontend projection/renderer
+
+**Decision:** The Office Engine is a frontend projection and renderer capability
+that depicts activity. It consumes application-facing contracts only; Kernel,
+Application, Infrastructure, and plugins never depend on it. Its office state is
+a derived, disposable projection with no write path into Life OS. Every inbound
+fact and outbound intent carries `householdId`, `workspaceId`, `actorId`, and the
+event position/version it was projected from; ordering is by position, not
+timestamp. One office state per workspace, never merged. Outbound intent is a
+proposal the server validates, subject to ADR-003 and ADR-009.
+
+**Reason:** A visualization must not become a second source of truth. Confining it
+to contracts and proposals keeps ADR-001's dependency direction intact and lets the
+engine be removed without changing domain behavior.
+
+**Caveat:** An engine snapshot is a read-model snapshot, authoritative inside the
+engine only — never history, which remains the event log under ADR-002. Ambient
+readings carry freshness and confidence so a depiction cannot imply certainty the
+projection does not have.

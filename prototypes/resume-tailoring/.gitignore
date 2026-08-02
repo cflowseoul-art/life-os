@@ -1,0 +1,11 @@
+# Verified career data, pasted JDs, and run artifacts stay local.
+# Only workflow files, role definitions, and sanitized templates are tracked.
+
+source-data/*
+!source-data/.gitkeep
+
+inbox/*
+!inbox/.gitkeep
+
+output/*
+!output/.gitkeep

@@ -1,0 +1,703 @@
+/* Life Office control tower — plain CSS, no build plugins, no assets. */
+
+.lo-root {
+  --lo-bg: #0f1420;
+  --lo-panel: #171d2b;
+  --lo-panel-soft: #1e2536;
+  --lo-line: #2b3550;
+  --lo-text: #e8ecf6;
+  --lo-muted: #94a0bb;
+  --lo-accent: #6ea8ff;
+  --lo-ok: #4ecf9a;
+  --lo-warn: #ffc35c;
+  --lo-stop: #ff7a7a;
+
+  /* The host shell (#root) centers text and styles headings; neutralise that
+     so the demo looks the same wherever it is mounted. */
+  width: 100%;
+  flex: 1;
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--lo-bg);
+  color: var(--lo-text);
+  text-align: left;
+  letter-spacing: normal;
+  /* Korean copy should wrap at word boundaries, not mid-word. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+}
+
+.lo-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lo-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+  /* Host stylesheet gives h1 a 56px display face with tight tracking. */
+  font-family: inherit;
+  color: var(--lo-text);
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+}
+
+.lo-subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--lo-muted);
+}
+
+.lo-spacer {
+  flex: 1;
+}
+
+.lo-btn {
+  border: 1px solid var(--lo-line);
+  background: var(--lo-panel-soft);
+  color: var(--lo-text);
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lo-btn:hover:not(:disabled) {
+  border-color: var(--lo-accent);
+}
+
+.lo-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lo-btn-primary {
+  background: var(--lo-accent);
+  border-color: var(--lo-accent);
+  color: #0b1220;
+}
+
+.lo-btn-approve {
+  background: var(--lo-ok);
+  border-color: var(--lo-ok);
+  color: #06251a;
+}
+
+.lo-btn-reject {
+  background: transparent;
+  border-color: var(--lo-stop);
+  color: var(--lo-stop);
+}
+
+.lo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .lo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Grid/flex children default to min-width:auto, which lets the fixed-width
+   floor push the whole page wide instead of scrolling inside its container. */
+.lo-grid > *,
+.lo-panel,
+.lo-floor-scroll {
+  min-width: 0;
+}
+
+.lo-panel {
+  background: var(--lo-panel);
+  border: 1px solid var(--lo-line);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.lo-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lo-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+/* ---------- office floor ---------- */
+
+/* The scene has a fixed minimum size; below that it scrolls inside its own
+   container instead of squashing sprites into each other. */
+.lo-floor-scroll {
+  overflow-x: auto;
+}
+
+/* Pixel office: flat tiles, hard edges, no gradients on furniture. */
+.lo-floor {
+  position: relative;
+  min-width: 720px;
+  height: 520px;
+  border-radius: 4px;
+  border: 2px solid #303c58;
+  /* checkerboard floor tiles */
+  background:
+    repeating-conic-gradient(
+        #182131 0% 25%,
+        #141c2a 0% 50%
+      )
+      0 0 / 48px 48px;
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+
+/* --- back wall with city windows --- */
+.lo-wall {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 0 26px;
+  box-sizing: border-box;
+  background: #1d2536;
+  border-bottom: 4px solid #2b3550;
+}
+
+.lo-window {
+  width: 62px;
+  height: 40px;
+  background:
+    linear-gradient(#0d1b33 50%, #10233f 50%),
+    #0d1b33;
+  border: 3px solid #3b4a6b;
+  box-shadow: inset 0 0 0 2px #101827;
+}
+
+.lo-wall-clock {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #e8ecf6;
+  border: 3px solid #3b4a6b;
+}
+
+/* --- walking paths --- */
+.lo-path {
+  position: absolute;
+  background: #1f2a3d;
+  border-top: 2px solid #2b3550;
+  border-bottom: 2px solid #2b3550;
+}
+
+.lo-path-h {
+  left: 0;
+  right: 0;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
+.lo-path-v {
+  top: 76px;
+  bottom: 0;
+  width: 44px;
+  transform: translateX(-50%);
+  border: none;
+  border-left: 2px solid #2b3550;
+  border-right: 2px solid #2b3550;
+}
+
+/* --- stations --- */
+.lo-entrance,
+.lo-coffee {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  text-align: center;
+}
+
+.lo-door {
+  display: block;
+  width: 34px;
+  height: 52px;
+  margin: 0 auto;
+  background: #3f4d6e;
+  border: 3px solid #55688f;
+  box-shadow: inset -8px 0 0 -5px #8fa3c9;
+}
+
+.lo-machine {
+  display: block;
+  width: 34px;
+  height: 44px;
+  margin: 0 auto;
+  background: #2f3a52;
+  border: 3px solid #55688f;
+  box-shadow:
+    inset 0 10px 0 -4px #c98f5a,
+    inset 0 -10px 0 -6px #1a2233;
+}
+
+.lo-tag {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--lo-muted);
+  background: #171d2b;
+  border: 1px solid var(--lo-line);
+  padding: 0 5px;
+}
+
+.lo-meeting-table {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 96px;
+  background: #33405c;
+  border: 3px solid #4a5c85;
+  box-shadow: inset 0 0 0 4px #2a3550;
+}
+
+.lo-report-platform {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 128px;
+  height: 96px;
+  background: #24304a;
+  border: 3px dashed #4a5c85;
+}
+
+.lo-zone {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 124px;
+  box-sizing: border-box;
+  border: 2px solid var(--lo-line);
+  border-radius: 2px;
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--lo-muted);
+  background: #171d2b;
+}
+
+.lo-zone-label {
+  font-weight: 700;
+  color: var(--lo-text);
+  font-size: 13px;
+}
+
+.lo-zone-active {
+  border-style: solid;
+  border-color: var(--lo-accent);
+  box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.12);
+}
+
+/* A workstation card sized to hold the whole sprite stack, so an employee who
+   walks away leaves a visibly empty desk instead of a stray rectangle. */
+.lo-desk {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 104px;
+  height: 104px;
+  border-radius: 2px;
+  border: 3px solid #44557d;
+  background: #29344c;
+  /* desktop surface + monitor block */
+  box-shadow:
+    inset 0 0 0 4px #1e2739,
+    inset 0 26px 0 -14px #6ea8ff;
+}
+
+.lo-report-bubble {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  background: #fff;
+  color: #10182a;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: lo-pop 320ms ease-out;
+  white-space: nowrap;
+}
+
+/* Tail points down at the reporter standing below the bubble. */
+.lo-report-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: #fff;
+  transform: rotate(45deg);
+}
+
+@keyframes lo-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%) scale(0.9);
+  }
+}
+
+/* ---------- sprites ---------- */
+
+.lo-sprite {
+  position: absolute;
+  /* translate(-50%) already centres the box — a negative margin as well would
+     shift every sprite a half-width off its desk. */
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  width: 100px;
+  text-align: center;
+  transition:
+    left 1600ms cubic-bezier(0.4, 0, 0.2, 1),
+    top 1600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lo-sprite-body {
+  font-size: 26px;
+  line-height: 1.1;
+  display: inline-block;
+}
+
+.lo-sprite-face {
+  display: inline-block;
+}
+
+/* Pixel figure keeps the old emoji footprint so the layout is unchanged. */
+.lo-pixel {
+  display: block;
+  width: 22px;
+  height: 29px;
+  shape-rendering: crispEdges;
+}
+
+/* Facing is a wrapper transform so it never fights the motion keyframes. */
+.lo-sprite-flip .lo-sprite-body {
+  transform: scaleX(-1);
+}
+
+.lo-sprite-name {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+.lo-sprite-role {
+  font-size: 9px;
+  line-height: 1.2;
+  color: var(--lo-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lo-badge {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--lo-line);
+  color: var(--lo-muted);
+  background: #171d2b;
+}
+
+.lo-badge-walking {
+  color: var(--lo-accent);
+  border-color: var(--lo-accent);
+}
+.lo-badge-working {
+  color: var(--lo-warn);
+  border-color: var(--lo-warn);
+}
+.lo-badge-reviewing {
+  color: #d4a5ff;
+  border-color: #d4a5ff;
+}
+.lo-badge-done {
+  color: var(--lo-ok);
+  border-color: var(--lo-ok);
+}
+.lo-badge-stopped {
+  color: var(--lo-stop);
+  border-color: var(--lo-stop);
+}
+
+/* Motion is purely decorative and keyed off the visual state. */
+.lo-anim-walking .lo-sprite-face {
+  animation: lo-step 420ms ease-in-out infinite;
+}
+.lo-anim-working .lo-sprite-face {
+  animation: lo-type 620ms ease-in-out infinite;
+}
+.lo-anim-reviewing .lo-sprite-face {
+  animation: lo-scan 1300ms ease-in-out infinite;
+}
+.lo-anim-waiting .lo-sprite-face {
+  animation: lo-breathe 2600ms ease-in-out infinite;
+}
+
+@keyframes lo-step {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(4deg);
+  }
+}
+
+@keyframes lo-type {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes lo-scan {
+  0%,
+  100% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes lo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lo-sprite {
+    transition-duration: 200ms;
+  }
+  .lo-sprite-face {
+    animation: none !important;
+  }
+}
+
+/* ---------- stage list ---------- */
+
+.lo-stage {
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.lo-stage + .lo-stage {
+  margin-top: 4px;
+}
+
+.lo-stage-active {
+  border-color: var(--lo-accent);
+  background: rgba(110, 168, 255, 0.08);
+}
+
+.lo-stage-approval {
+  border-color: var(--lo-warn);
+  background: rgba(255, 195, 92, 0.1);
+}
+
+.lo-stage-rejected {
+  border-color: var(--lo-stop);
+  background: rgba(255, 122, 122, 0.1);
+}
+
+.lo-stage-mark {
+  width: 20px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.lo-stage-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lo-stage-detail {
+  font-size: 11px;
+  color: var(--lo-muted);
+  margin-top: 1px;
+}
+
+/* ---------- approval panel ---------- */
+
+.lo-approval {
+  border: 1px solid var(--lo-warn);
+  background: rgba(255, 195, 92, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+/* Two columns so the panel stays short and the office floor remains on screen. */
+.lo-approval-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .lo-approval-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lo-approval-head {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--lo-warn);
+  margin-bottom: 8px;
+}
+
+.lo-field {
+  margin-bottom: 8px;
+}
+
+.lo-field-label {
+  font-size: 11px;
+  color: var(--lo-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lo-field-value {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.lo-payload {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #101624;
+  border: 1px solid var(--lo-line);
+  font-size: 11px;
+  color: var(--lo-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-x: auto;
+}
+
+.lo-approval-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lo-note {
+  font-size: 11px;
+  color: var(--lo-muted);
+  margin-top: 8px;
+}
+
+.lo-stopped {
+  border: 1px solid var(--lo-stop);
+  background: rgba(255, 122, 122, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+/* ---------- log ---------- */
+
+.lo-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.lo-log li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(43, 53, 80, 0.5);
+}
+
+.lo-log-time {
+  color: var(--lo-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.lo-log-ok {
+  color: var(--lo-ok);
+}
+.lo-log-warn {
+  color: var(--lo-warn);
+}
+.lo-log-stop {
+  color: var(--lo-stop);
+}
+
+/* Job context input panel */
+.lo-job-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.lo-field > span {
+  opacity: 0.75;
+}
+
+.lo-field input,
+.lo-field textarea {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  background: transparent;
+  color: inherit;
+  resize: vertical;
+}
+
+.lo-field input:disabled,
+.lo-field textarea:disabled {
+  opacity: 0.5;
+}
