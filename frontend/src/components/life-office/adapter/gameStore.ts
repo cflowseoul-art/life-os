@@ -11,8 +11,11 @@
 
 import { create } from "zustand";
 
-import { DESK_POSITIONS } from "./constants";
 import { AGENT_IDS, BOSS_AGENT_ID } from "./types";
+import {
+  BOSS_POSITION,
+  getDeskPosition,
+} from "../systems/queuePositions";
 import type {
   AgentAnimationState,
   AgentId,
@@ -45,21 +48,37 @@ const COLORS: Record<AgentId, string> = {
   manager: "#ff8b8b",
 };
 
+// One floor may contain multiple teams.
+// Career occupies the left 2×2 desk block; desks 3, 4, 7, 8 remain
+// available for another team on the same floor.
+const DESK_ASSIGNMENTS: Record<string, number> = {
+  research: 1,
+  analysis: 2,
+  draft: 5,
+  review: 6,
+};
+
 function seedAgents(): Map<string, AgentAnimationState> {
   const agents = new Map<string, AgentAnimationState>();
 
   AGENT_IDS.filter((id) => id !== BOSS_AGENT_ID).forEach((id, index) => {
+    const desk = DESK_ASSIGNMENTS[id];
+
+    if (!desk) {
+      return;
+    }
+
     agents.set(id, {
       id,
       name: NAMES[id],
       color: COLORS[id],
       number: index + 1,
-      desk: index + 1,
+      desk,
       currentTask: null,
       backendState: "idle",
       characterType: null,
       parentId: null,
-      currentPosition: { ...DESK_POSITIONS[id] },
+      currentPosition: { ...getDeskPosition(desk) },
       targetPosition: null,
       phase: "idle",
       bubble: { content: null },
@@ -147,7 +166,7 @@ export const useGameStore = create<GameStore>((set) => ({
   ready: false,
 
   boss: {
-    position: { ...DESK_POSITIONS.manager },
+    position: { ...BOSS_POSITION },
     backendState: "idle",
     currentTask: null,
     inUseBy: null,
