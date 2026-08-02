@@ -41,6 +41,7 @@ type Work = {
   contributor: string;
   status: string;
   report: string;
+  detail?: string[];
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -147,13 +148,12 @@ function Reading({
       </div>
 
       <div className="rc__body">
-        <p>{work.report}</p>
+        <p className="rc__lead">{work.report}</p>
+        {(work.detail ?? []).map((line) => <p key={line}>{line}</p>)}
       </div>
 
       {work.ask && (
-        <div className="rc__block">
-          <h2>무엇을 정해 주시면 됩니까?</h2>
-          <p>{work.ask.question}</p>
+        <div className="rc__decide">
           <div className="rc__choices">
             {work.ask.options.map((option) => (
               <button
@@ -183,40 +183,23 @@ function Reading({
       )}
 
       {work.artifact && (
-        <div className="rc__block">
-          <h2>정리한 결과</h2>
-          <p>{work.artifact.title}</p>
-          <ul className="rc__facts">
+        <div className="rc__result">
+          <ol className="rc__ordered">
             {work.artifact.sections.map((s) => (
               <li key={s.heading}>
-                {s.heading}
+                {s.heading.replace(/^\d+\.\s*/, "")}
                 <span className="rc__src">{naturalSource(s.body)}</span>
               </li>
             ))}
-          </ul>
+          </ol>
         </div>
       )}
 
-      <div className="rc__block">
-        <h2>왜 이렇게 판단했나요?</h2>
-        <p>
-          보내주신 공고에 적혀 있는 문장만 그대로 옮겼습니다. 없는 내용은 지어내지
-          않았습니다.
-        </p>
-        <p>
-          어느 쪽을 앞세우느냐는 대표님께서 어떤 사람으로 읽히고 싶으신지의 문제라,
-          제가 정하지 않고 여쭙습니다.
-        </p>
-        <p>
-          따로 강조해 달라고 하신 부분은 없었습니다. 그렇게 알고 진행했습니다.
-        </p>
-      </div>
-
-      <div className="rc__block">
-        <h2>무엇을 확인했나요?</h2>
-        {work.observations.length === 0 ? (
-          <p>아직 확인한 것이 없습니다.</p>
-        ) : (
+      {/* Supporting material. Present because the representative may check,
+          collapsed because checking is not the normal path. */}
+      {work.observations.length > 0 && (
+        <details className="rc__more">
+          <summary>제가 확인한 것 {work.observations.length}가지</summary>
           <ul className="rc__facts">
             {work.observations.map((o) => (
               <li key={o.id}>
@@ -228,11 +211,11 @@ function Reading({
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        </details>
+      )}
 
-      <div className="rc__block">
-        <h2>진행 과정</h2>
+      <details className="rc__more">
+        <summary>진행 과정</summary>
         <ul className="rc__facts">
           {work.history.map((h, i) => (
             <li key={`${h.at}-${String(i)}`}>
@@ -241,7 +224,7 @@ function Reading({
             </li>
           ))}
         </ul>
-      </div>
+      </details>
     </div>
   );
 }

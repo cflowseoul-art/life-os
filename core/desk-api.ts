@@ -38,8 +38,10 @@ export type DeskWork = {
   contributor: string;
   /** Plain-language state, derived from the hold. */
   status: string;
-  /** What the contributor reports. Composed only from recorded facts. */
+  /** The conclusion, first. One sentence the representative can act on. */
   report: string;
+  /** Everything that supports the conclusion. Composed only from recorded facts. */
+  detail: string[];
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -102,7 +104,12 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       title,
       contributor,
       status: "결정을 기다리고 있습니다",
-      report: `보내주신 공고에서 요건 ${String(observed)}개를 확인했습니다. 어느 쪽을 앞세울지는 대표님께서 정해 주셔야 할 것 같습니다.`,
+      report: "이력서 첫 문단을 무엇으로 시작할지, 대표님 결정만 남았습니다.",
+      detail: [
+        `보내주신 공고에서 요건 ${String(observed)}개를 확인했고, 문장은 공고에 있던 표현을 그대로 옮겼습니다.`,
+        "첫 문단에 무엇을 두느냐에 따라 읽는 쪽이 대표님을 다르게 기억합니다. 그건 제가 계산할 수 있는 문제가 아니라 여쭙습니다.",
+        "정해 주시면 그 순서로 정리해서 올려드리겠습니다. 제출은 하지 않습니다.",
+      ],
       ask: hold.outstandingAsk,
       artifact: null,
       observations: hold.observations,
@@ -118,7 +125,11 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       title,
       contributor,
       status: "마무리했습니다",
-      report: `정해 주신 순서대로 ${String(hold.artifact.sections.length)}개 항목을 정리했습니다. 어느 문장이 어디서 나왔는지도 안에 그대로 남겨 두었습니다.`,
+      report: "정해 주신 순서대로 정리해서 올려드립니다.",
+      detail: [
+        `${String(hold.artifact.sections.length)}개 항목을 말씀하신 순서로 배치했고, 표현은 공고에 있던 문장을 그대로 썼습니다.`,
+        "지어낸 내용은 없습니다. 어느 문장이 어디서 나왔는지는 아래에 남겨 두었습니다.",
+      ],
       ask: null,
       artifact: hold.artifact,
       observations: hold.observations,
@@ -133,7 +144,13 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     title,
     contributor,
     status: observed === 0 ? "보내주신 공고를 읽고 있습니다" : `공고에서 요건 ${String(observed)}개를 확인했습니다`,
-    report: "맡아 두었습니다. 대표님 판단이 필요한 지점에 닿으면 그때 올려드리겠습니다.",
+    report: "맡아 두었습니다. 지금 대표님께서 하실 일은 없습니다.",
+    detail: [
+      observed === 0
+        ? "보내주신 공고를 읽고 있습니다."
+        : `공고에서 요건 ${String(observed)}개까지 확인했습니다.`,
+      "대표님 판단이 필요한 지점에 닿으면 그때 올려드리겠습니다.",
+    ],
     ask: null,
     artifact: null,
     observations: hold.observations,
