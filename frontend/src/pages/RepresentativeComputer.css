@@ -1,6 +1,6 @@
 /* Representative Computer — mobile inbox presentation.
-   One sans family, one accent, mail-row density, floating compose.
-   Palette and rhythm come from the shared company tokens. */
+   Pixel-art surfaces (hard edges, chunky borders, offset shadows) in the same
+   design language as the office. Typography stays modern and never pixelated. */
 
 @import "../styles/company.css";
 
@@ -47,7 +47,7 @@
   width: 40px;
   height: 40px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 0;
   background: none;
   color: var(--ink-2);
   font-size: 17px;
@@ -63,10 +63,12 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: 44px;
-  padding: 0 14px;
-  border-radius: 22px;
+  height: 42px;
+  padding: 0 12px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
   background: var(--bg-sunk);
+  box-shadow: 3px 3px 0 var(--line);
 }
 
 .rc__search {
@@ -86,8 +88,8 @@
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
-  border: 0;
+  border-radius: 0;
+  border: 2px solid var(--ink);
   background: var(--accent);
   color: #fff;
   font: inherit;
@@ -112,6 +114,7 @@
   width: 276px;
   max-width: 84vw;
   background: var(--bg);
+  border-right: 3px solid var(--ink);
   z-index: 41;
   padding: 18px 0;
   overflow-y: auto;
@@ -131,7 +134,7 @@
   width: 100%;
   padding: 12px 22px;
   border: 0;
-  border-radius: 0 24px 24px 0;
+  border-radius: 0;
   background: none;
   font: inherit;
   font-size: 14.5px;
@@ -166,7 +169,7 @@
   width: 100%;
   padding: 10px 16px;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 2px solid var(--line);
   background: none;
   font: inherit;
   color: inherit;
@@ -181,7 +184,8 @@
   grid-row: span 2;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 0;
+  border: 2px solid var(--ink);
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 15px;
@@ -225,9 +229,9 @@
 
 .rc__dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
   background: var(--mark);
   margin-right: 6px;
   vertical-align: 1px;
@@ -267,13 +271,58 @@
 .rc__from .rc__name { font-size: 15px; }
 .rc__from-sub { font-size: 12.5px; color: var(--ink-3); }
 
-.rc__body p { font-size: 15px; line-height: 1.8; margin: 0 0 14px; overflow-wrap: anywhere; }
+/* The report reads as a letter: conclusion first, support beneath. */
+
+.rc__body p { font-size: 15px; line-height: 1.85; margin: 0 0 14px; overflow-wrap: anywhere; }
+.rc__body p:last-child { margin-bottom: 0; }
+
+.rc__lead {
+  font-size: 17px !important;
+  font-weight: 600;
+  line-height: 1.6 !important;
+  margin-bottom: 16px !important;
+}
+
+.rc__decide { margin: 22px 0 8px; }
+
+.rc__result { margin: 22px 0 8px; }
+
+.rc__ordered {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.rc__ordered li {
+  font-size: 15px;
+  line-height: 1.7;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.rc__more {
+  margin: 10px 0;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.rc__more summary {
+  font-size: 13.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rc__more summary::-webkit-details-marker { display: none; }
+.rc__more summary::before { content: "▸ "; }
+.rc__more[open] summary::before { content: "▾ "; }
+.rc__more[open] summary { margin-bottom: 8px; }
 
 .rc__block {
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
   padding: 16px;
   margin: 18px 0;
+  box-shadow: 4px 4px 0 var(--line);
 }
 
 .rc__block h2 {
@@ -309,30 +358,32 @@
   font-size: 14.5px;
   line-height: 1.5;
   padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 2px solid var(--line);
+  border-radius: 0;
   background: var(--bg);
   color: var(--ink);
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 
-.rc__choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.rc__choice[aria-pressed="true"] { border-color: var(--ink); background: var(--accent-soft); box-shadow: 3px 3px 0 var(--line); }
 
 .rc__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 .rc__btn {
   font: inherit;
   font-size: 14px;
-  padding: 10px 20px;
-  border-radius: 20px;
-  border: 1px solid var(--accent);
+  padding: 10px 18px;
+  border-radius: 0;
+  border: 2px solid var(--ink);
   background: var(--accent);
   color: #fff;
+  box-shadow: 3px 3px 0 var(--ink);
   cursor: pointer;
 }
 
-.rc__btn[disabled] { opacity: 0.45; cursor: default; }
+.rc__btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.rc__btn[disabled] { opacity: 0.4; box-shadow: none; cursor: default; }
 .rc__btn--ghost { background: none; color: var(--accent); }
 .rc__btn--ghost[disabled] { border-color: var(--line); color: var(--ink-3); }
 
@@ -357,7 +408,7 @@
   line-height: 1.7;
   color: var(--ink);
   padding: 8px 0 8px 14px;
-  border-left: 2px solid var(--accent-soft);
+  border-left: 4px solid var(--accent-soft);
   overflow-wrap: anywhere;
 }
 
@@ -378,18 +429,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 52px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 26px;
+  height: 50px;
+  padding: 0 18px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
   background: var(--accent);
   color: #fff;
   font: inherit;
   font-size: 14.5px;
   font-weight: 600;
-  box-shadow: 0 3px 10px rgba(24, 25, 27, 0.22);
+  box-shadow: 4px 4px 0 var(--ink);
   cursor: pointer;
 }
+
+.rc__fab:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
 
 .rc__compose { position: fixed; inset: 0; background: var(--bg); z-index: 50; display: flex; flex-direction: column; }
 
@@ -433,8 +486,8 @@
 
 .rc__attach-box {
   width: 100%;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
+  border: 2px dashed var(--ink);
+  border-radius: 0;
   padding: 12px;
   font: inherit;
   font-size: 14px;
