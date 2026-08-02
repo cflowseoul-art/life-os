@@ -12,6 +12,7 @@
     "db:down": "docker compose down",
     "dev": "bash scripts/dev.sh",
     "start": "tsx src/main.ts",
+    "desk": "tsx core/desk-api.ts",
     "db:schema": "bash scripts/db-schema.sh",
     "db:seed": "bash scripts/db-seed.sh"
   },
