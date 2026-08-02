@@ -12,7 +12,13 @@ export function EventLog({ entries }: { entries: LogEntry[] }) {
       {entries.map((entry) => (
         <li key={entry.id}>
           <span className="lo-log-time">{entry.at}</span>
-          <span className={entry.tone === "info" ? "" : `lo-log-${entry.tone}`}>
+          <span
+            className={
+              entry.tone === "info"
+                ? "lo-log-label"
+                : `lo-log-label lo-log-${entry.tone}`
+            }
+          >
             {entry.label}
           </span>
         </li>

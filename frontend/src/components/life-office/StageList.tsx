@@ -34,7 +34,7 @@ export function StageList({ state }: { state: WorkflowState }) {
           <div key={stage.id} className={`lo-stage ${modifier}`}>
             <div className="lo-stage-mark">{MARK[stageState.status]}</div>
 
-            <div>
+            <div className="lo-stage-body">
               <div className="lo-stage-title">
                 {stage.title}
                 {stage.requiresApproval ? " 🔒" : ""}

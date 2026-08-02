@@ -701,3 +701,268 @@
 .lo-field textarea:disabled {
   opacity: 0.5;
 }
+
+/* ==========================================================================
+   Full-screen Office shell (mobile-first)
+
+   Scoping rule: nothing below may set width/height/max-width/overflow on the
+   transform wrapper, the 1280x1024 content box, .pixi-canvas-container, or
+   any canvas. OfficeGame owns those dimensions.
+   ========================================================================== */
+
+.lo-shell {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--lo-bg);
+  color: var(--lo-text);
+  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-align: left;
+
+  --lo-bg: #0f1420;
+  --lo-panel: #171d2b;
+  --lo-panel-soft: #1e2536;
+  --lo-line: #2b3550;
+  --lo-text: #e8ecf6;
+  --lo-muted: #94a0bb;
+  --lo-accent: #6ea8ff;
+  --lo-ok: #4ecf9a;
+  --lo-warn: #ffc35c;
+  --lo-stop: #ff7a7a;
+}
+
+/* Positioning only — the stage's inner sizing is OfficeGame's business. */
+.lo-stage-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.lo-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: 10px 14px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: rgba(15, 20, 32, 0.82);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--lo-line);
+}
+
+.lo-topbar-title { font-size: 14px; font-weight: 600; margin: 0; }
+.lo-topbar-sub { font-size: 11px; color: var(--lo-muted); margin: 2px 0 0; }
+
+/* --- overlay panels ------------------------------------------------------ */
+
+.lo-overlay {
+  position: absolute;
+  z-index: 15;
+  background: rgba(23, 29, 43, 0.94);
+  border: 1px solid var(--lo-line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}
+
+.lo-overlay-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px 16px;
+}
+
+/* --- bottom tab bar (mobile) --------------------------------------------- */
+
+.lo-tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 32;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: rgba(15, 20, 32, 0.96);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--lo-line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.lo-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lo-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 12px 4px;
+  cursor: pointer;
+}
+
+.lo-tab[aria-selected="true"] { color: var(--lo-accent); font-weight: 600; }
+
+/* FAB sits above the tab bar and clear of the navigator row. */
+.lo-fab {
+  position: absolute;
+  right: 16px;
+  bottom: calc(104px + env(safe-area-inset-bottom));
+  z-index: 33;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: #0b1020;
+  background: var(--lo-accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+/* --- bottom sheet --------------------------------------------------------- */
+
+.lo-sheet-backdrop { position: absolute; inset: 0; z-index: 40; background: rgba(0,0,0,0.5); }
+
+.lo-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  max-height: 82dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--lo-panel);
+  border-top: 1px solid var(--lo-line);
+  border-radius: 16px 16px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior: contain;
+}
+
+.lo-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lo-line);
+}
+
+.lo-sheet-body {
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px 20px;
+}
+
+/* --- mobile panel geometry ----------------------------------------------- */
+
+.lo-panel-mobile {
+  top: 58px;
+  left: 10px;
+  right: 10px;
+  bottom: calc(108px + env(safe-area-inset-bottom));
+}
+
+/* --- team navigator ------------------------------------------------------- */
+
+.lo-navigator {
+  position: absolute;
+  left: 0;
+  right: 96px;
+  bottom: calc(52px + env(safe-area-inset-bottom));
+  z-index: 31;
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.lo-navigator::-webkit-scrollbar { display: none; }
+
+.lo-nav-chip {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 1px solid var(--lo-line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--lo-text);
+  background: rgba(23, 29, 43, 0.9);
+  cursor: pointer;
+}
+
+.lo-nav-chip[aria-pressed="true"] {
+  border-color: var(--lo-accent);
+  color: var(--lo-accent);
+  font-weight: 600;
+}
+
+.lo-nav-chip:disabled { opacity: 0.45; cursor: default; }
+
+/* --- layout switches ------------------------------------------------------ */
+
+.lo-desktop-only { display: none; }
+.lo-mobile-only { display: flex; }
+
+@media (min-width: 900px) {
+  .lo-desktop-only { display: flex; }
+  .lo-mobile-only { display: none; }
+  .lo-tabbar, .lo-fab { display: none; }
+
+  .lo-panel-left { top: 66px; left: 16px; bottom: 16px; width: 360px; }
+  .lo-panel-right { top: 66px; right: 16px; bottom: 16px; width: 400px; }
+  .lo-navigator { right: auto; left: 50%; transform: translateX(-50%); bottom: 16px; }
+}
+
+/* --- text safety, scoped to panel contents only --------------------------- */
+
+.lo-overlay-scroll .lo-stage-body,
+.lo-sheet-body .lo-stage-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.lo-overlay-scroll .lo-stage-mark { flex: 0 0 20px; }
+.lo-overlay-scroll .lo-badge { flex: 0 0 auto; white-space: nowrap; }
+
+.lo-overlay-scroll .lo-log-time { flex: 0 0 auto; white-space: nowrap; }
+
+.lo-overlay-scroll .lo-log-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.lo-overlay-scroll .lo-note,
+.lo-sheet-body .lo-note {
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.lo-path {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--lo-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}

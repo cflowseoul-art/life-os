@@ -241,7 +241,10 @@ export default function LifeOfficeDemo() {
   const progress = (
     <>
       <p className="lo-panel-title">실행 상태</p>
-      <div className="lo-note">{runLine}</div>
+      <div className="lo-note">
+        {runLine}
+        {run?.outputDir && <span className="lo-path">{run.outputDir}</span>}
+      </div>
       {(runError ?? run?.error) && (
         <div className="lo-note" style={{ marginTop: 6 }}>
           ⚠️ {runError ?? run?.error}
