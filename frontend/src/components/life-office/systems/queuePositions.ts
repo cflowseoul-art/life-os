@@ -16,32 +16,38 @@ import { DESKS_PER_ROW } from "../adapter/constants";
 // Boss desk positions (where agents stand IN FRONT of the desk)
 // Boss desk center at y:928 (grid-aligned 29*32)
 // Agents stand 60px above desk center so pathfinding can reach them
-export const BOSS_SLOT_LEFT: Position = { x: 520, y: 868 }; // Getting work (arrivals)
-export const BOSS_SLOT_RIGHT: Position = { x: 760, y: 868 }; // Receiving work (departures)
+export const BOSS_SLOT_LEFT: Position = { x: 176, y: 1248 }; // Getting work (arrivals)
+export const BOSS_SLOT_RIGHT: Position = { x: 336, y: 1248 }; // Receiving work (departures)
 
 // Boss center position (for rendering)
 // Desk visual: drawn 20px below boss with 80px height → desk center = boss_y + 60
 // For desk center at y=960 (grid-aligned 30*32), boss is at y=900
-export const BOSS_POSITION: Position = { x: 640, y: 900 };
+export const BOSS_POSITION: Position = { x: 256, y: 1280 };
 
 // Elevator position (DO NOT CHANGE - this is the elevator's fixed location)
-export const ELEVATOR_POSITION: Position = { x: 86, y: 178 };
+/**
+ * Representative / report destination — desk 6, kept empty on purpose.
+ * Per VERTICAL_OFFICE_LAYOUT_PLAN.md this is where a report is delivered.
+ */
+export const REPORT_POSITION: Position = { x: 384, y: 992 };
+
+export const ELEVATOR_POSITION: Position = { x: 96, y: 176 };
 
 // Pathfinding target for agents walking to elevator (can be adjusted independently)
-export const ELEVATOR_PATHFINDING_TARGET: Position = { x: 86, y: 192 };
+export const ELEVATOR_PATHFINDING_TARGET: Position = { x: 96, y: 256 };
 
 // Position where departing agents stand inside elevator (after arriving)
-export const ELEVATOR_DEPARTURE_POSITION: Position = { x: 86, y: 200 };
+export const ELEVATOR_DEPARTURE_POSITION: Position = { x: 96, y: 272 };
 
 // Elevator spawn positions (2x3 grid inside elevator)
 // Elevator interior: ~112x144px centered at x:86
 export const ELEVATOR_SPAWN_POSITIONS: Position[] = [
-  { x: 56, y: 190 }, // Top left
-  { x: 116, y: 190 }, // Top right
-  { x: 56, y: 240 }, // Middle left
-  { x: 116, y: 240 }, // Middle right
-  { x: 56, y: 290 }, // Bottom left
-  { x: 116, y: 290 }, // Bottom right
+  { x: 66, y: 200 }, // Top left
+  { x: 126, y: 200 }, // Top right
+  { x: 66, y: 250 }, // Middle left
+  { x: 126, y: 250 }, // Middle right
+  { x: 66, y: 300 }, // Bottom left
+  { x: 126, y: 300 }, // Bottom right
 ];
 
 // Track available spawn slots (rotates through positions)
@@ -108,10 +114,10 @@ export function resetSpawnIndex(): void {
 
 // Elevator zone bounds for collision exclusion
 export const ELEVATOR_ZONE = {
-  minX: 30, // 86 - 56 (half interior width)
-  maxX: 142, // 86 + 56
-  minY: 90, // Top of elevator
-  maxY: 300, // Floor level threshold (extended to include lower spawn positions)
+  minX: 40, // 96 - 56 (half interior width)
+  maxX: 152, // 96 + 56
+  minY: 96, // Top of elevator
+  maxY: 320, // Floor level threshold (extended to include lower spawn positions)
 };
 
 /**
@@ -132,14 +138,14 @@ export function isInElevatorZone(pos: Position): boolean {
 // Position 1+ are waiting spots in the queue line
 // A0-A2: horizontal along bottom, A3-A7: vertical going up (above printer)
 export const ARRIVAL_QUEUE_POSITIONS: Position[] = [
-  { x: 480, y: 930 }, // Position 0 (A0 - ready spot, left of boss desk)
-  { x: 330, y: 930 }, // Position 1 (first waiting spot)
-  { x: 190, y: 930 }, // Position 2 (horizontal)
-  { x: 70, y: 820 }, // Position 3 (moved up - above printer)
-  { x: 70, y: 710 }, // Position 4 (vertical going up)
-  { x: 70, y: 600 }, // Position 5
-  { x: 70, y: 490 }, // Position 6
-  { x: 70, y: 380 }, // Position 7
+  { x: 176, y: 1216 }, // Position 0 (A0 - ready spot, left of boss desk)
+  { x: 96, y: 1216 }, // Position 1 (first waiting spot)
+  { x: 64, y: 1152 }, // Position 2 (turns up the left wall)
+  { x: 64, y: 1088 }, // Position 3 (above printer)
+  { x: 64, y: 1024 }, // Position 4 (vertical going up)
+  { x: 64, y: 960 }, // Position 5
+  { x: 64, y: 896 }, // Position 6
+  { x: 64, y: 832 }, // Position 7
 ];
 
 // Departure queue positions (right side, horizontal then vertical L-shape)
@@ -147,14 +153,14 @@ export const ARRIVAL_QUEUE_POSITIONS: Position[] = [
 // Position 1+ are waiting spots in the queue line
 // D0-D3: horizontal along bottom, D4-D7: vertical going up
 export const DEPARTURE_QUEUE_POSITIONS: Position[] = [
-  { x: 800, y: 930 }, // Position 0 (D0 - ready spot, right of boss desk)
-  { x: 950, y: 930 }, // Position 1 (first waiting spot)
-  { x: 1090, y: 930 }, // Position 2 (horizontal)
-  { x: 1210, y: 930 }, // Position 3 (corner)
-  { x: 1210, y: 820 }, // Position 4 (vertical going up)
-  { x: 1210, y: 710 }, // Position 5
-  { x: 1210, y: 600 }, // Position 6
-  { x: 1210, y: 490 }, // Position 7
+  { x: 336, y: 1216 }, // Position 0 (D0 - ready spot, right of boss desk)
+  { x: 416, y: 1216 }, // Position 1 (first waiting spot)
+  { x: 448, y: 1152 }, // Position 2 (turns up the right wall)
+  { x: 448, y: 1088 }, // Position 3 (corner)
+  { x: 448, y: 1024 }, // Position 4 (vertical going up)
+  { x: 448, y: 960 }, // Position 5
+  { x: 448, y: 896 }, // Position 6
+  { x: 448, y: 864 }, // Position 7
 ];
 
 export type QueueType = "arrival" | "departure";
@@ -231,12 +237,12 @@ export function getDeskPosition(deskNum: number): Position {
   const row = Math.floor(index / rowSize);
   const col = index % rowSize;
   // Grid-aligned positions: 256, 512, 768, 1024
-  const xStart = 256;
+  const xStart = 128;
   // Chair center is at desk origin (408) + 30 = 438
   // Agent body center should be 24px above chair (like boss): 438 - 24 = 414
   // Agent bottom circle center is 18px below body center: 414 + 18 = 432
   return {
     x: xStart + col * 256,
-    y: 432 + row * 192, // Agent bottom circle center for proper chair seating
+    y: 416 + row * 288, // Agent bottom circle center for proper chair seating
   };
 }

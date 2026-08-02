@@ -14,10 +14,10 @@ import type { AgentId, Position } from "./types";
 // ============================================================================
 
 /** Width of the game canvas in pixels */
-export const CANVAS_WIDTH = 1280;
+export const CANVAS_WIDTH = 512;
 
 /** Height of the game canvas in pixels */
-export const CANVAS_HEIGHT = 1024;
+export const CANVAS_HEIGHT = 1536;
 
 /** Background color of the canvas (dark gray) */
 export const BACKGROUND_COLOR = 0x1a1a1a;
@@ -29,37 +29,37 @@ export const BACKGROUND_COLOR = 0x1a1a1a;
 /** Employee of the Month frame position */
 // Moved right, off the wall directly above desk 1, so the column above the
 // research/analysis row stays clear for speech bubbles.
-export const EMPLOYEE_OF_MONTH_POSITION = { x: 120, y: 50 };
+export const EMPLOYEE_OF_MONTH_POSITION = { x: 96, y: 48 };
 
 /** City window position */
 // Pushed to the right half. It was directly over the Career desks, competing
 // with the team for attention and crowding bubble space.
-export const CITY_WINDOW_POSITION = { x: 880, y: 30 };
+export const CITY_WINDOW_POSITION = { x: 208, y: 40 };
 
 /** Safety sign position */
 // Stays far right as ambient detail; nothing important lives out here now.
-export const SAFETY_SIGN_POSITION = { x: 1160, y: 40 };
+export const SAFETY_SIGN_POSITION = { x: 480, y: 120 };
 
 /** Wall clock position */
 // Shifted right of the whiteboard so the upper wall reads
 // left-to-right: awards, whiteboard, clock, window.
-export const WALL_CLOCK_POSITION = { x: 700, y: 80 };
+export const WALL_CLOCK_POSITION = { x: 448, y: 64 };
 
 /** Wall outlet position (below clock) */
-export const WALL_OUTLET_POSITION = { x: 700, y: 209 };
+export const WALL_OUTLET_POSITION = { x: 448, y: 176 };
 
 /** Whiteboard position */
 // Centred over the Career desk block (x 256-512) rather than over the middle
 // of the empty room, so team + whiteboard fit one portrait framing.
-export const WHITEBOARD_POSITION = { x: 400, y: 11 };
+export const WHITEBOARD_POSITION = { x: 320, y: 48 };
 
 /** Water cooler position */
 // Brought toward the team's right edge: a believable break spot the team can
 // walk to, without sitting on top of anyone's bubble.
-export const WATER_COOLER_POSITION = { x: 800, y: 300 };
+export const WATER_COOLER_POSITION = { x: 448, y: 832 };
 
 /** Coffee machine position (to the right of water cooler) */
-export const COFFEE_MACHINE_POSITION = { x: 880, y: 300 };
+export const COFFEE_MACHINE_POSITION = { x: 448, y: 576 };
 
 // ============================================================================
 // FLOOR ELEMENTS
@@ -67,17 +67,17 @@ export const COFFEE_MACHINE_POSITION = { x: 880, y: 300 };
 
 /** Printer station position — near the manager, per the room brief. */
 // Was the far bottom-left corner, a full room away from the boss desk.
-export const PRINTER_STATION_POSITION = { x: 880, y: 940 };
+export const PRINTER_STATION_POSITION = { x: 64, y: 1248 };
 
 /** Plant position (to the right of printer) */
-export const PLANT_POSITION = { x: 960, y: 965 };
+export const PLANT_POSITION = { x: 448, y: 1248 };
 
 // ============================================================================
 // BOSS AREA
 // ============================================================================
 
 /** Boss area rug position (centered under boss desk) */
-export const BOSS_RUG_POSITION = { x: 640, y: 940 };
+export const BOSS_RUG_POSITION = { x: 256, y: 1312 };
 
 /** Trash can offset from boss desk position */
 export const TRASH_CAN_OFFSET = { x: 110, y: 65 };
@@ -92,8 +92,8 @@ export const TRASH_CAN_OFFSET = { x: 110, y: 65 };
  * A shared cross-component source is intentionally out of scope; update both
  * sides together when changing the desk grid.
  */
-export const DESKS_PER_ROW = 4;
-export const MIN_DESK_COUNT = 8;
+export const DESKS_PER_ROW = 2;
+export const MIN_DESK_COUNT = 6;
 
 // ============================================================================
 // LIFE OFFICE — NOT FROM SOURCE
@@ -108,11 +108,11 @@ export const MIN_DESK_COUNT = 8;
  * `gameStore.ts`, which was out of scope for the coordinate recovery.
  */
 export const DESK_POSITIONS: Record<AgentId, Position> = {
-  research: { x: 220, y: 200 },
-  analysis: { x: 220, y: 340 },
-  draft: { x: 220, y: 480 },
-  review: { x: 460, y: 200 },
-  manager: { x: 460, y: 480 },
+  research: { x: 128, y: 416 },
+  analysis: { x: 384, y: 416 },
+  draft: { x: 128, y: 704 },
+  review: { x: 384, y: 704 },
+  manager: { x: 256, y: 1280 },
 };
 
 /**

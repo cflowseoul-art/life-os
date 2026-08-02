@@ -12,6 +12,7 @@
  * from source.
  */
 
+import { startCoffeeIdle } from "../adapter/coffeeIdle";
 import { useGameStore } from "../adapter/gameStore";
 import type {
   AgentMovement,
@@ -363,6 +364,13 @@ import { useEffect } from "react";
 export function useAnimationSystem(): void {
   useEffect(() => {
     animationSystem.start();
-    return () => animationSystem.stop();
+    // Decorative idle-coffee loop rides the same lifetime. It only issues
+    // paths and a bubble; it never touches workflow state.
+    const stopCoffee = startCoffeeIdle();
+
+    return () => {
+      stopCoffee();
+      animationSystem.stop();
+    };
   }, []);
 }

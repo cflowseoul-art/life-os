@@ -29,6 +29,7 @@ import { useWorkflowEngine } from "../components/life-office/useWorkflowEngine";
 import { useResumeProgress } from "../components/life-office/useResumeProgress";
 import {
   applyPreset,
+  applyPresetWhenReady,
   CAMERA_PRESETS,
   DEFAULT_MOBILE_PRESET,
   onCameraMovedByUser,
@@ -154,14 +155,10 @@ export default function LifeOfficeDemo() {
       return;
     }
 
-    // Let the Pixi stage mount before moving the camera.
-    const timer = window.setTimeout(() => {
-      applyPreset(preset);
-    }, 300);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
+    // Wait for the wrapper's real box instead of guessing with a fixed delay:
+    // a preset computed against the pre-mount window size lands off-centre and
+    // is then clamped there.
+    return applyPresetWhenReady(preset);
   }, []);
 
   const startAndClose = () => {
@@ -169,13 +166,82 @@ export default function LifeOfficeDemo() {
     setSheetOpen(false);
   };
 
+  // Header shows the running job once started, otherwise what is being typed.
   const jobLine = isJobContextValid(state.jobContext)
     ? `${state.jobContext.company} · ${state.jobContext.role}`
-    : "공고 미지정";
+    : draft.company.trim() !== "" || draft.role.trim() !== ""
+      ? `${draft.company || "회사 미입력"} · ${draft.role || "직무 미입력"}`
+      : "공고 미지정";
+
+  // Compact bar above the office. Single line on desktop; the JD is pasted into
+  // the textarea, never parsed. `분석 시작` is the only path to 김리서치 walking.
+  const jobBar = (
+    <section
+      className="lo-jobbar"
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "flex-start",
+        flexWrap: "wrap",
+        padding: "8px 12px",
+      }}
+    >
+      <input
+        type="text"
+        value={draft.company}
+        onChange={(e) => patch("company")(e.target.value)}
+        disabled={running}
+        placeholder="회사"
+        aria-label="회사"
+        style={{ flex: "0 1 140px", minWidth: 100 }}
+      />
+      <input
+        type="text"
+        value={draft.role}
+        onChange={(e) => patch("role")(e.target.value)}
+        disabled={running}
+        placeholder="직무"
+        aria-label="직무"
+        style={{ flex: "0 1 160px", minWidth: 100 }}
+      />
+      <textarea
+        rows={1}
+        value={draft.jdText}
+        onChange={(e) => patch("jdText")(e.target.value)}
+        disabled={running}
+        placeholder="채용공고 본문(JD)을 붙여넣으세요."
+        aria-label="채용공고 본문"
+        style={{ flex: "1 1 240px", minWidth: 160, resize: "vertical" }}
+      />
+      <button
+        type="button"
+        className="lo-btn lo-btn-primary"
+        onClick={startRun}
+        disabled={!canStart}
+        title={canStart ? undefined : "회사·직무·JD를 모두 입력해야 시작됩니다."}
+      >
+        분석 시작
+      </button>
+      <button
+        type="button"
+        className="lo-btn"
+        onClick={reset}
+      >
+        초기화
+      </button>
+      <div className="lo-note" style={{ flex: "1 1 100%", margin: 0 }}>
+        {canStart
+          ? "입력 완료 — 워크플로를 시작할 수 있습니다."
+          : "회사·직무·JD를 모두 입력해야 시작됩니다."}
+      </div>
+    </section>
+  );
 
   const runLine = run ? `${run.runner} · ${run.status}` : "실행 없음";
 
-  const inputs = (
+  // Fields only. Mobile still renders these; the desktop left overlay no
+  // longer does, because lo-jobbar above the office already carries them.
+  const inputFields = (
     <>
       <div className="lo-job-inputs">
         <label className="lo-field">
@@ -211,7 +277,12 @@ export default function LifeOfficeDemo() {
           placeholder="공고 본문을 붙여넣으세요."
         />
       </label>
+    </>
+  );
 
+  // Note + buttons. Shared by desktop and mobile, unchanged.
+  const inputActions = (
+    <>
       <div className="lo-note" style={{ margin: "10px 0" }}>
         {canStart
           ? "입력 완료 — 워크플로를 시작할 수 있습니다."
@@ -224,7 +295,7 @@ export default function LifeOfficeDemo() {
         onClick={startAndClose}
         disabled={!canStart}
       >
-        워크플로 시작
+        분석 시작
       </button>
 
       <button
@@ -303,6 +374,9 @@ export default function LifeOfficeDemo() {
         <OfficeGame />
       </div>
 
+      {/* Job input sits above the office; nothing starts without it. */}
+      {jobBar}
+
       <header className="lo-topbar">
         <div>
           <p className="lo-topbar-title">🏢 Life Office — 커리어팀</p>
@@ -313,11 +387,8 @@ export default function LifeOfficeDemo() {
         </div>
       </header>
 
-      {/* Desktop overlays: inputs left, runtime right. */}
-      <section className="lo-overlay lo-panel-left lo-desktop-only">
-        <div className="lo-overlay-scroll">{inputs}</div>
-      </section>
-
+      {/* Desktop overlay: runtime right. Job input lives in lo-jobbar above
+          the office; the left panel had only duplicates and is gone. */}
       <section className="lo-overlay lo-panel-right lo-desktop-only">
         <div className="lo-overlay-scroll">
           {progress}
@@ -345,24 +416,6 @@ export default function LifeOfficeDemo() {
       >
         + 새 작업
       </button>
-
-      <nav className="lo-navigator" aria-label="오피스 이동">
-        {CAMERA_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            className="lo-nav-chip"
-            aria-pressed={activePreset === preset.id}
-            disabled={preset.disabled}
-            onClick={() => {
-              applyPreset(preset);
-              setActivePreset(preset.id);
-            }}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </nav>
 
       <nav className="lo-tabbar" role="tablist">
         <button
@@ -411,7 +464,10 @@ export default function LifeOfficeDemo() {
                 닫기
               </button>
             </div>
-            <div className="lo-sheet-body">{inputs}</div>
+            <div className="lo-sheet-body">
+              {inputFields}
+              {inputActions}
+            </div>
           </div>
         </>
       )}

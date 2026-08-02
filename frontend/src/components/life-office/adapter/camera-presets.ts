@@ -35,8 +35,19 @@ export const CAMERA_PRESETS: CameraPreset[] = [
   {
     id: "career",
     label: "커리어팀",
-    center: { x: 448, y: 666 },
-    scale: 0.8,
+    // Career content spans world x 256-640 (desks 1/2/5/6 + manager) and
+    // y 11-900 (whiteboard down to the manager desk). Centre is the midpoint
+    // of that box: x (256+640)/2 = 448, y (11+900)/2 ~= 455.
+    //
+    // Scale 0.9 is chosen so the scaled canvas height (921.6) EXCEEDS a 844px
+    // portrait viewport. Below ~0.824 the office fits vertically, the clamp
+    // force-centres the Y axis, and the preset's own centre.y is discarded —
+    // which is why the previous 0.8 framing was effectively uncontrolled.
+    //
+    // Verified at 390x844: visible world x[231..665] y[-14..924] — contains
+    // every Career object, whiteboard and manager desk included.
+    center: { x: 448, y: 455 },
+    scale: 0.9,
   },
   {
     id: "map",
@@ -218,6 +229,75 @@ let applyingUntil = 0;
 
 export function isApplyingPreset(): boolean {
   return Date.now() < applyingUntil;
+}
+
+/**
+ * Whether the wrapper has reported a usable box yet.
+ *
+ * Before the stage mounts, `registerViewport` is unset and `readViewport()`
+ * falls back to `window.innerWidth/Height`. That window box is larger than the
+ * real wrapper, so a preset computed against it lands too far left and the
+ * clamp then pins it there — the far-right edge stays unreachable until the
+ * next gesture recomputes against the true size.
+ */
+function viewportReady(): boolean {
+  if (!viewport) {
+    return false;
+  }
+
+  const { width, height } = viewport();
+
+  return width > 0 && height > 0;
+}
+
+/**
+ * Apply a preset once the wrapper's box is stable.
+ *
+ * Waits for two consecutive identical non-zero readings before applying, so
+ * the first preset is never computed against a transient layout. Gives up
+ * after ~2s and applies anyway rather than leaving the camera unplaced.
+ */
+export function applyPresetWhenReady(preset: CameraPreset): () => void {
+  let cancelled = false;
+  let previous: string | null = null;
+  let elapsed = 0;
+
+  const STEP_MS = 50;
+  const TIMEOUT_MS = 2_000;
+
+  const tick = (): void => {
+    if (cancelled) {
+      return;
+    }
+
+    if (viewportReady()) {
+      const { width, height } = viewport?.() ?? { width: 0, height: 0 };
+      const signature = `${String(width)}x${String(height)}`;
+
+      // Two identical readings in a row means layout has settled.
+      if (signature === previous) {
+        applyPreset(preset);
+        return;
+      }
+
+      previous = signature;
+    }
+
+    elapsed += STEP_MS;
+
+    if (elapsed >= TIMEOUT_MS) {
+      applyPreset(preset);
+      return;
+    }
+
+    window.setTimeout(tick, STEP_MS);
+  };
+
+  tick();
+
+  return () => {
+    cancelled = true;
+  };
 }
 
 export function applyPreset(preset: CameraPreset): void {

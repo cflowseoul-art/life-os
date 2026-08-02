@@ -10,8 +10,8 @@ import { ELEVATOR_ZONE } from "./queuePositions";
 
 // Grid configuration
 export const TILE_SIZE = 32;
-export const GRID_WIDTH = 40; // 1280 / 32
-export const GRID_HEIGHT = 32; // 1024 / 32
+export const GRID_WIDTH = 16; // 512 / 32
+export const GRID_HEIGHT = 48; // 1536 / 32
 
 // Tile types for pathfinding
 export const TileType = {
@@ -39,18 +39,21 @@ export const TILE_COSTS: Record<TileType, number> = {
 // Agent sprite radius is ~28px, padding = 55% of that = ~15px
 const OBSTACLE_PADDING = 15;
 
-const WALL_Y_END = 232 + OBSTACLE_PADDING; // Wall visual end + padding (one extra row)
+const WALL_Y_END = 160 + OBSTACLE_PADDING; // Wall visual end + padding (one extra row)
 // Desk obstacles cover the desk SURFACE with padding
 // Chair positions (y=400, y=592) left walkable as destinations
 // Row 0: chair at y=400, desk surface at 440-520 (center 480 = 15*32)
 // Top row removed (+32) to allow agents to walk closer to desks
-const DESK_ROW_0_Y = 488 - OBSTACLE_PADDING; // Top of desk row 0 with padding
-const DESK_ROW_0_Y_END = 536 + OBSTACLE_PADDING; // Bottom of desk row 0 with padding
-// Row 1: chair at y=592, desk surface at 632-712 (center 672 = 21*32)
-const DESK_ROW_1_Y = 680 - OBSTACLE_PADDING; // Top of desk row 1 with padding
-const DESK_ROW_1_Y_END = 728 + OBSTACLE_PADDING; // Bottom of desk row 1 with padding
-// Grid-aligned X positions: 256, 512, 768, 1024 (all multiples of 32)
-const DESK_X_POSITIONS = [256, 512, 768, 1024]; // Center X of each desk column
+// Vertical layout: 3 rows, seats at y 416 / 704 / 992 (row pitch 288).
+// Each desk surface sits seat+56 .. seat+104, the same offset the horizontal
+// layout used, so chairs stay walkable as destinations.
+const DESK_ROW_BANDS: Array<{ y: number; yEnd: number }> = [
+  { y: 472 - OBSTACLE_PADDING, yEnd: 520 + OBSTACLE_PADDING },
+  { y: 760 - OBSTACLE_PADDING, yEnd: 808 + OBSTACLE_PADDING },
+  { y: 1048 - OBSTACLE_PADDING, yEnd: 1096 + OBSTACLE_PADDING },
+];
+// Grid-aligned X positions: 128, 384 (both multiples of 32)
+const DESK_X_POSITIONS = [128, 384]; // Center X of each desk column
 const DESK_HALF_WIDTH = 70 + OBSTACLE_PADDING; // Desk visual half-width + padding
 // Desk half height matches the calculated deskHalfH in initializeStaticGrid
 
@@ -60,21 +63,21 @@ const ELEVATOR_Y = ELEVATOR_ZONE.minY; // 90
 const ELEVATOR_WIDTH = ELEVATOR_ZONE.maxX - ELEVATOR_ZONE.minX; // 112
 const ELEVATOR_HEIGHT = ELEVATOR_ZONE.maxY - ELEVATOR_ZONE.minY; // 210
 
-const BOSS_DESK_X = 640;
-// Boss at y=900, desk drawn 20px below with 80px height → desk center at y=960
-const BOSS_DESK_Y = 960; // Grid-aligned: 30*32 = 960
+const BOSS_DESK_X = 256;
+// Boss at y=1280, desk drawn 20px below with 80px height → desk center at y=1340
+const BOSS_DESK_Y = 1344; // Grid-aligned: 42*32 = 1344
 const BOSS_DESK_HALF_WIDTH = 80 + OBSTACLE_PADDING;
 const BOSS_DESK_HALF_HEIGHT = 40 + OBSTACLE_PADDING;
 
 // Printer station (bottom left corner) - only bottom portion blocked
-const PRINTER_X = 50;
-const PRINTER_Y = 993;
+const PRINTER_X = 64;
+const PRINTER_Y = 1248;
 const PRINTER_HALF_WIDTH = 50 + OBSTACLE_PADDING;
 const PRINTER_HALF_HEIGHT = 12;
 
 // Trash can (right of boss desk)
-const TRASH_CAN_X = 640 + 110; // Boss position.x + offset
-const TRASH_CAN_Y = 900 + 65 + 20; // Boss position.y + offset + bottom adjustment
+const TRASH_CAN_X = 256 + 110; // Boss position.x + offset
+const TRASH_CAN_Y = 1280 + 65 + 20; // Boss position.y + offset + bottom adjustment
 const TRASH_CAN_HALF_WIDTH = 20 + OBSTACLE_PADDING;
 const TRASH_CAN_HALF_HEIGHT = 15;
 
@@ -146,16 +149,10 @@ export class NavigationGrid {
       }
     }
 
-    // Mark desks as obstacles
-    for (let row = 0; row < 2; row++) {
-      const deskY =
-        row === 0
-          ? (DESK_ROW_0_Y + DESK_ROW_0_Y_END) / 2
-          : (DESK_ROW_1_Y + DESK_ROW_1_Y_END) / 2;
-      const deskHalfH =
-        row === 0
-          ? (DESK_ROW_0_Y_END - DESK_ROW_0_Y) / 2
-          : (DESK_ROW_1_Y_END - DESK_ROW_1_Y) / 2;
+    // Mark desks as obstacles — one band per desk row (3 in the vertical map).
+    for (const band of DESK_ROW_BANDS) {
+      const deskY = (band.y + band.yEnd) / 2;
+      const deskHalfH = (band.yEnd - band.y) / 2;
 
       for (const deskX of DESK_X_POSITIONS) {
         this.markRectangle(

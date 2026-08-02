@@ -54,8 +54,8 @@ const COLORS: Record<AgentId, string> = {
 const DESK_ASSIGNMENTS: Record<string, number> = {
   research: 1,
   analysis: 2,
-  draft: 5,
-  review: 6,
+  draft: 3,
+  review: 4,
 };
 
 function seedAgents(): Map<string, AgentAnimationState> {
@@ -142,6 +142,46 @@ type GameStore = {
   ) => void;
 };
 
+/**
+ * How long a speech bubble stays on screen before clearing itself.
+ *
+ * UNVERIFIED: the Claude Office source that owned this constant is outside the
+ * readable paths, so this is a stand-in, not the original value.
+ */
+const BUBBLE_DURATION_MS = 4000;
+
+/** One pending expiry per speaker, keyed by agent id (boss included). */
+const bubbleTimers = new Map<string, number>();
+
+/**
+ * Replaces any pending expiry for `id`, then arms a new one when a bubble is
+ * actually being shown. Clearing a bubble just cancels the timer.
+ */
+function scheduleBubbleExpiry(
+  id: string,
+  hasContent: boolean,
+  clear: () => void,
+): void {
+  const pending = bubbleTimers.get(id);
+
+  if (pending !== undefined) {
+    window.clearTimeout(pending);
+    bubbleTimers.delete(id);
+  }
+
+  if (!hasContent) {
+    return;
+  }
+
+  bubbleTimers.set(
+    id,
+    window.setTimeout(() => {
+      bubbleTimers.delete(id);
+      clear();
+    }, BUBBLE_DURATION_MS),
+  );
+}
+
 function patch(
   state: GameStore,
   id: string,
@@ -213,8 +253,15 @@ export const useGameStore = create<GameStore>((set) => ({
   setAgentTarget: (id, targetPosition) =>
     set((state) => patch(state, id, { targetPosition })),
   setAgentPhase: (id, phase) => set((state) => patch(state, id, { phase })),
-  setAgentBubble: (id, content) =>
-    set((state) => patch(state, id, { bubble: { content } })),
+  setAgentBubble: (id, content) => {
+    // One bubble per employee: a new bubble cancels the pending expiry of the
+    // one it replaces, so the timer always belongs to the visible bubble.
+    scheduleBubbleExpiry(id, content !== null, () => {
+      set((state) => patch(state, id, { bubble: { content: null } }));
+    });
+
+    set((state) => patch(state, id, { bubble: { content } }));
+  },
   setReady: (ready) => set({ ready }),
   reset: () => set({ agents: seedAgents() }),
 
@@ -243,8 +290,13 @@ export const useGameStore = create<GameStore>((set) => ({
       return { agents };
     }),
 
-  setBossBubble: (content) =>
-    set((state) => ({ boss: { ...state.boss, bubble: { content } } })),
+  setBossBubble: (content) => {
+    scheduleBubbleExpiry(BOSS_AGENT_ID, content !== null, () => {
+      set((state) => ({ boss: { ...state.boss, bubble: { content: null } } }));
+    });
+
+    set((state) => ({ boss: { ...state.boss, bubble: { content } } }));
+  },
   setBossState: (backendState) =>
     set((state) => ({ boss: { ...state.boss, backendState } })),
 

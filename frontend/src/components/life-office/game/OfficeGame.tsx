@@ -354,48 +354,20 @@ export function OfficeGame(): ReactNode {
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={0.6}
+        minScale={1}
         maxScale={3}
         centerZoomedOut={false}
         limitToBounds={false}
-        wheel={{ disabled: true }}
+        wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
-        onPanningStop={(ref) => {
-          settleWithinBounds(ref);
-
-          if (!isApplyingPreset()) {
-            notifyManualMove();
-          }
-        }}
-        onPinchStop={(ref) => {
-          settleWithinBounds(ref);
-
-          if (!isApplyingPreset()) {
-            notifyManualMove();
-          }
-        }}
-        onZoomStop={(ref) => { settleWithinBounds(ref); }}
       >
         <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
-          // The transform content box must BE the office, not a viewport-sized
-          // div with the canvas overflowing inside it — otherwise the library
-          // translates a box narrower than 1280 and the right edge is
-          // unreachable no matter what the clamp allows.
-          contentStyle={{
-            width: `${String(CANVAS_WIDTH)}px`,
-            height: `${String(CANVAS_HEIGHT)}px`,
-          }}
+          contentClass="w-full h-full"
         >
-          <div
-            className="pixi-canvas-container"
-            style={{
-              width: `${String(CANVAS_WIDTH)}px`,
-              height: `${String(CANVAS_HEIGHT)}px`,
-            }}
-          >
+          <div className="pixi-canvas-container w-full h-full">
             <Application
               key={`pixi-app-${hmrVersion}`}
               width={CANVAS_WIDTH}

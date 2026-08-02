@@ -13,7 +13,10 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../adapter/constants";
 // ============================================================================
 
 // Floor/wall dimensions
-const WALL_HEIGHT = 250;
+// Vertical layout: wall band is 160px (VERTICAL_OFFICE_LAYOUT_PLAN.md), matching
+// the navigation grid's WALL_Y_END. Everything else here is expressed in terms
+// of CANVAS_WIDTH/CANVAS_HEIGHT and reflows to portrait unchanged.
+const WALL_HEIGHT = 160;
 const WALL_TRIM_HEIGHT = 10;
 const FLOOR_TILE_SIZE = 100;
 
