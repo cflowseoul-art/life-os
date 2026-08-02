@@ -40,6 +40,7 @@ import { RevertLastReceipt } from "./application/revert-last-receipt.js";
 import { LlmInventoryQueryParser } from "./household-supplies/parser/llm-inventory-query-parser.js";
 import { RuleInventoryQueryParser } from "./household-supplies/parser/rule-inventory-query-parser.js";
 import { InventoryQueryParserRouter } from "./household-supplies/parser/inventory-query-parser-router.js";
+import { ResumeRunService } from "./application/resume/resume-run-service.js";
 
 
 const databaseUrl =
@@ -263,6 +264,12 @@ const moduleRouter =
     getKnowledgeDocuments,
   );
 
+// Execution kind (replay vs Claude) is resolved from APP_ENV during
+// construction; a disallowed combination throws here rather than mid-run.
+const resumeRunService = new ResumeRunService(
+  process.cwd(),
+);
+
 const httpHandler =
   new LifeOsHttpHandler(
     moduleRouter,
@@ -272,6 +279,7 @@ const httpHandler =
     assistantService,
     receiptAnalyzer,
     executeReceiptInventory,
+    resumeRunService,
   );
 
 const server =

@@ -12,17 +12,23 @@ import {
   nextScriptedEvent,
   workflowReducer,
 } from "./workflow";
-import type { JobContext, WorkflowState } from "./types";
+import type { JobContext, WorkflowEvent, WorkflowState } from "./types";
 
 export type WorkflowControls = {
   state: WorkflowState;
+  /** Applies an event directly — used to drive state from backend progress. */
+  send: (event: WorkflowEvent) => void;
   start: (jobContext: JobContext) => void;
   approve: () => void;
   reject: () => void;
   reset: () => void;
 };
 
-export function useWorkflowEngine(): WorkflowControls {
+/**
+ * @param scripted When false the mocked timer progression is suspended, so a
+ * real backend run can be the only thing advancing the workflow.
+ */
+export function useWorkflowEngine(scripted = true): WorkflowControls {
   const [state, dispatch] = useReducer(workflowReducer, undefined, createInitialState);
 
   const stateRef = useRef(state);
@@ -32,22 +38,27 @@ export function useWorkflowEngine(): WorkflowControls {
   const activePhase = activeStage ? state.stages[activeStage.id].phase : null;
 
   useEffect(() => {
-    const scripted = nextScriptedEvent(stateRef.current);
-
     if (!scripted) {
       return;
     }
 
+    const next = nextScriptedEvent(stateRef.current);
+
+    if (!next) {
+      return;
+    }
+
     const timer = window.setTimeout(() => {
-      dispatch(scripted.event);
-    }, scripted.delayMs);
+      dispatch(next.event);
+    }, next.delayMs);
 
     return () => window.clearTimeout(timer);
-  }, [state.status, state.activeStageIndex, activePhase]);
+  }, [scripted, state.status, state.activeStageIndex, activePhase]);
 
   return useMemo(
     () => ({
       state,
+      send: (event: WorkflowEvent) => { dispatch(event); },
       start: (jobContext: JobContext) =>
         dispatch({ type: "WORKFLOW_STARTED", jobContext }),
       approve: () => {

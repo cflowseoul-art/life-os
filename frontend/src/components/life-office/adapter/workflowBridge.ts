@@ -11,11 +11,23 @@
 import { useEffect, useRef } from "react";
 
 import { animationSystem } from "../systems/animationSystem";
-import { DESK_POSITIONS, WORK_POSITIONS } from "./constants";
+import { getDeskPosition } from "../systems/queuePositions";
+import { WORK_POSITIONS } from "./constants";
 import { useGameStore } from "./gameStore";
 import { BOSS_AGENT_ID } from "./types";
 import type { EmployeeId, WorkflowState } from "../types";
 import { REPORT_MESSAGE, STAGES } from "../workflow";
+
+/**
+ * Where an employee goes home to. Derived from the agent's own desk number in
+ * the store — the same source gameStore seeds positions from — so a sprite can
+ * never be sent to a desk it does not occupy.
+ */
+function deskPositionFor(agentId: string): ReturnType<typeof getDeskPosition> | null {
+  const agent = useGameStore.getState().agents.get(agentId);
+
+  return agent ? getDeskPosition(agent.desk) : null;
+}
 
 /** Phase → what the sprite is doing. */
 function phaseLabel(stageId: string): string {
@@ -42,7 +54,12 @@ export function useWorkflowBridge(state: WorkflowState): void {
     if (previous && previous !== activeId && previous !== BOSS_AGENT_ID) {
       s.setAgentBubble(previous, null);
       s.setAgentPhase(previous, "idle");
-      animationSystem.setAgentPath(previous, DESK_POSITIONS[previous]);
+
+      const home = deskPositionFor(previous);
+
+      if (home) {
+        animationSystem.setAgentPath(previous, home);
+      }
     }
 
     if (!activeStage || !activeId) {
@@ -70,7 +87,13 @@ export function useWorkflowBridge(state: WorkflowState): void {
     } else if (activePhase === "done") {
       s.setAgentPhase(activeId, "idle");
       s.setAgentBubble(activeId, null);
-      animationSystem.setAgentPath(activeId, DESK_POSITIONS[activeId]);
+
+      const home = deskPositionFor(activeId);
+
+      if (home) {
+        animationSystem.setAgentPath(activeId, home);
+      }
+
       walkedRef.current = null;
     }
   }, [store, state, activeStage, activeId, activePhase]);

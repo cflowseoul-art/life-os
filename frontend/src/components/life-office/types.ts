@@ -125,4 +125,6 @@ export type WorkflowEvent =
   | { type: "APPROVAL_GRANTED"; stageId: string }
   | { type: "APPROVAL_REJECTED"; stageId: string; reason: string }
   | { type: "STAGE_COMPLETED"; stageId: string }
-  | { type: "WORKFLOW_RESET" };
+  | { type: "WORKFLOW_RESET" }
+  /** Runtime failure from the backend run, distinct from a user rejection. */
+  | { type: "WORKFLOW_FAILED"; reason: string };

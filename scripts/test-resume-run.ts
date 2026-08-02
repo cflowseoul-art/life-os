@@ -1,9 +1,17 @@
 import path from "node:path";
 import { ResumeRunService } from "../src/application/resume/resume-run-service.js";
+import { selectRunner } from "../src/application/resume/resume-runner-factory.js";
 
 const repositoryRoot = path.resolve(".");
 
+// Replay by default: no APP_ENV means development, and development defaults
+// to the ReplayResumeRunner. Set RESUME_RUNNER=claude with
+// ALLOW_LIVE_AI_IN_DEV=true to exercise the real thing.
 const service = new ResumeRunService(repositoryRoot);
+
+console.log(
+  `runner: ${selectRunner().runnerName} (APP_ENV=${process.env.APP_ENV ?? "development"})`,
+);
 
 const run = service.start({
   company: "OpenAI",

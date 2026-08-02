@@ -27,38 +27,50 @@ export const BACKGROUND_COLOR = 0x1a1a1a;
 // ============================================================================
 
 /** Employee of the Month frame position */
-export const EMPLOYEE_OF_MONTH_POSITION = { x: 184, y: 50 };
+// Moved right, off the wall directly above desk 1, so the column above the
+// research/analysis row stays clear for speech bubbles.
+export const EMPLOYEE_OF_MONTH_POSITION = { x: 120, y: 50 };
 
 /** City window position */
-export const CITY_WINDOW_POSITION = { x: 319, y: 30 };
+// Pushed to the right half. It was directly over the Career desks, competing
+// with the team for attention and crowding bubble space.
+export const CITY_WINDOW_POSITION = { x: 880, y: 30 };
 
 /** Safety sign position */
-export const SAFETY_SIGN_POSITION = { x: 1120, y: 40 };
+// Stays far right as ambient detail; nothing important lives out here now.
+export const SAFETY_SIGN_POSITION = { x: 1160, y: 40 };
 
 /** Wall clock position */
-export const WALL_CLOCK_POSITION = { x: 581, y: 80 };
+// Shifted right of the whiteboard so the upper wall reads
+// left-to-right: awards, whiteboard, clock, window.
+export const WALL_CLOCK_POSITION = { x: 700, y: 80 };
 
 /** Wall outlet position (below clock) */
-export const WALL_OUTLET_POSITION = { x: 581, y: 209 };
+export const WALL_OUTLET_POSITION = { x: 700, y: 209 };
 
 /** Whiteboard position */
-export const WHITEBOARD_POSITION = { x: 641, y: 11 };
+// Centred over the Career desk block (x 256-512) rather than over the middle
+// of the empty room, so team + whiteboard fit one portrait framing.
+export const WHITEBOARD_POSITION = { x: 400, y: 11 };
 
 /** Water cooler position */
-export const WATER_COOLER_POSITION = { x: 1010, y: 200 };
+// Brought toward the team's right edge: a believable break spot the team can
+// walk to, without sitting on top of anyone's bubble.
+export const WATER_COOLER_POSITION = { x: 800, y: 300 };
 
 /** Coffee machine position (to the right of water cooler) */
-export const COFFEE_MACHINE_POSITION = { x: 1081, y: 191 };
+export const COFFEE_MACHINE_POSITION = { x: 880, y: 300 };
 
 // ============================================================================
 // FLOOR ELEMENTS
 // ============================================================================
 
-/** Printer station position (bottom left corner) */
-export const PRINTER_STATION_POSITION = { x: 50, y: 945 };
+/** Printer station position — near the manager, per the room brief. */
+// Was the far bottom-left corner, a full room away from the boss desk.
+export const PRINTER_STATION_POSITION = { x: 880, y: 940 };
 
 /** Plant position (to the right of printer) */
-export const PLANT_POSITION = { x: 118, y: 970 };
+export const PLANT_POSITION = { x: 960, y: 965 };
 
 // ============================================================================
 // BOSS AREA

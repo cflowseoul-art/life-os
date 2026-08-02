@@ -26,6 +26,10 @@ import type {
 import type {
   ExecuteReceiptInventory,
 } from "../../application/receipt/execute-receipt-inventory.js";
+
+import type {
+  ResumeRunService,
+} from "../../application/resume/resume-run-service.js";
 export type HttpRequest = {
   method: string;
   url: string;
@@ -85,6 +89,15 @@ type MatchedRoute =
       workspaceId: string;
     }
   | {
+      kind: "resume-run-start";
+      workspaceId: string;
+    }
+  | {
+      kind: "resume-run-status";
+      workspaceId: string;
+      runId: string;
+    }
+  | {
       kind: "not-found";
     };
 
@@ -106,6 +119,7 @@ export class LifeOsHttpHandler {
     private readonly assistantService?: AssistantService,
     private readonly receiptAnalyzer?: ReceiptAnalyzer,
     private readonly executeReceiptInventory?: ExecuteReceiptInventory,
+    private readonly resumeRunService?: ResumeRunService,
   ) {}
 
   async handle(
@@ -325,6 +339,73 @@ export class LifeOsHttpHandler {
     }
 
 
+    if (route.kind === "resume-run-start") {
+      if (method !== "POST") {
+        return this.methodNotAllowed();
+      }
+
+      if (!this.resumeRunService) {
+        return this.json(500, {
+          error: {
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Resume run service is not configured",
+          },
+        });
+      }
+
+      try {
+        const body = this.parseJsonBody(request.body);
+
+        // Execution kind is chosen by APP_ENV inside the service; the request
+        // cannot ask for replay or Claude.
+        const run = this.resumeRunService.start({
+          company: this.requireString(body, "company"),
+          role: this.requireString(body, "role"),
+          jdText: this.requireString(body, "jdText"),
+        });
+
+        return this.json(200, {
+          module: "resume",
+          action: "run_started",
+          data: run,
+        });
+      } catch (error) {
+        return this.handleError(error);
+      }
+    }
+
+    if (route.kind === "resume-run-status") {
+      if (method !== "GET") {
+        return this.methodNotAllowed();
+      }
+
+      if (!this.resumeRunService) {
+        return this.json(500, {
+          error: {
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Resume run service is not configured",
+          },
+        });
+      }
+
+      const run = this.resumeRunService.get(route.runId);
+
+      if (!run) {
+        return this.json(404, {
+          error: {
+            code: "NOT_FOUND",
+            message: "Resume run not found",
+          },
+        });
+      }
+
+      return this.json(200, {
+        module: "resume",
+        action: "run_status",
+        data: run,
+      });
+    }
+
     if (route.kind === "receipt-analyze") {
       if (method !== "POST") {
         return this.methodNotAllowed();
@@ -435,6 +516,43 @@ export class LifeOsHttpHandler {
         kind: "health",
       };
     }
+    const resumeRunStatusMatch = url.pathname.match(
+      /^\/api\/workspaces\/([^/]+)\/resume\/runs\/([^/]+)\/?$/,
+    );
+
+    if (resumeRunStatusMatch) {
+      const workspaceId =
+        this.decodeWorkspaceId(resumeRunStatusMatch[1]);
+
+      return workspaceId === null
+        ? {
+            kind: "not-found",
+          }
+        : {
+            kind: "resume-run-status",
+            workspaceId,
+            runId: decodeURIComponent(resumeRunStatusMatch[2] ?? ""),
+          };
+    }
+
+    const resumeRunStartMatch = url.pathname.match(
+      /^\/api\/workspaces\/([^/]+)\/resume\/runs\/?$/,
+    );
+
+    if (resumeRunStartMatch) {
+      const workspaceId =
+        this.decodeWorkspaceId(resumeRunStartMatch[1]);
+
+      return workspaceId === null
+        ? {
+            kind: "not-found",
+          }
+        : {
+            kind: "resume-run-start",
+            workspaceId,
+          };
+    }
+
     const assistantTextMatch = url.pathname.match(
       /^\/api\/workspaces\/([^/]+)\/assistant\/text\/?$/,
     );

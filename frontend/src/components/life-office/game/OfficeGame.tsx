@@ -94,6 +94,13 @@ import {
   useDeskPositions,
 } from "./DeskGrid";
 import { ZoomControls } from "./ZoomControls";
+import {
+  clampCurrent,
+  isApplyingPreset,
+  notifyManualMove,
+  registerCamera,
+  registerViewport,
+} from "../adapter/camera-presets";
 import { LoadingScreen } from "./LoadingScreen";
 import { OfficeBackground } from "./OfficeBackground";
 
@@ -183,6 +190,22 @@ export function OfficeGame(): ReactNode {
   const appRef = useRef<PixiApplication | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
+
+  // After any user gesture, snap back inside the shared bounds. This is the
+  // only clamp in play — the library's own limitToBounds is off, because its
+  // content box is the viewport-sized wrapper rather than the 1280x1024
+  // canvas, which produced asymmetric limits.
+  const settleWithinBounds = useCallback((ref: ReactZoomPanPinchRef) => {
+    const { positionX, positionY, scale } = ref.state;
+    const clamped = clampCurrent(positionX, positionY, scale);
+
+    if (
+      Math.abs(clamped.positionX - positionX) > 0.5
+      || Math.abs(clamped.positionY - positionY) > 0.5
+    ) {
+      ref.setTransform(clamped.positionX, clamped.positionY, scale, 120);
+    }
+  }, []);
 
   // HMR version for forcing remount
   const hmrVersion = getHmrVersion();
@@ -306,6 +329,21 @@ export function OfficeGame(): ReactNode {
   // ResizeObserver was causing progressive canvas drift because the event log
   // and sidebar content changes triggered micro-resizes on every update.
   useEffect(() => {
+    // Expose the camera so the mobile navigator can apply presets without
+    // either module importing the other.
+    registerCamera((positionX, positionY, scale) => {
+      transformRef.current?.setTransform(positionX, positionY, scale, 400);
+    });
+
+    // Bounds are computed against the wrapper's real box, not the window.
+    registerViewport(() => {
+      const element = transformRef.current?.instance.wrapperComponent;
+
+      return element
+        ? { width: element.clientWidth, height: element.clientHeight }
+        : { width: window.innerWidth, height: window.innerHeight };
+    });
+
     const handleResize = () => transformRef.current?.resetTransform(0);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -320,16 +358,44 @@ export function OfficeGame(): ReactNode {
         maxScale={3}
         centerZoomedOut={false}
         limitToBounds={false}
-        wheel={{ step: 0.1 }}
+        wheel={{ disabled: true }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
+        onPanningStop={(ref) => {
+          settleWithinBounds(ref);
+
+          if (!isApplyingPreset()) {
+            notifyManualMove();
+          }
+        }}
+        onPinchStop={(ref) => {
+          settleWithinBounds(ref);
+
+          if (!isApplyingPreset()) {
+            notifyManualMove();
+          }
+        }}
+        onZoomStop={(ref) => { settleWithinBounds(ref); }}
       >
         <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
-          contentClass="w-full h-full"
+          // The transform content box must BE the office, not a viewport-sized
+          // div with the canvas overflowing inside it — otherwise the library
+          // translates a box narrower than 1280 and the right edge is
+          // unreachable no matter what the clamp allows.
+          contentStyle={{
+            width: `${String(CANVAS_WIDTH)}px`,
+            height: `${String(CANVAS_HEIGHT)}px`,
+          }}
         >
-          <div className="pixi-canvas-container w-full h-full">
+          <div
+            className="pixi-canvas-container"
+            style={{
+              width: `${String(CANVAS_WIDTH)}px`,
+              height: `${String(CANVAS_HEIGHT)}px`,
+            }}
+          >
             <Application
               key={`pixi-app-${hmrVersion}`}
               width={CANVAS_WIDTH}

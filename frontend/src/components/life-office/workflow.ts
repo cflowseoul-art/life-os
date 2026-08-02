@@ -360,6 +360,41 @@ export function workflowReducer(
       return withLog(next, `${stage.title} — 대표 반려, 워크플로 중단`, "stop");
     }
 
+    case "WORKFLOW_FAILED": {
+      if (state.status === "stopped" || state.status === "completed") {
+        return state;
+      }
+
+      const employees = { ...state.employees };
+
+      for (const employee of CAREER_TEAM) {
+        if (employees[employee.id] !== "done") {
+          employees[employee.id] = "stopped";
+        }
+      }
+
+      // Only the stage that was mid-flight is marked; finished and pending
+      // stages keep their status. "rejected" is the closest existing
+      // StageStatus for "did not complete" — the union has no "failed".
+      const stages = { ...state.stages };
+      const active = STAGES[state.activeStageIndex];
+
+      if (active && stages[active.id]?.status === "in_progress") {
+        stages[active.id] = { status: "rejected", phase: null };
+      }
+
+      const next: WorkflowState = {
+        ...state,
+        status: "stopped",
+        stages,
+        employees,
+        approval: null,
+        stopReason: event.reason,
+      };
+
+      return withLog(next, `실행 실패 — ${event.reason}`, "stop");
+    }
+
     case "STAGE_COMPLETED": {
       const stage = stageById(event.stageId);
 
