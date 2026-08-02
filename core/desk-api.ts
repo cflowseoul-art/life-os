@@ -56,26 +56,26 @@ export type DeskView = {
 function describe(event: EventEnvelope["event"]): string {
   switch (event.type) {
     case "HandedOver":
-      return "위임 접수";
+      return "맡았습니다";
     case "ObservationRecorded":
-      return `근거 기록 — ${event.observation.statement}`;
+      return `확인했습니다 — ${event.observation.statement}`;
     case "AskRaised":
-      return `결재 요청 — ${event.ask.question}`;
+      return `여쭤봤습니다 — ${event.ask.question}`;
     case "AskAnswered":
-      return "대표님 결정 기록";
+      return "대표님께서 정해 주셨습니다";
     case "ArtifactKept":
-      return `결과 보관 — ${event.artifact.title}`;
+      return `정리해서 올렸습니다 — ${event.artifact.title}`;
     case "ProposalRejected":
-      return `제안 반려 — ${event.reasons.join(", ")}`;
+      return `확인이 덜 돼 다시 보고 있습니다 — ${event.reasons.join(", ")}`;
     case "HoldWithdrawn":
-      return `철회 — ${event.reason}`;
+      return `그만두었습니다 — ${event.reason}`;
   }
 }
 
 function actorLabel(actor: EventEnvelope["actor"]): string {
   if (actor.kind === "user") return "대표님";
   if (actor.kind === "capability") return contributorFor(actor.id);
-  return "시스템";
+  return "회사";
 }
 
 function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
@@ -101,8 +101,8 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       section: "awaiting",
       title,
       contributor,
-      status: "결재 대기",
-      report: `공고 원문에서 요건 ${String(observed)}개를 그대로 옮겨 적었습니다. 어느 것을 앞세울지는 대표님 판단입니다.`,
+      status: "결정을 기다리고 있습니다",
+      report: `보내주신 공고에서 요건 ${String(observed)}개를 확인했습니다. 어느 쪽을 앞세울지는 대표님께서 정해 주셔야 할 것 같습니다.`,
       ask: hold.outstandingAsk,
       artifact: null,
       observations: hold.observations,
@@ -117,8 +117,8 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       section: "done",
       title,
       contributor,
-      status: "완료",
-      report: `대표님이 정하신 순서대로 ${String(hold.artifact.sections.length)}개 항목을 정리했습니다. 각 항목은 공고 원문 줄 번호로 되짚을 수 있습니다.`,
+      status: "마무리했습니다",
+      report: `정해 주신 순서대로 ${String(hold.artifact.sections.length)}개 항목을 정리했습니다. 어느 문장이 어디서 나왔는지도 안에 그대로 남겨 두었습니다.`,
       ask: null,
       artifact: hold.artifact,
       observations: hold.observations,
@@ -132,8 +132,8 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     section: "inProgress",
     title,
     contributor,
-    status: observed === 0 ? "공고 원문 확인 중" : `공고 요건 ${String(observed)}개 확인함`,
-    report: "맡아 두었습니다. 대표님 판단이 필요한 지점에 닿으면 그때 올리겠습니다.",
+    status: observed === 0 ? "보내주신 공고를 읽고 있습니다" : `공고에서 요건 ${String(observed)}개를 확인했습니다`,
+    report: "맡아 두었습니다. 대표님 판단이 필요한 지점에 닿으면 그때 올려드리겠습니다.",
     ask: null,
     artifact: null,
     observations: hold.observations,

@@ -69,6 +69,27 @@ function when(iso: string | undefined): string {
   return d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
 }
 
+/**
+ * Provenance, said the way a person would say it. The record stores a pointer
+ * (`handover.jdText:2`); nobody outside the code should ever read that.
+ */
+function naturalSource(text: string): string {
+  return text
+    .replace(/handover\.jdText:(\d+)/g, "보내주신 공고 $1번째 줄")
+    .replace(/^공고 원문 (.+) 에서 확인한 요건입니다\.$/, "$1에서 확인했습니다");
+}
+
+/** Refusals, said by a person rather than by a validator. */
+function naturalRefusal(reason: string): string {
+  if (reason.includes("회사") || reason.includes("직무")) {
+    return "어느 회사, 어떤 자리인지까지 적어 주시면 바로 착수하겠습니다. (예: 토스 · 프로덕트 디자이너)";
+  }
+  if (reason.includes("본문")) {
+    return "공고 내용을 함께 주시면 그대로 읽고 정리하겠습니다.";
+  }
+  return reason;
+}
+
 function lastMoved(work: Work): string {
   return when(work.history[work.history.length - 1]?.at);
 }
@@ -112,7 +133,7 @@ function Reading({
 
   return (
     <div className="rc__read">
-      <button type="button" className="rc__icon-btn" onClick={onBack} aria-label="뒤로">←</button>
+      <button type="button" className="rc__icon-btn" onClick={onBack} aria-label="이전으로">←</button>
 
       <h1>{work.title}</h1>
 
@@ -131,7 +152,7 @@ function Reading({
 
       {work.ask && (
         <div className="rc__block">
-          <h2>결정</h2>
+          <h2>무엇을 정해 주시면 됩니까?</h2>
           <p>{work.ask.question}</p>
           <div className="rc__choices">
             {work.ask.options.map((option) => (
@@ -163,13 +184,13 @@ function Reading({
 
       {work.artifact && (
         <div className="rc__block">
-          <h2>결과</h2>
+          <h2>정리한 결과</h2>
           <p>{work.artifact.title}</p>
           <ul className="rc__facts">
             {work.artifact.sections.map((s) => (
               <li key={s.heading}>
                 {s.heading}
-                <span className="rc__src">{s.body}</span>
+                <span className="rc__src">{naturalSource(s.body)}</span>
               </li>
             ))}
           </ul>
@@ -177,25 +198,32 @@ function Reading({
       )}
 
       <div className="rc__block">
-        <h2>판단 근거</h2>
+        <h2>왜 이렇게 판단했나요?</h2>
         <p>
-          맡기신 원문에 적힌 내용만 그대로 옮겼고, 원문에 없는 내용은 채우지 않았습니다.
-          무엇을 앞세울지는 대표님 판단으로 남겨 두었습니다.
+          보내주신 공고에 적혀 있는 문장만 그대로 옮겼습니다. 없는 내용은 지어내지
+          않았습니다.
         </p>
-        <p>입력: 대표님이 보내신 요청과 첨부. 가정: 따로 강조하라고 하신 항목은 없습니다.</p>
+        <p>
+          어느 쪽을 앞세우느냐는 대표님께서 어떤 사람으로 읽히고 싶으신지의 문제라,
+          제가 정하지 않고 여쭙습니다.
+        </p>
+        <p>
+          따로 강조해 달라고 하신 부분은 없었습니다. 그렇게 알고 진행했습니다.
+        </p>
       </div>
 
       <div className="rc__block">
-        <h2>근거 · 출처</h2>
+        <h2>무엇을 확인했나요?</h2>
         {work.observations.length === 0 ? (
-          <p>기록된 근거가 없습니다.</p>
+          <p>아직 확인한 것이 없습니다.</p>
         ) : (
           <ul className="rc__facts">
             {work.observations.map((o) => (
               <li key={o.id}>
                 {o.statement}
                 <span className="rc__src">
-                  {o.source} · {when(o.acquiredAt)} 확인 · 확신도 {o.confidence}
+                  {naturalSource(o.source)} · {when(o.acquiredAt)}에 확인
+                  {o.confidence < 1 && " · 미루어 본 것"}
                 </span>
               </li>
             ))}
@@ -204,7 +232,7 @@ function Reading({
       </div>
 
       <div className="rc__block">
-        <h2>처리 이력</h2>
+        <h2>진행 과정</h2>
         <ul className="rc__facts">
           {work.history.map((h, i) => (
             <li key={`${h.at}-${String(i)}`}>
@@ -257,13 +285,13 @@ function Compose({
       <div className="rc__compose-body">
         <div className="rc__to">
           <span>받는 곳</span>
-          <span>AI Company</span>
+          <span>우리 회사</span>
         </div>
 
         <textarea
           className="rc__write"
           rows={8}
-          placeholder="맡기실 일을 평소 말씀하시듯 적어 주세요."
+          placeholder="무엇을 맡기시겠습니까? 평소 말씀하시듯 적어 주십시오."
           value={text}
           onChange={(e) => { setText(e.target.value); }}
         />
@@ -273,7 +301,7 @@ function Compose({
           <textarea
             className="rc__attach-box"
             rows={6}
-            placeholder="공고나 문서를 붙여 넣으세요."
+            placeholder="공고나 문서가 있으시면 여기에 붙여 주십시오."
             value={attachment}
             onChange={(e) => { setAttachment(e.target.value); }}
           />
@@ -281,7 +309,7 @@ function Compose({
 
         {refusals.length > 0 && (
           <ul className="rc__refusals">
-            {refusals.map((r) => <li key={r}>{r}</li>)}
+            {[...new Set(refusals.map(naturalRefusal))].map((r) => <li key={r}>{r}</li>)}
           </ul>
         )}
       </div>
@@ -306,7 +334,7 @@ export default function RepresentativeComputer() {
     fetch("/api/desk")
       .then((r) => r.json() as Promise<Desk>)
       .then(setDesk)
-      .catch(() => { setError("컴퓨터를 열지 못했습니다."); });
+      .catch(() => { setError("지금은 열어드리지 못했습니다. 잠시 후 다시 들어와 주십시오."); });
   }, []);
 
   const send = useCallback((v: { subject: string; request: string; attachment: string }) => {
@@ -324,10 +352,10 @@ export default function RepresentativeComputer() {
           setComposing(false);
           setAccepted(true);
         } else {
-          setRefusals(result.reasons ?? ["보내지 못했습니다."]);
+          setRefusals(result.reasons ?? ["보내드리지 못했습니다."]);
         }
       })
-      .catch(() => { setRefusals(["보내지 못했습니다."]); })
+      .catch(() => { setRefusals(["보내드리지 못했습니다."]); })
       .finally(() => { setBusy(false); });
   }, []);
 
@@ -345,10 +373,10 @@ export default function RepresentativeComputer() {
           setOpenId(null);
           setReleased(true);
         } else {
-          setError(result.reason ?? "결정을 기록하지 못했습니다.");
+          setError(result.reason ?? "정하신 것을 남기지 못했습니다. 다시 한 번 눌러 주십시오.");
         }
       })
-      .catch(() => { setError("결정을 기록하지 못했습니다."); })
+      .catch(() => { setError("정하신 것을 남기지 못했습니다. 다시 한 번 눌러 주십시오."); })
       .finally(() => { setBusy(false); });
   }, []);
 
@@ -386,7 +414,7 @@ export default function RepresentativeComputer() {
           <input
             className="rc__search"
             type="search"
-            placeholder="보고 검색"
+            placeholder="보고 찾기"
             value={query}
             onChange={(e) => { setQuery(e.target.value); }}
           />
@@ -425,8 +453,8 @@ export default function RepresentativeComputer() {
         />
       ) : firstRun ? (
         <div className="rc__intro">
-          <p className="rc__intro-lede">저희가 대표님 밑에서 일합니다.</p>
-          <p>맡기실 일을 평소 말씀하시듯 적어 주시면 됩니다.</p>
+          <p className="rc__intro-lede">저희가 대표님 회사의 직원들입니다.</p>
+          <p>맡기실 일을 평소 말씀하시듯 적어 주시면 됩니다. 나머지는 저희가 맡겠습니다.</p>
           <ul className="rc__intro-examples">
             <li>“이 공고 보고 이력서 좀 맞춰 줘”</li>
             <li>“우유 다 썼어. 다음에 장 볼 때 챙겨 줘”</li>
@@ -434,8 +462,8 @@ export default function RepresentativeComputer() {
             <li>“다음 주에 검진 예약해야 하는데 일정이랑 안 겹치게 봐 줘”</li>
           </ul>
           <p className="rc__intro-bound">
-            돈이 나가거나, 다른 사람에게 말이 전해지거나, 되돌릴 수 없는 일은 먼저 대표님께
-            여쭙고 진행합니다.
+            돈이 나가거나, 다른 사람에게 말이 전해지거나, 되돌릴 수 없는 일은 반드시 먼저
+            여쭙고 진행하겠습니다.
           </p>
         </div>
       ) : (
@@ -445,41 +473,41 @@ export default function RepresentativeComputer() {
               <h2>김리서치</h2>
               <p>맡았습니다.</p>
               <p>현재 적절한 팀에 배정하고 있습니다.</p>
-              <p className="rc__fine">대표님의 판단이 필요한 시점에 다시 보고드리겠습니다.</p>
+              <p className="rc__fine">대표님 판단이 필요한 때에 다시 올려드리겠습니다.</p>
             </div>
           )}
 
           {released && (
             <div className="rc__notice">
               <h2>정해 주셔서 감사합니다.</h2>
-              <p>이어서 정리하고, 끝나면 지난 보고에 올려 두겠습니다.</p>
+              <p>이어서 정리해서, 끝나면 지난 보고에 올려 두겠습니다.</p>
               <p className="rc__fine">닫으셔도 됩니다. 열어 두지 않아도 진행됩니다.</p>
             </div>
           )}
 
           {place === "inbox" && (
             inbox.length === 0
-              ? <p className="rc__none">{q === "" ? "올라온 보고가 없습니다." : "찾으시는 보고가 없습니다."}</p>
+              ? <p className="rc__none">{q === "" ? "아직 올려드릴 보고가 없습니다." : "찾으시는 보고가 없습니다."}</p>
               : inbox.map((w) => <Mail key={w.id} work={w} onOpen={() => { setOpenId(w.id); }} />)
           )}
 
           {place === "entrusted" && (
             <>
-              <p className="rc__label">지금 회사가 맡고 있는 일입니다.</p>
+              <p className="rc__label">지금 저희가 맡고 있는 일입니다.</p>
               {entrusted.length === 0
-                ? <p className="rc__none">맡긴 일이 없습니다.</p>
+                ? <p className="rc__none">지금 맡고 있는 일이 없습니다.</p>
                 : entrusted.map((w) => <Mail key={w.id} work={w} onOpen={() => { setOpenId(w.id); }} />)}
             </>
           )}
 
           {place === "past" && (
             past.length === 0
-              ? <p className="rc__none">{q === "" ? "지난 보고가 없습니다." : "찾으시는 보고가 없습니다."}</p>
+              ? <p className="rc__none">{q === "" ? "지난 보고가 아직 없습니다." : "찾으시는 보고가 없습니다."}</p>
               : past.map((w) => <Mail key={w.id} work={w} onOpen={() => { setOpenId(w.id); }} />)
           )}
 
           {place === "schedule" && (
-            <p className="rc__none">지금 알고 계셔야 할 약속은 없습니다.</p>
+            <p className="rc__none">지금 챙기실 약속은 없습니다.</p>
           )}
         </div>
       )}
