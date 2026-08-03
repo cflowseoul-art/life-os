@@ -198,10 +198,6 @@ button, input, textarea { font: inherit; color: inherit; }
 .subject { font-size: 14px; font-weight: 500; margin-top: 7px; white-space: normal; }
 .snippet { font-size: 13px; color: var(--ink-2); margin-top: 3px; line-height: 1.55; white-space: normal; }
 
-/* 완료는 잠깐 머무는 자리입니다. 그 사실을 조용히 적어 둡니다. */
-.retention { margin: -2px 0 4px; padding: 0 16px 8px; font-size: 12px; color: var(--ink-4); }
-.stamp--filed { color: var(--ink-4); border-style: dashed; }
-
 .empty { padding: 20px 16px; font-size: 14px; color: var(--ink-4); }
 
 /* ── Reader ──────────────────────────────────────────────────────────── */
@@ -410,7 +406,7 @@ body[data-drawer="true"] .drawer { transform: none; }
   .panel { padding-bottom: 40px; }
   .desks { grid-template-columns: 1fr 1fr; }
   .row { padding-left: 20px; padding-right: 20px; }
-  .screen-head, .group-label, .empty, .cal, .retention { padding-left: 20px; padding-right: 20px; }
+  .screen-head, .group-label, .empty, .cal { padding-left: 20px; padding-right: 20px; }
   .reader { padding-left: 20px; }
   .fab { right: calc(100% - 1120px + 24px); }
 }

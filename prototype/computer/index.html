@@ -185,12 +185,11 @@
     <!-- ── 3. Reports ───────────────────────────────────────────────── -->
     <section class="screen" id="reports">
       <div class="screen-head">
-        <h1 class="screen-title">Drop</h1>
-        <p class="screen-sub">마무리된 서류를 정리해 둔 곳입니다. 꺼내 보실 수 있게 그대로 둡니다.</p>
+        <h1 class="screen-title">지난 보고</h1>
+        <p class="screen-sub">마무리된 보고는 여기 그대로 남습니다. 언제든 꺼내 보실 수 있습니다.</p>
       </div>
 
-      <p class="group-label">완료</p>
-      <p class="retention">하루가 지나면 아래로 정리해 둡니다.</p>
+      <p class="group-label">2026년 8월</p>
 
       <button class="row" type="button" onclick="openReport('receipt')">
         <span class="sprite" aria-hidden="true">한</span>
@@ -200,7 +199,7 @@
           <span class="subject">이마트 성수점 영수증</span>
           <span class="snippet">3개 품목 재고 반영 · 지출 18,500원 재무팀 전달</span>
         </span>
-        <span><span class="stamp stamp--filed">보관</span><span class="when">8/2</span></span>
+        <span><span class="stamp">완료</span><span class="when">8/2</span></span>
       </button>
 
       <button class="row" type="button" onclick="openReport('career-done')">
@@ -211,10 +210,10 @@
           <span class="subject">토스 · 프로덕트 디자이너</span>
           <span class="snippet">이력서 정리본 · 3개 항목 배치</span>
         </span>
-        <span><span class="stamp stamp--filed">보관</span><span class="when">7/31</span></span>
+        <span><span class="stamp">완료</span><span class="when">7/31</span></span>
       </button>
 
-      <p class="group-label">정리된 서류</p>
+      <p class="group-label">2026년 7월</p>
 
       <button class="row" type="button" onclick="openReport('finance')">
         <span class="sprite" aria-hidden="true">김</span>
@@ -470,7 +469,7 @@
 <script>
   const PLACES = [
     { id: "inbox", label: "받은 보고", glyph: "📥" },
-    { id: "reports", label: "Drop", glyph: "🗄" },
+    { id: "reports", label: "지난 보고", glyph: "📚" },
     { id: "outbox", label: "보낸 지시", glyph: "📤" },
     { id: "calendar", label: "일정", glyph: "📅" },
   ];
