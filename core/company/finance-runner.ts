@@ -13,7 +13,7 @@ import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
 import { anomalies, baselines, onlySpending } from "../capabilities/finance/ledger.ts";
 import { ALL_POLICIES_PASS, recommendationRequested, violations } from "../capabilities/finance/policy.ts";
-import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
+import { readCategoryRules, readKpi, readLedger } from "../infrastructure/ledger/dugong.ts";
 
 type FinanceHold = {
   holdId: string;
@@ -78,6 +78,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
 
   const read = await readLedger();
   const rules = await readCategoryRules();
+  const kpi = await readKpi();
   const actor = { kind: "capability" as const, id: finance.CAPABILITY_ID };
   const now = today.toISOString();
   const currentMonth = now.slice(0, 7);
@@ -110,7 +111,12 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
     // A month is only complete once the next one has begun.
     const monthComplete = months.some((m) => m.month > currentMonth);
     const found = anomalies(spending, currentMonth, 3, monthComplete);
-    const failed = violations({ transactions: read.transactions, rules, month: currentMonth });
+    const failed = violations({
+      transactions: read.transactions,
+      rules,
+      month: currentMonth,
+      kpi: kpi.get(currentMonth),
+    });
     const asked = recommendationRequested(hold.text);
 
     // Statements are recorded with their kind. Nothing normal is recorded:

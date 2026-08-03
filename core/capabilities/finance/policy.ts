@@ -52,6 +52,8 @@ export type PolicyContext = {
   transactions: LedgerTransaction[];
   rules: Map<string, CategoryRule>;
   month: string;
+  /** LOOKER_KPI figures for the month, as the ledger computed them. */
+  kpi?: Record<string, number>;
 };
 
 /** Finance's registry. The engine owns evaluation; Finance owns the rules. */
@@ -140,6 +142,39 @@ financePolicies.register({
 /** Only the rules that are not being followed. Evaluation lives in the engine. */
 export function violations(context: PolicyContext) {
   return financePolicies.evaluate(context);
+}
+
+/**
+ * 부수입은 투자 가능 금액보다 커야 한다.
+ *
+ * Both figures are the ledger's: 부수입 is summed from 거래내역 rows the ledger
+ * classified as such, and 투자 가능 금액 is LOOKER_KPI's own column. Finance
+ * computes neither.
+ */
+financePolicies.register({
+  id: "side-income-over-investable",
+  title: "부수입 > 투자 가능 금액",
+  severity: "medium",
+  condition: (ctx) => {
+    const investable = ctx.kpi?.["투자 가능 금액"];
+    if (investable === undefined) return true;
+    return sideIncome(ctx) > investable;
+  },
+  evidence: (ctx) => asEvidence(sideIncomeRows(ctx)),
+  template: {
+    state: (ctx) =>
+      `${ctx.month} 부수입은 ${won(sideIncome(ctx))}, 투자 가능 금액은 `
+      + `${won(ctx.kpi?.["투자 가능 금액"] ?? 0)}입니다.`,
+    expected: "부수입이 투자 가능 금액보다 커야 합니다.",
+  },
+});
+
+function sideIncomeRows(ctx: PolicyContext): LedgerTransaction[] {
+  return ctx.transactions.filter((tx) => tx.month === ctx.month && tx.category.trim() === "부수입");
+}
+
+function sideIncome(ctx: PolicyContext): number {
+  return sideIncomeRows(ctx).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 }
 
 export const ALL_POLICIES_PASS = "대표님께서 설정하신 운영 기준은 모두 정상입니다.";
