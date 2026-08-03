@@ -10,12 +10,19 @@
  * place, rather than at every call site.
  */
 
+import { existsSync } from "node:fs";
+
 import { EventLog } from "../events/log.ts";
 import type { ActorContext, Scope } from "../identity/types.ts";
 
 export interface EventStore {
   /** The stream a capability of this scope writes to and reads from. */
   logFor(context: ActorContext, scope: Scope): EventLog;
+  /**
+   * Everything this person may read: the household stream plus their own.
+   * Another member's personal stream is not in this list and cannot be.
+   */
+  readableFor(context: ActorContext): EventLog[];
 }
 
 /**
@@ -34,7 +41,21 @@ export class FileEventStore implements EventStore {
       scope === "household"
         ? `${this.root}/households/${household}/household.jsonl`
         : `${this.root}/households/${household}/users/${context.user.id}.jsonl`,
+      { householdId: household, scope, userId: context.user.id },
     );
+  }
+
+  readableFor(context: ActorContext): EventLog[] {
+    const streams = [this.logFor(context, "household"), this.logFor(context, "personal")];
+
+    // Work recorded before identity existed belongs to the household owner, and
+    // to nobody else. It is read, never rewritten (Art. 18).
+    const legacy = process.env.LIFE_OS_LOG ?? `${this.root}/events.jsonl`;
+    if (context.household.ownerUserId === context.user.id && existsSync(legacy)) {
+      streams.push(new EventLog(legacy));
+    }
+
+    return streams;
   }
 }
 
@@ -49,5 +70,9 @@ export class LegacyEventStore implements EventStore {
 
   logFor(): EventLog {
     return this.log;
+  }
+
+  readableFor(): EventLog[] {
+    return [this.log];
   }
 }

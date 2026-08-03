@@ -28,8 +28,14 @@ export class EventLogCorrupt extends Error {
   }
 }
 
+/** Identity stamped on every event this log writes. */
+export type LogStamp = { householdId: string; scope: "personal" | "household"; userId?: string };
+
 export class EventLog {
-  constructor(private readonly path: string = DEFAULT_LOG_PATH) {}
+  constructor(
+    private readonly path: string = DEFAULT_LOG_PATH,
+    private readonly stamp?: LogStamp,
+  ) {}
 
   /**
    * Durably appends one event and returns the envelope.
@@ -47,10 +53,15 @@ export class EventLog {
       id: randomUUID(),
       schemaVersion: SCHEMA_VERSION,
       at: new Date().toISOString(),
-      actor,
+      // A user action carries the person; the log knows the household and scope.
+      actor:
+        actor.kind === "user" && this.stamp?.userId
+          ? { kind: "user", userId: this.stamp.userId }
+          : actor,
       capability,
       source,
       event,
+      ...(this.stamp ? { householdId: this.stamp.householdId, scope: this.stamp.scope } : {}),
     };
 
     mkdirSync(dirname(this.path), { recursive: true });

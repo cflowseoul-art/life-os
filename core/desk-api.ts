@@ -16,6 +16,8 @@ import { createServer } from "node:http";
 import { verifyGoogleIdToken } from "./identity/google.ts";
 import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
 import { FileIdentityStore } from "./identity/store.ts";
+import { FileEventStore } from "./storage/event-store.ts";
+import { scopeOf } from "./company/scope.ts";
 import type { ActorContext } from "./identity/types.ts";
 import {
   clearedCookie,
@@ -26,13 +28,12 @@ import {
   sessionCookie,
 } from "./identity/session.ts";
 
-import { CustodyEngine } from "./custody/engine.ts";
+import { CustodyEngine, project } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
 import { advanceFinanceFromLedger } from "./company/finance-runner.ts";
-import { startFinanceSchedule } from "./company/finance-watch.ts";
 import { advanceHome } from "./company/home-runner.ts";
 import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
 import { readReceipt } from "./capabilities/home/index.ts";
@@ -219,13 +220,16 @@ function toWork(
   };
 }
 
-export function deskView(engine: CustodyEngine, log: EventLog): DeskView {
-  const events = log.read();
+export function deskView(engine: CustodyEngine, logs: EventLog[]): DeskView {
+  // Household stream + this person's own. Another member's personal stream is
+  // not readable here, so it cannot appear however the projection is written.
+  const events = logs
+    .flatMap((l) => l.read())
+    .sort((a, b) => a.at.localeCompare(b.at));
   const projects = detectProjects(events);
   // The order exists before any department result is read.
   const workOrders = projectWorkOrders(events);
-  const works = engine
-    .ledger()
+  const works = [...project(events).values()]
     .map((hold) => toWork(hold, events, projects, workOrders))
     .filter((w): w is DeskWork => w !== null);
 
@@ -262,7 +266,24 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
 }
 
 const identity = new FileIdentityStore();
-const log = new EventLog(process.env.LIFE_OS_LOG);
+const events = new FileEventStore();
+
+/** Everything a request needs, resolved from the actor and nothing else. */
+function desk(actor: ActorContext) {
+  const household = events.logFor(actor, "household");
+  const personal = events.logFor(actor, "personal");
+  const readable = events.readableFor(actor);
+
+  return {
+    household,
+    personal,
+    readable,
+    /** Career is personal, so the custody engine runs on the personal stream. */
+    engine: new CustodyEngine(personal),
+    logFor: (capability: string) => (scopeOf(capability) === "household" ? household : personal),
+    view: () => deskView(new CustodyEngine(personal), readable),
+  };
+}
 
 /**
  * The authentication boundary.
@@ -282,10 +303,9 @@ function body(req: import("node:http").IncomingMessage): Promise<string> {
     req.on("end", () => { resolve(text); });
   });
 }
-const engine = new CustodyEngine(log);
-
-// Month start, and the ledger changing. Nothing else wakes Finance.
-startFinanceSchedule(log);
+// The scheduled check needs a household to check for, and a household comes
+// from an actor. Re-enabled in the next milestone, when a background runner can
+// resolve one without a request. See MIGRATION note.
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -357,10 +377,12 @@ function handle(
   url: URL,
   actor: ActorContext,
 ): void {
-  void actor;
+  const ctx = desk(actor);
+  const engine = ctx.engine;
+  const log = ctx.household;
 
   if (req.method === "GET" && url.pathname === "/api/desk") {
-    json(res, 200, deskView(engine, log));
+    json(res, 200, ctx.view());
     return;
   }
 
@@ -390,7 +412,7 @@ function handle(
 
       // Home records receipts itself: no fork, so no engine round trip.
       if (routed.capability === "home") {
-        log.append(
+        ctx.logFor("home").append(
           {
             type: "HandedOver",
             holdId: randomUUID(),
@@ -406,14 +428,14 @@ function handle(
           "ceo-office:accepted",
         );
 
-        advanceHome(log);
-        json(res, 200, { ok: true, desk: deskView(engine, log) });
+        advanceHome(ctx.logFor("home"));
+        json(res, 200, { ok: true, desk: ctx.view() });
         return;
       }
 
       // Finance reads statements itself, same shape as Home.
       if (routed.capability === "finance") {
-        log.append(
+        ctx.logFor("finance").append(
           {
             type: "HandedOver",
             holdId: randomUUID(),
@@ -429,8 +451,8 @@ function handle(
           "ceo-office:accepted",
         );
 
-        void advanceFinanceFromLedger(log).then(() => {
-          json(res, 200, { ok: true, desk: deskView(engine, log) });
+        void advanceFinanceFromLedger(ctx.logFor("finance")).then(() => {
+          json(res, 200, { ok: true, desk: ctx.view() });
         });
         return;
       }
@@ -438,7 +460,7 @@ function handle(
       // A department that cannot execute yet still owns the work and still
       // takes custody. Work is never refused for a missing capability (§3).
       if (!isStaffed(routed)) {
-        log.append(
+        ctx.logFor(routed.owner).append(
           {
             type: "HandedOver",
             holdId: randomUUID(),
@@ -454,7 +476,7 @@ function handle(
           "computer",
         );
 
-        json(res, 200, { ok: true, desk: deskView(engine, log) });
+        json(res, 200, { ok: true, desk: ctx.view() });
         return;
       }
 
@@ -470,7 +492,7 @@ function handle(
         return;
       }
 
-      json(res, 200, { ok: true, holdId: result.holdId, desk: deskView(engine, log) });
+      json(res, 200, { ok: true, holdId: result.holdId, desk: ctx.view() });
     });
     return;
   }
@@ -536,8 +558,8 @@ function handle(
         "computer",
       );
 
-      advanceHome(log);
-      json(res, 200, { ok: true, desk: deskView(engine, log) });
+      advanceHome(ctx.logFor("home"));
+      json(res, 200, { ok: true, desk: ctx.view() });
     });
     return;
   }
@@ -573,8 +595,8 @@ function handle(
           "ceo-office:accepted",
         );
 
-        void advanceFinanceFromLedger(log).then(() => {
-          json(res, 200, { ok: true, desk: deskView(engine, log) });
+        void advanceFinanceFromLedger(ctx.logFor("finance")).then(() => {
+          json(res, 200, { ok: true, desk: ctx.view() });
         });
         return;
       }
@@ -589,9 +611,9 @@ function handle(
 
       // Work may have completed. The owning department starts whatever
       // naturally follows, silently. Nothing about this is reported (§4).
-      continueProjects(log);
+      continueProjects(ctx.personal);
 
-      json(res, 200, { ok: true, desk: deskView(engine, log) });
+      json(res, 200, { ok: true, desk: ctx.view() });
     });
     return;
   }

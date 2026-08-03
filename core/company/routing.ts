@@ -18,6 +18,9 @@
  * wired in, it proposes a department and this module still decides (Art. 7).
  */
 
+import type { Scope } from "../identity/types.ts";
+import { scopeOf } from "./scope.ts";
+
 export type DepartmentId =
   | "asset"
   | "treasury"
@@ -32,6 +35,8 @@ export type DepartmentId =
 
 type Department = {
   id: DepartmentId;
+  /** Required. A department with no declared scope cannot exist. */
+  scope: Scope;
   /** Words that indicate the decision this work will produce. Strong. */
   decisionSignals: string[];
   /** Words that indicate what the work is about. Weak. */
@@ -56,6 +61,7 @@ const DEPARTMENTS: Department[] = [
     // State: what is owned or owed right now. Ambiguous "얼마나 있어?" is a
     // question about state, so it belongs here rather than to Finance.
     id: "asset",
+    scope: scopeOf("asset"),
     decisionSignals: [
       "잔액", "얼마나 있", "얼마 있", "자산", "순자산", "부채", "빚",
       "예금", "적금", "통장에", "남아 있", "보유", "받을 돈", "예정 자산",
@@ -66,6 +72,7 @@ const DEPARTMENTS: Department[] = [
   {
     // Capacity: what can be put to work. "얼마 있어"는 Asset, "얼마 쓸 수 있어"는 Treasury.
     id: "treasury",
+    scope: scopeOf("treasury"),
     decisionSignals: [
       "운용", "여윳돈", "여유 자금", "굴릴", "굴려", "투자할 수 있", "비상금",
       "버틸 수 있", "몇 달", "여유가 얼마",
@@ -75,12 +82,14 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "career",
+    scope: scopeOf("career"),
     decisionSignals: ["이력서", "지원", "공고", "채용", "포트폴리오", "면접", "오퍼", "이직"],
     subjectSignals: ["회사", "직무", "경력", "연봉 협상"],
     capability: "career",
   },
   {
     id: "finance",
+    scope: scopeOf("finance"),
     decisionSignals: [
       "결제", "해지", "구독", "송금", "지출", "예산", "청구", "명세서", "자동이체",
       // How money was used — Finance's question, distinct from what is held.
@@ -92,6 +101,7 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "home",
+    scope: scopeOf("home"),
     decisionSignals: [
       "장보기", "주문", "구매", "재고", "떨어졌", "다 썼", "영수증", "마트", "장 봤",
       // A request to buy something for the house is Home's, and stops at the list.
@@ -102,6 +112,7 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "health",
+    scope: scopeOf("health"),
     decisionSignals: ["예약", "검진", "진료", "처방"],
     subjectSignals: ["병원", "건강", "약", "증상"],
     capability: null,
@@ -111,6 +122,8 @@ const DEPARTMENTS: Department[] = [
 export type RoutingDecision = {
   /** Exactly one. Never zero, never two (§3). */
   owner: DepartmentId;
+  /** Which stream this work belongs in. Decided by the department, not the user. */
+  scope: Scope;
   /**
    * True while Operations is holding the request because no domain department
    * is yet accountable. Temporary by construction: ownership transfers as soon
@@ -155,6 +168,7 @@ export function route(request: { subject?: string; body?: string; attachment?: s
     // department can be named. Never a refusal, never a question back.
     return {
       owner: "operations",
+      scope: scopeOf("operations"),
       provisional: true,
       contributors: [],
       reason: "아직 담당 부서가 정해지지 않아 운영이 임시로 맡습니다.",
@@ -169,6 +183,7 @@ export function route(request: { subject?: string; body?: string; attachment?: s
   if (second && second.decision === top.decision && top.decision > 0) {
     return {
       owner: top.department.id,
+      scope: top.department.scope,
       provisional: false,
       contributors: ["planning", second.department.id],
       reason: "결정이 두 영역에 걸쳐 있어, 한 부서가 맡고 조율을 함께 붙입니다.",
@@ -178,6 +193,7 @@ export function route(request: { subject?: string; body?: string; attachment?: s
 
   return {
     owner: top.department.id,
+    scope: top.department.scope,
     provisional: false,
     // The owner asks the rest; the router only notes who is implicated.
     contributors: scored.slice(1).map((s) => s.department.id),
