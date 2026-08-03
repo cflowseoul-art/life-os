@@ -35,6 +35,16 @@ export type LedgerTransaction = {
   amount: number;
   /** 결제수단, when the ledger carries one. */
   method: string;
+  /** 거래유형 (O) — 지출 · 입금 · 저축이동 · 투자이동 · 카드대금이동. The ledger's word. */
+  type: string;
+  /** 상태 (K) — 출금 · 입금. */
+  status: string;
+  /** 통계포함 (P) — the ledger's own Y/N, decided when the row was recorded. */
+  countsInStats: boolean;
+  /** 기준월 (R) — the ledger's month, not one we sliced off the date. */
+  month: string;
+  /** 거래고유키 (M) — the natural key for matching anything to this row. */
+  key: string;
   /** Row number in 거래내역, so any figure can be traced back by hand. */
   row: number;
 };
@@ -52,6 +62,11 @@ const COLUMNS: Record<keyof Omit<LedgerTransaction, "row">, string[]> = {
   category: ["분류", "카테고리", "항목", "category"],
   amount: ["이용금액", "금액", "출금", "지출", "amount", "price"],
   method: ["이용카드/계좌", "결제수단", "수단", "카드", "계정", "method", "account"],
+  type: ["거래유형"],
+  status: ["상태"],
+  countsInStats: ["통계포함"],
+  month: ["기준월"],
+  key: ["거래고유키"],
 };
 
 /** Minimal RFC4180 splitter: quoted fields, embedded commas, doubled quotes. */
@@ -102,13 +117,9 @@ export function parseLedgerRows(rows: string[][]): LedgerTransaction[] {
   if (rows.length < 2) return [];
 
   const headers = rows[0].map((h) => h.trim());
-  const at = {
-    date: indexOfColumn(headers, COLUMNS.date),
-    description: indexOfColumn(headers, COLUMNS.description),
-    category: indexOfColumn(headers, COLUMNS.category),
-    amount: indexOfColumn(headers, COLUMNS.amount),
-    method: indexOfColumn(headers, COLUMNS.method),
-  };
+  const at = Object.fromEntries(
+    Object.entries(COLUMNS).map(([field, aliases]) => [field, indexOfColumn(headers, aliases)]),
+  ) as Record<keyof typeof COLUMNS, number>;
 
   if (at.date === -1 || at.amount === -1) return [];
 
@@ -120,12 +131,21 @@ export function parseLedgerRows(rows: string[][]): LedgerTransaction[] {
 
     if (date === null || Number.isNaN(amount) || amount === 0) return;
 
+    const cell = (i: number) => (i === -1 ? "" : (cells[i] ?? "").trim());
+
     transactions.push({
       date,
-      description: at.description === -1 ? "" : cells[at.description] ?? "",
-      category: at.category === -1 ? "" : cells[at.category] ?? "",
+      description: cell(at.description),
+      category: cell(at.category),
       amount,
-      method: at.method === -1 ? "" : cells[at.method] ?? "",
+      method: cell(at.method),
+      type: cell(at.type),
+      status: cell(at.status),
+      // The ledger decides. Absent the column, the row counts rather than
+      // vanishing — but the ledger's Y/N is never second-guessed.
+      countsInStats: at.countsInStats === -1 ? true : cell(at.countsInStats).toUpperCase() !== "N",
+      month: cell(at.month) === "" ? date.slice(0, 7) : cell(at.month).replace(".", "-"),
+      key: cell(at.key),
       row: index + 2,
     });
   });
@@ -255,7 +275,8 @@ export async function readCategoryRules(): Promise<Map<string, CategoryRule>> {
 async function readSheet(): Promise<LedgerTransaction[]> {
   const sheetName = process.env.DUGONG_LEDGER_SHEET_NAME ?? "거래내역";
 
-  return parseLedgerRows(await fetchRows(sheetName));
+  // A:R — every column the ledger fills, including the ones it already decided.
+  return parseLedgerRows(await fetchRows(`${sheetName}!A:R`));
 }
 
 /**

@@ -105,7 +105,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
     }
 
     // The ledger's own rules decide what is spending (분류규칙 · 통계포함).
-    const spending = onlySpending(read.transactions, rules);
+    const spending = onlySpending(read.transactions);
     const months = baselines(spending);
     // A month is only complete once the next one has begun.
     const monthComplete = months.some((m) => m.month > currentMonth);

@@ -8,7 +8,7 @@
  * one. Below that, the figure is null and the sentence is written without it.
  */
 
-import type { CategoryRule, LedgerTransaction } from "../../infrastructure/ledger/dugong.ts";
+import type { LedgerTransaction } from "../../infrastructure/ledger/dugong.ts";
 import { flowOf } from "./policy.ts";
 
 /**
@@ -19,15 +19,15 @@ import { flowOf } from "./policy.ts";
  * would overstate every figure Finance states. When no rule exists for a
  * category, it counts — the ledger's silence is not a licence to drop a row.
  */
-export function isSpending(tx: LedgerTransaction, rules: Map<string, CategoryRule>): boolean {
-  return flowOf(tx, rules) === "spending";
+export function isSpending(tx: LedgerTransaction): boolean {
+  // 통계포함 (P) is the ledger's decision about whether this row counts at all,
+  // and 상태 (K) tells us whether it has happened yet — 예정 is a plan, not a
+  // payment, and counting it would overstate the month.
+  return tx.countsInStats && tx.status.trim() !== "예정" && flowOf(tx) === "spending";
 }
 
-export function onlySpending(
-  transactions: LedgerTransaction[],
-  rules: Map<string, CategoryRule>,
-): LedgerTransaction[] {
-  return transactions.filter((tx) => isSpending(tx, rules));
+export function onlySpending(transactions: LedgerTransaction[]): LedgerTransaction[] {
+  return transactions.filter(isSpending);
 }
 
 /** Money out, as a positive figure. The ledger's sign convention stays there. */
@@ -35,8 +35,9 @@ function spend(tx: LedgerTransaction): number {
   return tx.amount < 0 ? -tx.amount : tx.amount;
 }
 
-function month(date: string): string {
-  return date.slice(0, 7);
+/** 기준월 (R). The ledger's month, whatever convention it uses. */
+function month(tx: LedgerTransaction): string {
+  return tx.month;
 }
 
 export type MonthlyBaseline = {
@@ -52,7 +53,7 @@ export function baselines(transactions: LedgerTransaction[]): MonthlyBaseline[] 
   const months = new Map<string, MonthlyBaseline>();
 
   for (const tx of transactions) {
-    const key = month(tx.date);
+    const key = month(tx);
     const entry = months.get(key) ?? { month: key, total: 0, byCategory: {}, rowsByCategory: {} };
     const category = tx.category.trim() === "" ? "미분류" : tx.category.trim();
 
@@ -163,9 +164,18 @@ export type ReceiptMatch =
  */
 export function matchReceipt(
   transactions: LedgerTransaction[],
-  receipt: { store: string; total: number; date: string },
+  receipt: { store: string; total: number; date: string; key?: string },
   dayWindow = 3,
 ): ReceiptMatch {
+  // 거래고유키 (M) is the ledger's own identity for a row. When it is known,
+  // nothing else needs to be guessed at.
+  if (receipt.key) {
+    const exact = transactions.find((tx) => tx.key !== "" && tx.key === receipt.key);
+    return exact
+      ? { matched: true, transaction: exact, why: `거래고유키가 일치합니다 (거래내역 ${String(exact.row)}행).` }
+      : { matched: false, reason: "같은 거래고유키를 가진 거래가 없습니다. 보류해 두었습니다." };
+  }
+
   const day = Date.parse(receipt.date);
 
   const sameAmount = transactions.filter((tx) => spend(tx) === receipt.total);

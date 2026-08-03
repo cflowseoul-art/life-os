@@ -24,26 +24,26 @@ import type { CategoryRule, LedgerTransaction } from "../../infrastructure/ledge
 export type { Severity, Statement };
 
 /**
- * The ledger's own vocabulary.
+ * Flow, as the ledger states it.
  *
- * 분류규칙 states 거래유형 for the categories it covers. The names below are the
- * ledger's reserved category names for the flows it does not rule on — they are
- * read as written, not inferred from amounts or patterns.
+ * 거래유형 (O) is decided when the row is recorded and is the ledger's own
+ * word for what this money did. Finance reads it; it does not re-derive it from
+ * category names, amounts, or 분류규칙. Where Finance and the ledger could
+ * disagree, there is now nothing to disagree with.
  */
-const INCOME_CATEGORIES = ["월급", "부수입"];
-const CARRYOVER_CATEGORIES = ["이월금"];
-
 export type Flow = "spending" | "transfer" | "income" | "carryover";
 
-export function flowOf(tx: LedgerTransaction, rules: Map<string, CategoryRule>): Flow {
-  const category = tx.category.trim();
+export function flowOf(tx: LedgerTransaction): Flow {
+  const type = tx.type.trim();
 
-  if (CARRYOVER_CATEGORIES.includes(category)) return "carryover";
-  if (INCOME_CATEGORIES.includes(category)) return "income";
+  if (type.includes("이동")) return "transfer";
+  // The ledger has no 거래유형 for a carried balance — it records it as 입금
+  // with 분류 이월금. 분류 is a ledger field too, so this reads, not infers.
+  if (tx.category.trim() === "이월금") return "carryover";
+  if (type === "입금" || tx.status.trim() === "입금") return "income";
+  if (type === "지출" || tx.status.trim() === "출금") return "spending";
 
-  const rule = rules.get(category);
-  if (rule && !rule.countsAsSpending) return "transfer";
-
+  // Unknown word from the ledger: counted, never silently dropped.
   return "spending";
 }
 
@@ -61,9 +61,8 @@ const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
 /** Rows of a given flow in the month under review. */
 function rowsOfFlow(context: PolicyContext, flow: Flow): LedgerTransaction[] {
-  return context.transactions.filter(
-    (tx) => tx.date.startsWith(context.month) && flowOf(tx, context.rules) === flow,
-  );
+  // 기준월 (R) is the ledger's month, not one sliced off the date.
+  return context.transactions.filter((tx) => tx.month === context.month && flowOf(tx) === flow);
 }
 
 function asEvidence(transactions: LedgerTransaction[], limit = 5): Statement[] {
@@ -97,20 +96,23 @@ financePolicies.register({
     title: "이동은 통계 제외",
     owner: "finance",
     severity: "medium",
+    // The ledger's own per-row 통계포함 (P) is what actually counts.
     condition: (ctx) =>
-      [...ctx.rules.values()].every((r) => !r.type.includes("이동") || !r.countsAsSpending),
-    evidence: (ctx) => {
-      const wrong = [...ctx.rules.values()].filter((r) => r.type.includes("이동") && r.countsAsSpending);
-      return asEvidence(
+      ctx.transactions.every(
+        (tx) => tx.month !== ctx.month || flowOf(tx) !== "transfer" || !tx.countsInStats,
+      ),
+    evidence: (ctx) =>
+      asEvidence(
         ctx.transactions.filter(
-          (tx) => tx.date.startsWith(ctx.month) && wrong.some((r) => r.category === tx.category.trim()),
+          (tx) => tx.month === ctx.month && flowOf(tx) === "transfer" && tx.countsInStats,
         ),
-      );
-    },
+      ),
     template: {
       state: (ctx) => {
-        const wrong = [...ctx.rules.values()].filter((r) => r.type.includes("이동") && r.countsAsSpending);
-        return `분류규칙에서 ${wrong.map((r) => r.category).join(", ")}가 통계포함 Y로 돼 있습니다.`;
+        const wrong = ctx.transactions.filter(
+          (tx) => tx.month === ctx.month && flowOf(tx) === "transfer" && tx.countsInStats,
+        );
+        return `이동 거래 ${String(wrong.length)}건이 통계포함 Y로 기록돼 있습니다.`;
       },
       expected: "저축·투자·카드대금 이동은 통계에서 제외돼야 합니다.",
     },
@@ -121,16 +123,13 @@ financePolicies.register({
     title: "분류 누락 없음",
     owner: "finance",
     severity: "low",
-    condition: (ctx) =>
-      ctx.transactions.every((tx) => !tx.date.startsWith(ctx.month) || tx.category.trim() !== ""),
+    condition: (ctx) => ctx.transactions.every((tx) => tx.month !== ctx.month || tx.category.trim() !== ""),
     evidence: (ctx) =>
-      asEvidence(
-        ctx.transactions.filter((tx) => tx.date.startsWith(ctx.month) && tx.category.trim() === ""),
-      ),
+      asEvidence(ctx.transactions.filter((tx) => tx.month === ctx.month && tx.category.trim() === "")),
     template: {
       state: (ctx) => {
         const blank = ctx.transactions.filter(
-          (tx) => tx.date.startsWith(ctx.month) && tx.category.trim() === "",
+          (tx) => tx.month === ctx.month && tx.category.trim() === "",
         );
         return `${ctx.month} 거래 중 ${String(blank.length)}건에 분류가 비어 있습니다.`;
       },
