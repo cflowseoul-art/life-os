@@ -40,22 +40,22 @@
     <section class="screen" id="inbox" data-active="true">
       <div class="screen-head">
         <h1 class="screen-title">대표님, 안녕하십니까.</h1>
-        <p class="screen-sub">8월 3일 월요일 · 오늘 결정하실 것은 한 건입니다.</p>
+        <p class="screen-sub">8월 3일 월요일 · 오늘 확인하실 것은 한 건입니다.</p>
       </div>
 
-      <p class="group-label">대표님 결정을 기다리는 보고</p>
+      <p class="group-label">확인 필요</p>
       <button class="row row--needs" type="button" onclick="openReport('resume')">
         <span class="sprite" aria-hidden="true">박</span>
         <span class="row-main">
-          <span class="who"><span class="dot" aria-label="결정 필요"></span>박진로 <span class="title">선임</span></span>
+          <span class="who"><span class="dot" aria-label="확인 필요"></span>박진로 <span class="title">선임</span></span>
           <span class="row-dept">커리어팀</span>
           <span class="subject">리멤버 · 시니어 디자이너</span>
           <span class="snippet">첫 문단에 무엇을 앞세울지 하나만 정해 주시면, 이력서 정리는 끝납니다.</span>
         </span>
-        <span><span class="stamp">결정 필요</span><span class="when">오전 9:12</span></span>
+        <span><span class="stamp">확인 필요</span><span class="when">오전 9:12</span></span>
       </button>
 
-      <p class="group-label">회사가 맡고 있는 일</p>
+      <p class="group-label">업무 진행 현황</p>
       <button class="row" type="button" onclick="openReport('finance')">
         <span class="sprite" aria-hidden="true">김</span>
         <span class="row-main">
@@ -97,30 +97,9 @@
         <span><span class="stamp">진행 중</span><span class="when">8/1</span></span>
       </button>
 
-      <p class="group-label">마무리된 일</p>
-      <button class="row" type="button" onclick="openReport('receipt')">
-        <span class="sprite" aria-hidden="true">한</span>
-        <span class="row-main">
-          <span class="who">한살림 <span class="title">선임</span></span>
-          <span class="row-dept">살림팀</span>
-          <span class="subject">이마트 성수점 영수증</span>
-          <span class="snippet">영수증 정리했습니다. 3개 품목을 재고에 반영했습니다.</span>
-        </span>
-        <span><span class="stamp">완료</span><span class="when">8/2</span></span>
-      </button>
-      <button class="row" type="button" onclick="openReport('career-done')">
-        <span class="sprite" aria-hidden="true">박</span>
-        <span class="row-main">
-          <span class="who">박진로 <span class="title">선임</span></span>
-          <span class="row-dept">커리어팀</span>
-          <span class="subject">토스 · 프로덕트 디자이너</span>
-          <span class="snippet">이력서 정리본이 준비됐습니다. 정해 주신 순서 그대로입니다.</span>
-        </span>
-        <span><span class="stamp">완료</span><span class="when">7/31</span></span>
-      </button>
-    </section>
+          </section>
 
-    <!-- ── 2. Report Reader ─────────────────────────────────────────── -->
+<!-- ── 2. Report Reader ─────────────────────────────────────────── -->
     <section class="screen" id="reader">
       <article class="reader">
         <button class="back" type="button" onclick="show('inbox')">← 받은 보고</button>
@@ -131,7 +110,7 @@
             <p class="submitter-name" id="rd-who">박진로 <span class="title">선임</span></p>
             <p class="submitter-dept" id="rd-dept">커리어팀</p>
           </div>
-          <p class="submitter-meta"><span id="rd-state">결정 필요</span><br>2026-08-03</p>
+          <p class="submitter-meta"><span id="rd-state">확인 필요</span><br>2026-08-03</p>
         </div>
 
         <h1 id="rd-title">리멤버 · 시니어 디자이너</h1>
@@ -163,7 +142,7 @@
           <p>두 가지로 좁혀 두었습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라 제가 정하지 않았습니다.</p>
 
           <div class="decide">
-            <h2 class="h">결정 필요</h2>
+            <h2 class="h">확인 필요</h2>
             <p>이력서 첫 문단에서 무엇을 앞세울까요?</p>
             <div class="choices">
               <button class="choice" type="button" aria-pressed="false" onclick="pick(this)">모바일 앱 UX 개선 경험</button>
@@ -206,11 +185,12 @@
     <!-- ── 3. Reports ───────────────────────────────────────────────── -->
     <section class="screen" id="reports">
       <div class="screen-head">
-        <h1 class="screen-title">지난 보고</h1>
-        <p class="screen-sub">끝난 일은 그대로 남습니다. 언제든 되짚어 보실 수 있습니다.</p>
+        <h1 class="screen-title">Drop</h1>
+        <p class="screen-sub">마무리된 서류를 정리해 둔 곳입니다. 꺼내 보실 수 있게 그대로 둡니다.</p>
       </div>
 
-      <p class="group-label">8월</p>
+      <p class="group-label">완료</p>
+      <p class="retention">하루가 지나면 아래로 정리해 둡니다.</p>
 
       <button class="row" type="button" onclick="openReport('receipt')">
         <span class="sprite" aria-hidden="true">한</span>
@@ -220,7 +200,7 @@
           <span class="subject">이마트 성수점 영수증</span>
           <span class="snippet">3개 품목 재고 반영 · 지출 18,500원 재무팀 전달</span>
         </span>
-        <span><span class="stamp">완료</span><span class="when">8/2</span></span>
+        <span><span class="stamp stamp--filed">보관</span><span class="when">8/2</span></span>
       </button>
 
       <button class="row" type="button" onclick="openReport('career-done')">
@@ -231,10 +211,10 @@
           <span class="subject">토스 · 프로덕트 디자이너</span>
           <span class="snippet">이력서 정리본 · 3개 항목 배치</span>
         </span>
-        <span><span class="stamp">완료</span><span class="when">7/31</span></span>
+        <span><span class="stamp stamp--filed">보관</span><span class="when">7/31</span></span>
       </button>
 
-      <p class="group-label">7월</p>
+      <p class="group-label">정리된 서류</p>
 
       <button class="row" type="button" onclick="openReport('finance')">
         <span class="sprite" aria-hidden="true">김</span>
@@ -269,12 +249,12 @@
       <button class="row row--needs" type="button" onclick="openReport('resume')">
         <span class="sprite" aria-hidden="true">박</span>
         <span class="row-main">
-          <span class="who"><span class="dot" aria-label="결정 필요"></span>박진로 <span class="title">선임</span></span>
+          <span class="who"><span class="dot" aria-label="확인 필요"></span>박진로 <span class="title">선임</span></span>
           <span class="row-dept">우리 회사</span>
           <span class="subject">“리멤버 공고 보고 이력서 좀 맞춰 줘”</span>
           <span class="snippet">접수 → 커리어팀 배정 → 진행 → 결정 대기</span>
         </span>
-        <span><span class="stamp">결정 필요</span><span class="when">8/3 09:11</span></span>
+        <span><span class="stamp">확인 필요</span><span class="when">8/3 09:11</span></span>
       </button>
 
       <button class="row" type="button" onclick="openReport('health')">
@@ -345,7 +325,7 @@
         <p class="screen-sub">같은 일을 자리로 본 것입니다. 목록과 같은 내용입니다.</p>
       </div>
       <p class="office-note">
-        지금 5층에 올라와 있는 사람은 한 명입니다 — 목록의 「결정 필요」 한 건과 같습니다.
+        지금 5층에 올라와 있는 사람은 한 명입니다 — 목록의 「확인 필요」 한 건과 같습니다.
       </p>
 
       <div class="floor floor--top">
@@ -490,13 +470,13 @@
 <script>
   const PLACES = [
     { id: "inbox", label: "받은 보고", glyph: "📥" },
-    { id: "reports", label: "지난 보고", glyph: "📚" },
+    { id: "reports", label: "Drop", glyph: "🗄" },
     { id: "outbox", label: "보낸 지시", glyph: "📤" },
     { id: "calendar", label: "일정", glyph: "📅" },
   ];
 
   const REPORTS = {
-    resume: { title: "리멤버 · 시니어 디자이너", sprite: "박", name: "박진로", title2: "선임", dept: "커리어팀", state: "결정 필요" },
+    resume: { title: "리멤버 · 시니어 디자이너", sprite: "박", name: "박진로", title2: "선임", dept: "커리어팀", state: "확인 필요" },
     finance: { title: "2026년 8월 사용 내역", sprite: "김", name: "김재무", title2: "팀장", dept: "재무팀", state: "진행 중" },
     asset: { title: "8월 1일 잔액 기록", sprite: "최", name: "최자산", title2: "팀장", dept: "자산관리팀", state: "진행 중" },
     treasury: { title: "운용 가능 금액 산정", sprite: "오", name: "오운용", title2: "팀장", dept: "자산운용팀", state: "보류" },
