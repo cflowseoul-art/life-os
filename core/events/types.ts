@@ -8,7 +8,8 @@
 
 /** Who caused an event. Art. 8 — an action with no actor is not inspectable. */
 export type Actor =
-  | { kind: "user" }
+  /** `userId` is absent only in events written before identity existed. */
+  | { kind: "user"; userId?: string }
   | { kind: "capability"; id: string }
   | { kind: "system" };
 
@@ -89,9 +90,13 @@ export type LifeEvent =
  * Art. 14 (Durability): a reader years from now must know which shape it is
  * looking at without asking us. Bumped only when the envelope changes.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type EventEnvelope = {
+  /** Which household this belongs to. Absent in pre-identity events. */
+  householdId?: string;
+  /** Whose stream it belongs to, for personal capabilities. */
+  scope?: "personal" | "household";
   /** Stable for the life of the event. Never regenerated on replay. */
   id: string;
   schemaVersion: number;

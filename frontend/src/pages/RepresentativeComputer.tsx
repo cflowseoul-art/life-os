@@ -10,7 +10,7 @@
  *   - the representative sees one state vocabulary — 확인 필요 · 진행 중 · 완료
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./RepresentativeComputer.css";
 
@@ -382,7 +382,85 @@ function Compose({
   );
 }
 
+type Me =
+  | { ok: true; user: { displayName: string; email: string }; household: { name: string; isOwner: boolean } }
+  | { ok: false };
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize(config: { client_id: string; callback: (r: { credential: string }) => void }): void;
+          renderButton(el: HTMLElement, options: Record<string, string>): void;
+        };
+      };
+    };
+  }
+}
+
+/**
+ * The door.
+ *
+ * Google Identity Services hands us a credential; the server verifies it and
+ * sets an httpOnly cookie. Nothing about the session is stored in the page, so
+ * a refresh is answered by the server, not by local state.
+ */
+function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
+  const holder = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+
+    script.onload = () => {
+      window.google?.accounts.id.initialize({
+        client_id: clientId,
+        callback: ({ credential }) => {
+          fetch("/api/auth/google", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ credential }),
+          })
+            .then((r) => r.json() as Promise<{ ok: boolean; reason?: string }>)
+            .then((result) => {
+              if (result.ok) onSignedIn();
+              else setError(result.reason ?? "로그인하지 못했습니다.");
+            })
+            .catch(() => { setError("로그인하지 못했습니다."); });
+        },
+      });
+
+      if (holder.current) {
+        window.google?.accounts.id.renderButton(holder.current, { theme: "outline", size: "large" });
+      }
+    };
+
+    document.head.appendChild(script);
+    return () => { script.remove(); };
+  }, [clientId, onSignedIn]);
+
+  return (
+    <main className="rc">
+      <div className="signin">
+        <span className="plate"><b>Life OS</b><span>대표님의 컴퓨터</span></span>
+        <h1>대표님, 들어오십시오.</h1>
+        <p>회사는 대표님 계정으로 움직입니다. 구글 계정으로 들어와 주십시오.</p>
+        <div ref={holder} />
+        {!clientId && <p className="empty">VITE_GOOGLE_CLIENT_ID가 설정되지 않았습니다.</p>}
+        {error && <p className="empty">{error}</p>}
+      </div>
+    </main>
+  );
+}
+
 export default function RepresentativeComputer() {
+  const [me, setMe] = useState<Me | null>(null);
   const [desk, setDesk] = useState<Desk | null>(null);
   const [place, setPlace] = useState<Place>("inbox");
   const [lens, setLens] = useState<"list" | "office">("list");
@@ -396,12 +474,23 @@ export default function RepresentativeComputer() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const loadMe = useCallback(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json() as Promise<Me>)
+      .then(setMe)
+      .catch(() => { setMe({ ok: false }); });
+  }, []);
+
+  useEffect(loadMe, [loadMe]);
+
   useEffect(() => {
+    if (!me?.ok) return;
+
     fetch("/api/desk")
       .then((r) => r.json() as Promise<Desk>)
       .then(setDesk)
       .catch(() => { setError("지금은 열어드리지 못했습니다. 잠시 후 다시 들어와 주십시오."); });
-  }, []);
+  }, [me]);
 
   const sendPhoto = useCallback((file: File, store: string) => {
     setBusy(true);
@@ -499,6 +588,8 @@ export default function RepresentativeComputer() {
     return () => { window.removeEventListener("keydown", onKey); };
   }, [composing]);
 
+  if (me === null) return <main className="rc" />;
+  if (!me.ok) return <SignIn onSignedIn={loadMe} />;
   if (error) return <main className="rc"><p className="empty">{error}</p></main>;
   if (!desk) return <main className="rc" />;
 
@@ -535,7 +626,7 @@ export default function RepresentativeComputer() {
     <main className="rc" data-drawer={drawer}>
       <header className="bar">
         <button type="button" className="icon-btn menu-btn" onClick={() => { setDrawer(true); }} aria-label="메뉴">☰</button>
-        <span className="plate"><b>우리 회사</b><span>5F 대표실</span></span>
+        <span className="plate"><b>{me.household.name}</b><span>5F 대표실</span></span>
         <input
           className="search"
           type="search"
@@ -547,7 +638,16 @@ export default function RepresentativeComputer() {
           <button type="button" aria-pressed={lens === "list"} onClick={() => { setLens("list"); setOpenId(null); }}>목록</button>
           <button type="button" aria-pressed={lens === "office"} onClick={() => { setLens("office"); setOpenId(null); }}>사무실</button>
         </div>
-        <span className="me" aria-label="대표님">대</span>
+        <button
+          type="button"
+          className="me"
+          title={`${me.user.displayName} · ${me.user.email}`}
+          onClick={() => {
+            void fetch("/api/auth/signout", { method: "POST" }).then(() => { setMe({ ok: false }); });
+          }}
+        >
+          {me.user.displayName.slice(0, 1)}
+        </button>
       </header>
 
       {drawer && (

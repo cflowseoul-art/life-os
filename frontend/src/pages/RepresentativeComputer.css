@@ -427,3 +427,9 @@
 @media (prefers-reduced-motion: reduce) {
   .drawer { transition: none; }
 }
+
+/* The door. Same materials as the desk, nothing more. */
+.rc .signin { max-width: 420px; padding: 64px 20px; }
+.rc .signin h1 { font-size: 22px; font-weight: 700; margin: 22px 0 10px; letter-spacing: -0.02em; }
+.rc .signin p { font-size: 14.5px; color: var(--ink-2); line-height: 1.75; margin: 0 0 22px; }
+.rc .me { cursor: pointer; }

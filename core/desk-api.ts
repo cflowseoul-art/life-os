@@ -13,6 +13,19 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
+import { verifyGoogleIdToken } from "./identity/google.ts";
+import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
+import { FileIdentityStore } from "./identity/store.ts";
+import type { ActorContext } from "./identity/types.ts";
+import {
+  clearedCookie,
+  cookieValue,
+  issueSession,
+  readSession,
+  SESSION_COOKIE,
+  sessionCookie,
+} from "./identity/session.ts";
+
 import { CustodyEngine } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
@@ -248,7 +261,27 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
   res.end(payload);
 }
 
+const identity = new FileIdentityStore();
 const log = new EventLog(process.env.LIFE_OS_LOG);
+
+/**
+ * The authentication boundary.
+ *
+ * Everything past this line receives an `ActorContext` and nothing else — no
+ * cookies, no tokens, no knowledge that Google exists.
+ */
+async function actorFrom(req: import("node:http").IncomingMessage): Promise<ActorContext | null> {
+  const session = readSession(cookieValue(req.headers.cookie, SESSION_COOKIE));
+  return session ? contextFor(identity, session) : null;
+}
+
+function body(req: import("node:http").IncomingMessage): Promise<string> {
+  return new Promise((resolve) => {
+    let text = "";
+    req.on("data", (chunk: Buffer) => { text += chunk.toString("utf8"); });
+    req.on("end", () => { resolve(text); });
+  });
+}
 const engine = new CustodyEngine(log);
 
 // Month start, and the ledger changing. Nothing else wakes Finance.
@@ -258,6 +291,73 @@ const port = Number(process.env.PORT ?? 3000);
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
+
+  // ── Authentication ─────────────────────────────────────────────────────
+  if (req.method === "POST" && url.pathname === "/api/auth/google") {
+    void (async () => {
+      try {
+        const sent = JSON.parse((await body(req)) || "{}") as { credential?: string; householdId?: string };
+        if (!sent.credential) { json(res, 400, { ok: false, reason: "로그인 정보가 오지 않았습니다." }); return; }
+
+        const verified = await verifyGoogleIdToken(sent.credential);
+        const { userId, householdId } = await resolveOrCreate(identity, verified, sent.householdId);
+        const token = issueSession(userId, householdId);
+        const context = await contextFor(identity, readSession(token)!);
+
+        res.setHeader("set-cookie", sessionCookie(token));
+        json(res, 200, {
+          ok: true,
+          user: context && { displayName: context.user.displayName, email: context.user.email },
+          household: context && { name: context.household.name },
+        });
+      } catch (error) {
+        json(res, 401, { ok: false, reason: error instanceof Error ? error.message : "로그인하지 못했습니다." });
+      }
+    })();
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/auth/me") {
+    void actorFrom(req).then((context) => {
+      json(res, 200, context
+        ? {
+            ok: true,
+            user: { displayName: context.user.displayName, email: context.user.email },
+            household: { name: context.household.name, isOwner: context.household.ownerUserId === context.user.id },
+          }
+        : { ok: false });
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/signout") {
+    res.setHeader("set-cookie", clearedCookie());
+    json(res, 200, { ok: true });
+    return;
+  }
+
+  // ── Everything below requires an identity ──────────────────────────────
+  if (url.pathname.startsWith("/api/")) {
+    void actorFrom(req).then((context) => {
+      if (!context) { json(res, 401, { ok: false, reason: "로그인이 필요합니다." }); return; }
+      handle(req, res, url, context);
+    });
+    return;
+  }
+
+  json(res, 404, { ok: false, reason: "없는 경로입니다." });
+}).listen(port, "127.0.0.1", () => {
+  console.log(`desk api: http://127.0.0.1:${String(port)}/api/desk`);
+});
+
+/** Domain routes. They receive the actor; they never parse a request for it. */
+function handle(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  url: URL,
+  actor: ActorContext,
+): void {
+  void actor;
 
   if (req.method === "GET" && url.pathname === "/api/desk") {
     json(res, 200, deskView(engine, log));
@@ -497,6 +597,4 @@ createServer((req, res) => {
   }
 
   json(res, 404, { ok: false, reason: "없는 경로입니다." });
-}).listen(port, "127.0.0.1", () => {
-  console.log(`desk api: http://127.0.0.1:${String(port)}/api/desk`);
-});
+}
