@@ -18,7 +18,7 @@ import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
-import { advanceFinance, advanceFinanceFromLedger } from "./company/finance-runner.ts";
+import { advanceFinanceFromLedger } from "./company/finance-runner.ts";
 import { startFinanceSchedule } from "./company/finance-watch.ts";
 import { advanceHome } from "./company/home-runner.ts";
 import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
@@ -26,7 +26,7 @@ import { readReceipt } from "./capabilities/home/index.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
-import { signature } from "./company/employees.ts";
+import { roster, signature } from "./company/employees.ts";
 import { projectWorkOrders, workOrderFor } from "./company/work-order.ts";
 import type { WorkOrder } from "./company/work-order.ts";
 import { templateFor } from "./reports/templates.ts";
@@ -76,6 +76,8 @@ export type DeskWork = {
 };
 
 export type DeskView = {
+  /** The company as it stands today. One roster, no screen-side copy. */
+  employees: ReturnType<typeof roster>;
   /** Every instruction the company took in, with where it stands. */
   workOrders: WorkOrder[];
   /** Recognised by the company, never created by the representative. */
@@ -215,6 +217,7 @@ export function deskView(engine: CustodyEngine, log: EventLog): DeskView {
     .filter((w): w is DeskWork => w !== null);
 
   return {
+    employees: roster(),
     workOrders,
     projects,
     awaiting: works.filter((w) => w.section === "awaiting"),
@@ -325,9 +328,6 @@ createServer((req, res) => {
           "finance",
           "ceo-office:accepted",
         );
-
-        // Statement text advances locally; otherwise Finance reads the ledger.
-        advanceFinance(log);
 
         void advanceFinanceFromLedger(log).then(() => {
           json(res, 200, { ok: true, desk: deskView(engine, log) });
@@ -473,8 +473,9 @@ createServer((req, res) => {
           "ceo-office:accepted",
         );
 
-        advanceFinance(log);
-        json(res, 200, { ok: true, desk: deskView(engine, log) });
+        void advanceFinanceFromLedger(log).then(() => {
+          json(res, 200, { ok: true, desk: deskView(engine, log) });
+        });
         return;
       }
 

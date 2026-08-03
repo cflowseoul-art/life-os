@@ -70,7 +70,13 @@ type WorkOrder = {
   completedAt: string | null;
 };
 
-type Desk = { workOrders?: WorkOrder[]; awaiting: Work[]; inProgress: Work[]; done: Work[] };
+type Desk = {
+  employees?: Employee[];
+  workOrders?: WorkOrder[];
+  awaiting: Work[];
+  inProgress: Work[];
+  done: Work[];
+};
 
 type Place = "inbox" | "reports" | "outbox" | "calendar";
 
@@ -81,17 +87,14 @@ const PLACES: { id: Place; label: string; glyph: string }[] = [
   { id: "calendar", label: "일정", glyph: "📅" },
 ];
 
-/**
- * The floors, by how often a team reports. Only departments that actually have
- * work appear — no empty desks, no roadmap.
- */
-const FLOORS: { floor: string; teams: string[] }[] = [
-  { floor: "5F", teams: ["대표실"] },
-  { floor: "4F", teams: ["재무팀", "자산관리팀"] },
-  { floor: "3F", teams: ["자산운용팀", "총무팀"] },
-  { floor: "2F", teams: ["살림팀", "건강팀"] },
-  { floor: "1F", teams: ["커리어팀"] },
-];
+type Employee = {
+  id: string;
+  name: string;
+  title: string;
+  department: string;
+  departmentLabel: string;
+  floor: string;
+};
 
 function stateOf(work: Work): string {
   if (work.section === "awaiting") return "확인 필요";
@@ -576,49 +579,47 @@ export default function RepresentativeComputer() {
                 지금 5층에 올라와 있는 사람은 {desk.awaiting.length}명입니다 — 목록의 「확인 필요」와 같습니다.
               </p>
 
-              {FLOORS.map(({ floor, teams }) => {
-                const here = all.filter((w) => teams.includes(w.departmentLabel ?? ""));
-                const upstairs = floor === "5F" ? desk.awaiting : [];
-                const seated = here.filter((w) => w.section !== "awaiting");
-                if (floor !== "5F" && seated.length === 0 && here.length === 0) return null;
+              {(() => {
+                const staff = desk.employees ?? [];
+                const floors = [...new Set(staff.map((e) => e.floor))].sort().reverse();
+                // Position is read from the work order, never set by this screen.
+                const upstairs = new Set(desk.awaiting.map((w) => w.contributor));
+                const workOf = (name: string) =>
+                  all.find((w) => w.contributor === name && w.section !== "done");
 
-                return (
+                return floors.map((floor) => (
                   <div key={floor} className={`floor${floor === "5F" ? " floor--top" : ""}`}>
                     <div className="floor-head">
                       <span className="floor-no">{floor}</span>
-                      <span className="floor-teams">{teams.join(" · ")}</span>
+                      <span className="floor-teams">
+                        {[...new Set(staff.filter((e) => e.floor === floor).map((e) => e.departmentLabel))].join(" · ")}
+                      </span>
                     </div>
                     <div className="desks">
-                      {floor === "5F" && (
-                        <div className="desk">
-                          <span className="sprite" aria-hidden>서</span>
-                          <div>
-                            <p className="desk-name">서비서 <span className="title">실장</span></p>
-                            <p className="desk-dept">대표실</p>
-                            <p className="desk-work">지시를 접수하고 부서에 배정합니다.</p>
-                            <span className="desk-tag">자리에 있음</span>
-                          </div>
-                        </div>
-                      )}
-                      {(floor === "5F" ? upstairs : seated).map((w) => (
-                        <div key={w.id} className={`desk${w.section === "awaiting" ? " desk--away" : ""}`}>
-                          <span className="sprite" aria-hidden>{w.contributor.slice(0, 1)}</span>
-                          <div>
-                            <p className="desk-name">
-                              {w.contributor}<span className="title"> {w.contributorTitle}</span>
-                            </p>
-                            <p className="desk-dept">{w.departmentLabel}</p>
-                            <p className="desk-work">{w.title}</p>
-                            <span className="desk-tag">
-                              {w.section === "awaiting" ? "보고 대기 중" : "자리에 있음"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                      {staff
+                        .filter((e) => (floor === "5F" ? e.floor === "5F" || upstairs.has(e.name) : e.floor === floor && !upstairs.has(e.name)))
+                        .map((e) => {
+                          const work = workOf(e.name);
+                          const away = upstairs.has(e.name);
+
+                          return (
+                            <div key={`${floor}-${e.id}`} className={`desk${away ? " desk--away" : ""}`}>
+                              <span className="sprite" aria-hidden>{e.name.slice(0, 1)}</span>
+                              <div>
+                                <p className="desk-name">{e.name}<span className="title"> {e.title}</span></p>
+                                <p className="desk-dept">{e.departmentLabel}{away ? ` · ${e.floor}` : ""}</p>
+                                <p className="desk-work">
+                                  {work ? work.title : "맡고 있는 일이 없습니다."}
+                                </p>
+                                <span className="desk-tag">{away ? "보고 대기 중" : "자리에 있음"}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
-                );
-              })}
+                ));
+              })()}
             </section>
           ) : (
             <section>

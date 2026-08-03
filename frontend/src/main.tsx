@@ -10,10 +10,10 @@ const path = window.location.pathname.replace(/\/$/, '')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {path === '/computer'
-      ? <RepresentativeComputer />
-      : path === '/life-office'
-        ? <LifeOfficeDemo />
-        : <App />}
+    {path === '/life-office'
+      ? <LifeOfficeDemo />
+      : path === '/legacy'
+        ? <App />
+        : <RepresentativeComputer />}
   </StrictMode>,
 )
