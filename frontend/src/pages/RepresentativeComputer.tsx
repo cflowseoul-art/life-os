@@ -87,6 +87,7 @@ const PLACES: { id: Place; label: string; glyph: string }[] = [
   { id: "calendar", label: "일정", glyph: "📅" },
 ];
 
+/** Desks, as the company describes them. The screen adds nothing. */
 type Employee = {
   id: string;
   name: string;
@@ -94,6 +95,7 @@ type Employee = {
   department: string;
   departmentLabel: string;
   floor: string;
+  capability: string;
 };
 
 function stateOf(work: Work): string {

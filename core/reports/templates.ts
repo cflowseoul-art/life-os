@@ -14,6 +14,7 @@
  */
 
 import { employeeFor } from "../company/employees.ts";
+import { producesReports } from "../company/manifest.ts";
 
 /** What a template is given. Buckets are generic; labels are the team's job. */
 export type ReportInput = {
@@ -288,8 +289,26 @@ export const operations: ReportTemplate = {
 
 const TEMPLATES: ReportTemplate[] = [career, finance, health, home, operations];
 
-/** A capability with no template gets the common envelope and its own name. */
+/**
+ * A capability with no template gets the common envelope and its own name.
+ *
+ * A capability the manifest says produces no reports gets a template that says
+ * so — the rule lives in the manifest, not scattered through the report code.
+ */
 export function templateFor(capability: string): ReportTemplate {
+  if (!producesReports(capability)) {
+    return {
+      capability,
+      contributor: employeeFor(capability).displayName,
+      compose: () => ({
+        summary: "이 일은 보고 대상이 아닙니다.",
+        sections: [],
+        recommendation: NO_DECISION,
+        decision: null,
+      }),
+    };
+  }
+
   return (
     TEMPLATES.find((t) => t.capability === capability) ?? {
       capability,

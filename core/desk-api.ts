@@ -17,7 +17,7 @@ import { verifyGoogleIdToken } from "./identity/google.ts";
 import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
 import { FileIdentityStore } from "./identity/store.ts";
 import { FileEventStore } from "./storage/event-store.ts";
-import { scopeOf } from "./company/scope.ts";
+import { companyRoster, isEnabled, producesReports, scopeOf, validateManifest } from "./company/manifest.ts";
 import type { ActorContext } from "./identity/types.ts";
 import {
   clearedCookie,
@@ -40,7 +40,7 @@ import { readReceipt } from "./capabilities/home/index.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
-import { roster, signature } from "./company/employees.ts";
+import { signature } from "./company/employees.ts";
 import { projectWorkOrders, workOrderFor } from "./company/work-order.ts";
 import type { WorkOrder } from "./company/work-order.ts";
 import { templateFor } from "./reports/templates.ts";
@@ -91,7 +91,7 @@ export type DeskWork = {
 
 export type DeskView = {
   /** The company as it stands today. One roster, no screen-side copy. */
-  employees: ReturnType<typeof roster>;
+  employees: ReturnType<typeof companyRoster>;
   /** Every instruction the company took in, with where it stands. */
   workOrders: WorkOrder[];
   /** Recognised by the company, never created by the representative. */
@@ -176,7 +176,7 @@ function toWork(
 
   const composed = template.compose({
     state,
-    staffed: ["career", "home", "finance"].includes(hold.capability),
+    staffed: isEnabled(hold.capability) && producesReports(hold.capability),
     facts: hold.observations.map((o) => o.statement),
     outcome: (hold.artifact?.sections ?? []).map((sec) => sec.heading.replace(/^\d+\.\s*/, "")),
     question: hold.outstandingAsk?.question ?? null,
@@ -234,7 +234,7 @@ export function deskView(engine: CustodyEngine, logs: EventLog[]): DeskView {
     .filter((w): w is DeskWork => w !== null);
 
   return {
-    employees: roster(),
+    employees: companyRoster(),
     workOrders,
     projects,
     awaiting: works.filter((w) => w.section === "awaiting"),
@@ -264,6 +264,9 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
   });
   res.end(payload);
 }
+
+// The company refuses to start if its own description is inconsistent.
+validateManifest();
 
 const identity = new FileIdentityStore();
 const events = new FileEventStore();

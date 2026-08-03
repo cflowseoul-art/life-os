@@ -60,9 +60,25 @@ let lastFingerprint: string | null = null;
 let lastMonthChecked: string | null = null;
 
 /**
+ * Which capabilities this scheduler may wake.
+ *
+ * Read from the manifest, never written here. A capability with
+ * `scheduler: "none"` is invisible to the scheduler by construction, and a new
+ * scheduled capability needs no change in this file.
+ */
+export function runnable(kind: "household" | "personal"): string[] {
+  return scheduled(kind).map((c) => c.id);
+}
+
+/**
  * Runs a check if a trigger fired. Returns what happened, for inspection only.
  */
 export async function checkFinancePolicies(log: EventLog, now = new Date()): Promise<WatchResult> {
+  // Nothing to wake unless the manifest says this capability is scheduled.
+  if (!runnable("household").includes("finance")) {
+    return { ran: false, reason: "none", reported: [], suppressed: [] };
+  }
+
   const read = await readLedger();
   if (!read.ok) return { ran: false, reason: "none", reported: [], suppressed: [] };
 

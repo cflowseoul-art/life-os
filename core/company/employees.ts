@@ -75,27 +75,6 @@ export const GIVEN_NAME_BY_DEPARTMENT: Record<string, string> = {
   operations: "Chongmu",  // 총무 — keeps the company running
 };
 
-/**
- * Where each department sits.
- *
- * Floors are ordered by how often a team reports — the CEO floor is the top,
- * and the teams that come up most often are nearest. Layout lives here with the
- * roster, not in a screen.
- */
-export const DEPARTMENT_FLOOR: Record<string, string> = {
-  ceo: "5F",
-  finance: "4F",
-  asset: "4F",
-  treasury: "3F",
-  operations: "3F",
-  home: "2F",
-  health: "2F",
-  career: "1F",
-  strategy: "1F",
-  data: "1F",
-  audit: "1F",
-};
-
 /** Departments, as the representative reads them. */
 export const DEPARTMENT_LABEL: Record<string, string> = {
   finance: "재무팀",
@@ -227,25 +206,6 @@ export function employeeFor(department: string): Employee {
  * A person and a title, in the representative's language. The department is
  * metadata; the romanized name stays internal.
  */
-/** The roster as a surface may show it: person, title, department, floor. */
-export function roster(): {
-  id: string;
-  name: string;
-  title: string;
-  department: string;
-  departmentLabel: string;
-  floor: string;
-}[] {
-  return EMPLOYEES.filter((e) => e.status === "active").map((e) => ({
-    id: e.id,
-    name: e.displayName,
-    title: e.displayTitle,
-    department: String(e.department),
-    departmentLabel: e.displayDepartment,
-    floor: DEPARTMENT_FLOOR[String(e.department)] ?? "1F",
-  }));
-}
-
 export function signature(department: string): {
   name: string;
   title: string;

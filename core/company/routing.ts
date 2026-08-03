@@ -7,6 +7,9 @@
  * exactly one thing: who owns this. Everything it produces is internal and
  * never reaches a surface (§4).
  *
+ * Routing decides one thing: which capability should handle this. Scope, floor,
+ * employee, scheduler and reports are the manifest's business, not routing's.
+ *
  * Routing reads the request for the *decision it will produce*, not merely its
  * subject: "이 오퍼 받아야 할까" is about a job and produces a life decision, so
  * subject-matching alone would misroute exactly the requests that matter most.
@@ -19,7 +22,7 @@
  */
 
 import type { Scope } from "../identity/types.ts";
-import { scopeOf } from "./scope.ts";
+import { isEnabled, manifestFor } from "./manifest.ts";
 
 export type DepartmentId =
   | "asset"
@@ -35,19 +38,10 @@ export type DepartmentId =
 
 type Department = {
   id: DepartmentId;
-  /** Required. A department with no declared scope cannot exist. */
-  scope: Scope;
   /** Words that indicate the decision this work will produce. Strong. */
   decisionSignals: string[];
   /** Words that indicate what the work is about. Weak. */
   subjectSignals: string[];
-  /**
-   * The capability that executes this department's work today.
-   * `null` means the department exists and owns work, but cannot yet execute
-   * it. It still takes custody and still reports (§3). Work is never refused
-   * because a capability is missing.
-   */
-  capability: string | null;
 };
 
 /**
@@ -61,35 +55,28 @@ const DEPARTMENTS: Department[] = [
     // State: what is owned or owed right now. Ambiguous "얼마나 있어?" is a
     // question about state, so it belongs here rather than to Finance.
     id: "asset",
-    scope: scopeOf("asset"),
     decisionSignals: [
       "잔액", "얼마나 있", "얼마 있", "자산", "순자산", "부채", "빚",
       "예금", "적금", "통장에", "남아 있", "보유", "받을 돈", "예정 자산",
     ],
     subjectSignals: ["계좌", "통장", "포인트", "대출 잔액"],
-    capability: "asset",
   },
   {
     // Capacity: what can be put to work. "얼마 있어"는 Asset, "얼마 쓸 수 있어"는 Treasury.
     id: "treasury",
-    scope: scopeOf("treasury"),
     decisionSignals: [
       "운용", "여윳돈", "여유 자금", "굴릴", "굴려", "투자할 수 있", "비상금",
       "버틸 수 있", "몇 달", "여유가 얼마",
     ],
     subjectSignals: ["운용 가능", "비상 자금"],
-    capability: "treasury",
   },
   {
     id: "career",
-    scope: scopeOf("career"),
     decisionSignals: ["이력서", "지원", "공고", "채용", "포트폴리오", "면접", "오퍼", "이직"],
     subjectSignals: ["회사", "직무", "경력", "연봉 협상"],
-    capability: "career",
   },
   {
     id: "finance",
-    scope: scopeOf("finance"),
     decisionSignals: [
       "결제", "해지", "구독", "송금", "지출", "예산", "청구", "명세서", "자동이체",
       // How money was used — Finance's question, distinct from what is held.
@@ -97,25 +84,20 @@ const DEPARTMENTS: Department[] = [
       "카테고리", "가맹점", "저축이동", "투자이동", "늘었", "줄었",
     ],
     subjectSignals: ["카드", "명세", "통장", "요금"],
-    capability: "finance",
   },
   {
     id: "home",
-    scope: scopeOf("home"),
     decisionSignals: [
       "장보기", "주문", "구매", "재고", "떨어졌", "다 썼", "영수증", "마트", "장 봤",
       // A request to buy something for the house is Home's, and stops at the list.
       "사줘", "사 줘", "사다 줘", "사놔", "사둬", "챙겨 줘", "떨어짐", "다 먹었",
     ],
     subjectSignals: ["냉장고", "집", "살림", "택배", "생필품"],
-    capability: "home",
   },
   {
     id: "health",
-    scope: scopeOf("health"),
     decisionSignals: ["예약", "검진", "진료", "처방"],
     subjectSignals: ["병원", "건강", "약", "증상"],
-    capability: null,
   },
 ];
 
@@ -168,7 +150,7 @@ export function route(request: { subject?: string; body?: string; attachment?: s
     // department can be named. Never a refusal, never a question back.
     return {
       owner: "operations",
-      scope: scopeOf("operations"),
+      scope: "household",
       provisional: true,
       contributors: [],
       reason: "아직 담당 부서가 정해지지 않아 운영이 임시로 맡습니다.",
@@ -183,17 +165,17 @@ export function route(request: { subject?: string; body?: string; attachment?: s
   if (second && second.decision === top.decision && top.decision > 0) {
     return {
       owner: top.department.id,
-      scope: top.department.scope,
+      scope: manifestFor(top.department.id).scope,
       provisional: false,
       contributors: ["planning", second.department.id],
       reason: "결정이 두 영역에 걸쳐 있어, 한 부서가 맡고 조율을 함께 붙입니다.",
-      capability: top.department.capability,
+      capability: isEnabled(top.department.id) ? top.department.id : null,
     };
   }
 
   return {
     owner: top.department.id,
-    scope: top.department.scope,
+    scope: manifestFor(top.department.id).scope,
     provisional: false,
     // The owner asks the rest; the router only notes who is implicated.
     contributors: scored.slice(1).map((s) => s.department.id),
@@ -201,7 +183,7 @@ export function route(request: { subject?: string; body?: string; attachment?: s
       top.decision > 0
         ? "이 요청이 만들어 낼 결정이 이 부서의 것입니다."
         : "요청이 다루는 대상이 이 부서의 영역입니다.",
-    capability: top.department.capability,
+    capability: isEnabled(top.department.id) ? top.department.id : null,
   };
 }
 
