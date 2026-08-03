@@ -70,7 +70,12 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "finance",
-    decisionSignals: ["결제", "해지", "구독", "송금", "지출", "예산", "청구", "명세서", "자동이체"],
+    decisionSignals: [
+      "결제", "해지", "구독", "송금", "지출", "예산", "청구", "명세서", "자동이체",
+      // How money was used — Finance's question, distinct from what is held.
+      "썼어", "쓴 돈", "많이 썼", "어디에 돈", "소비", "가계부", "고정비", "변동비",
+      "카테고리", "가맹점", "저축이동", "투자이동", "늘었", "줄었",
+    ],
     subjectSignals: ["카드", "명세", "통장", "요금"],
     capability: "finance",
   },
