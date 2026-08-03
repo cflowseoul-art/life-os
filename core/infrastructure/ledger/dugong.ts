@@ -9,13 +9,19 @@
  * update — a future receipt write will be a separate, explicitly-gated module,
  * and it will not exist until receipts can match a real transaction first.
  *
- * Two sources, same shape:
- *   DUGONG_LEDGER_CSV  a local export (path)      — no network, works offline
- *   DUGONG_SHEET_ID    the sheet itself (gviz CSV) — requires the sheet to be
- *                      readable by link; a private sheet returns 401 and this
- *                      module reports that rather than returning nothing.
+ * Access is a Google service account, read-only:
+ *   GOOGLE_APPLICATION_CREDENTIALS   service-account key file
+ *   DUGONG_LEDGER_SPREADSHEET_ID     the ledger
+ *   DUGONG_LEDGER_SHEET_NAME         the tab (거래내역)
+ *
+ * The OAuth scope requested is `spreadsheets.readonly`. Even if this module
+ * were asked to write, the token it holds could not.
+ *
+ * DUGONG_LEDGER_CSV (a local export path) is honoured first, so the same logic
+ * can be exercised offline without touching the real ledger.
  */
 
+import { createSign } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 
 export type LedgerTransaction = {
@@ -39,11 +45,13 @@ export type LedgerRead =
 
 /** Column aliases. The ledger names its columns; we adapt, it does not. */
 const COLUMNS: Record<keyof Omit<LedgerTransaction, "row">, string[]> = {
-  date: ["날짜", "일자", "거래일", "거래일자", "date"],
-  description: ["내용", "가맹점", "적요", "거래처", "메모", "description", "merchant"],
+  // Dugong Ledger's own column names come first; the rest are tolerated
+  // spellings so a renamed column does not silently zero out the figures.
+  date: ["이용일자", "날짜", "일자", "거래일", "거래일자", "date"],
+  description: ["가맹점명/받는 사람", "가맹점명", "내용", "가맹점", "적요", "거래처", "메모", "description", "merchant"],
   category: ["분류", "카테고리", "항목", "category"],
-  amount: ["금액", "출금", "지출", "amount", "price"],
-  method: ["결제수단", "수단", "카드", "계정", "method", "account"],
+  amount: ["이용금액", "금액", "출금", "지출", "amount", "price"],
+  method: ["이용카드/계좌", "결제수단", "수단", "카드", "계정", "method", "account"],
 };
 
 /** Minimal RFC4180 splitter: quoted fields, embedded commas, doubled quotes. */
@@ -86,7 +94,14 @@ export function parseLedgerCsv(csv: string): LedgerTransaction[] {
   const lines = csv.split(/\r?\n/).filter((l) => l.trim() !== "");
   if (lines.length < 2) return [];
 
-  const headers = splitRow(lines[0]);
+  return parseLedgerRows(lines.map(splitRow));
+}
+
+/** Same mapping, from rows the Sheets API returned. */
+export function parseLedgerRows(rows: string[][]): LedgerTransaction[] {
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map((h) => h.trim());
   const at = {
     date: indexOfColumn(headers, COLUMNS.date),
     description: indexOfColumn(headers, COLUMNS.description),
@@ -99,8 +114,7 @@ export function parseLedgerCsv(csv: string): LedgerTransaction[] {
 
   const transactions: LedgerTransaction[] = [];
 
-  lines.slice(1).forEach((line, index) => {
-    const cells = splitRow(line);
+  rows.slice(1).forEach((cells, index) => {
     const date = normaliseDate(cells[at.date] ?? "");
     const amount = Number((cells[at.amount] ?? "").replace(/[^\d.-]/g, ""));
 
@@ -119,11 +133,81 @@ export function parseLedgerCsv(csv: string): LedgerTransaction[] {
   return transactions;
 }
 
-const SHEET_ID = process.env.DUGONG_SHEET_ID ?? "11wMsNGXzHnDq7FbK51B3dyGZUe_NnNLmZwZid0EvtM0";
-const SHEET_NAME = process.env.DUGONG_SHEET_TAB ?? "거래내역";
+/** Read-only. The one scope this module ever asks for. */
+const SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 
-function sheetUrl(): string {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+type ServiceAccount = { client_email: string; private_key: string; token_uri?: string };
+
+function base64url(input: Buffer | string): string {
+  return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * Exchanges the service-account key for a read-only access token.
+ *
+ * Signed locally with node:crypto — no SDK, no dependency, and the key never
+ * leaves this process.
+ */
+async function accessToken(account: ServiceAccount): Promise<string> {
+  const tokenUri = account.token_uri ?? "https://oauth2.googleapis.com/token";
+  const now = Math.floor(Date.now() / 1000);
+
+  const claim = {
+    iss: account.client_email,
+    scope: SCOPE,
+    aud: tokenUri,
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const unsigned = `${base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${base64url(JSON.stringify(claim))}`;
+  const signature = createSign("RSA-SHA256").update(unsigned).sign(account.private_key);
+  const assertion = `${unsigned}.${base64url(signature)}`;
+
+  const response = await fetch(tokenUri, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+
+  const body = (await response.json()) as { access_token?: string; error_description?: string; error?: string };
+
+  if (!response.ok || !body.access_token) {
+    throw new Error(body.error_description ?? body.error ?? `토큰 발급 실패 (${String(response.status)})`);
+  }
+
+  return body.access_token;
+}
+
+/** Reads the tab as rows. Never writes: no write method exists here. */
+async function readSheet(): Promise<LedgerTransaction[]> {
+  const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const spreadsheetId = process.env.DUGONG_LEDGER_SPREADSHEET_ID;
+  const sheetName = process.env.DUGONG_LEDGER_SHEET_NAME ?? "거래내역";
+
+  if (!keyFile) throw new Error("GOOGLE_APPLICATION_CREDENTIALS가 설정되지 않았습니다.");
+  if (!existsSync(keyFile)) throw new Error(`인증 파일을 찾지 못했습니다: ${keyFile}`);
+  if (!spreadsheetId) throw new Error("DUGONG_LEDGER_SPREADSHEET_ID가 설정되지 않았습니다.");
+
+  const account = JSON.parse(readFileSync(keyFile, "utf8")) as ServiceAccount;
+  const token = await accessToken(account);
+
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`
+    + `/values/${encodeURIComponent(sheetName)}?majorDimension=ROWS`;
+
+  const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+
+  if (!response.ok) {
+    const detail = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(detail.error?.message ?? `시트를 읽지 못했습니다 (${String(response.status)})`);
+  }
+
+  const body = (await response.json()) as { values?: string[][] };
+  return parseLedgerRows(body.values ?? []);
 }
 
 /**
@@ -141,26 +225,17 @@ export async function readLedger(): Promise<LedgerRead> {
   }
 
   try {
-    const response = await fetch(sheetUrl(), { redirect: "follow" });
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        reason:
-          response.status === 401 || response.status === 403
-            ? "가계부 시트를 열 권한이 없습니다. 링크가 있는 사람은 보기로 공유해 주시거나, 내보낸 CSV 경로를 알려주십시오."
-            : `가계부 시트를 읽지 못했습니다 (${String(response.status)}).`,
-      };
-    }
-
-    const text = await response.text();
-
-    if (text.trimStart().startsWith("<")) {
-      return { ok: false, reason: "가계부 시트가 CSV 대신 로그인 화면을 돌려주었습니다. 보기 권한을 열어 주십시오." };
-    }
-
-    return { ok: true, transactions: parseLedgerCsv(text), source: "거래내역" };
+    const transactions = await readSheet();
+    return {
+      ok: true,
+      transactions,
+      source: `${process.env.DUGONG_LEDGER_SHEET_NAME ?? "거래내역"} (Dugong Ledger)`,
+    };
   } catch (error) {
-    return { ok: false, reason: `가계부에 연결하지 못했습니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}` };
+    // No access is never reported as "no spending" (Art. 9).
+    return {
+      ok: false,
+      reason: `가계부를 읽지 못했습니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+    };
   }
 }
