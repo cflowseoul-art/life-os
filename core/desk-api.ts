@@ -38,10 +38,16 @@ export type DeskWork = {
   contributor: string;
   /** Plain-language state, derived from the hold. */
   status: string;
-  /** The conclusion, first. One sentence the representative can act on. */
+  /** 1. Summary — the conclusion, in one sentence. */
   report: string;
-  /** Everything that supports the conclusion. Composed only from recorded facts. */
-  detail: string[];
+  /** 2. Findings — what was actually found, as bullets. */
+  findings: string[];
+  /** 3. Recommendation. */
+  recommendation: string;
+  /** 4. Decision required, or null when nothing is asked of the representative. */
+  decision: string | null;
+  /** What the representative handed over, shown as an attachment. */
+  attachment: { name: string; lines: number; preview: string[] } | null;
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -80,6 +86,33 @@ function actorLabel(actor: EventEnvelope["actor"]): string {
   return "회사";
 }
 
+/** The file the representative sent, shown back rather than described. */
+function attachmentFor(
+  hold: Hold,
+  events: EventEnvelope[],
+): { name: string; lines: number; preview: string[] } | null {
+  const handed = events.find(
+    (e) => e.event.type === "HandedOver" && e.event.holdId === hold.id,
+  );
+
+  if (!handed || handed.event.type !== "HandedOver") return null;
+
+  const lines = handed.event.handover.jdText.split("\n").filter((l) => l.trim() !== "");
+
+  if (lines.length === 0) return null;
+
+  return {
+    name: `${hold.company} 공고 원문`,
+    lines: lines.length,
+    preview: lines.slice(0, 6),
+  };
+}
+
+/** Findings are the observations themselves. Nothing is summarised into them. */
+function findingsFor(hold: Hold): string[] {
+  return hold.observations.map((o) => o.statement);
+}
+
 function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
   if (hold.state === "withdrawn") return null;
 
@@ -96,6 +129,8 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     }));
 
   const observed = hold.observations.length;
+  const attachment = attachmentFor(hold, events);
+  const findings = findingsFor(hold);
 
   if (hold.state === "asking" && hold.outstandingAsk) {
     return {
@@ -104,12 +139,12 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       title,
       contributor,
       status: "결정을 기다리고 있습니다",
-      report: "이력서 첫 문단을 무엇으로 시작할지, 대표님 결정만 남았습니다.",
-      detail: [
-        `보내주신 공고에서 요건 ${String(observed)}개를 확인했고, 문장은 공고에 있던 표현을 그대로 옮겼습니다.`,
-        "첫 문단에 무엇을 두느냐에 따라 읽는 쪽이 대표님을 다르게 기억합니다. 그건 제가 계산할 수 있는 문제가 아니라 여쭙습니다.",
-        "정해 주시면 그 순서로 정리해서 올려드리겠습니다. 제출은 하지 않습니다.",
-      ],
+      report: `공고 요건 ${String(observed)}개를 확인했습니다. 첫 문단에 무엇을 앞세울지만 정해 주시면 됩니다.`,
+      findings,
+      recommendation:
+        "우열은 제가 정하지 않았습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라, 두 가지로 좁혀 두었습니다.",
+      decision: hold.outstandingAsk.question,
+      attachment,
       ask: hold.outstandingAsk,
       artifact: null,
       observations: hold.observations,
@@ -126,10 +161,10 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       contributor,
       status: "마무리했습니다",
       report: "정해 주신 순서대로 정리해서 올려드립니다.",
-      detail: [
-        `${String(hold.artifact.sections.length)}개 항목을 말씀하신 순서로 배치했고, 표현은 공고에 있던 문장을 그대로 썼습니다.`,
-        "지어낸 내용은 없습니다. 어느 문장이 어디서 나왔는지는 아래에 남겨 두었습니다.",
-      ],
+      findings,
+      recommendation: "이대로 쓰셔도 됩니다. 제출은 대표님이 하실 때 따로 여쭙겠습니다.",
+      decision: null,
+      attachment,
       ask: null,
       artifact: hold.artifact,
       observations: hold.observations,
@@ -145,12 +180,10 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     contributor,
     status: observed === 0 ? "보내주신 공고를 읽고 있습니다" : `공고에서 요건 ${String(observed)}개를 확인했습니다`,
     report: "맡아 두었습니다. 지금 대표님께서 하실 일은 없습니다.",
-    detail: [
-      observed === 0
-        ? "보내주신 공고를 읽고 있습니다."
-        : `공고에서 요건 ${String(observed)}개까지 확인했습니다.`,
-      "대표님 판단이 필요한 지점에 닿으면 그때 올려드리겠습니다.",
-    ],
+    findings,
+    recommendation: "판단이 필요한 지점에 닿으면 그때 올려드리겠습니다.",
+    decision: null,
+    attachment,
     ask: null,
     artifact: null,
     observations: hold.observations,

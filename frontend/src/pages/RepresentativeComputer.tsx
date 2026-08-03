@@ -41,7 +41,10 @@ type Work = {
   contributor: string;
   status: string;
   report: string;
-  detail?: string[];
+  findings?: string[];
+  recommendation?: string;
+  decision?: string | null;
+  attachment?: { name: string; lines: number; preview: string[] } | null;
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -148,12 +151,50 @@ function Reading({
       </div>
 
       <div className="rc__body">
+        <h2 className="rc__h">요약</h2>
         <p className="rc__lead">{work.report}</p>
-        {(work.detail ?? []).map((line) => <p key={line}>{line}</p>)}
+
+        {(work.findings ?? []).length > 0 && (
+          <>
+            <h2 className="rc__h">확인한 내용</h2>
+            <ul className="rc__bullets">
+              {(work.findings ?? []).map((f) => <li key={f}>{f}</li>)}
+            </ul>
+          </>
+        )}
+
+        {work.artifact && (
+          <>
+            <h2 className="rc__h">정리한 순서</h2>
+            <ol className="rc__bullets">
+              {work.artifact.sections.map((sec) => (
+                <li key={sec.heading}>{sec.heading.replace(/^\d+\.\s*/, "")}</li>
+              ))}
+            </ol>
+          </>
+        )}
+
+        {work.attachment && (
+          <div className="rc__attachment">
+            <p className="rc__attachment-name">
+              {work.attachment.name} · {work.attachment.lines}줄
+            </p>
+            <pre className="rc__attachment-preview">{work.attachment.preview.join("\n")}</pre>
+          </div>
+        )}
+
+        {work.recommendation && (
+          <>
+            <h2 className="rc__h">제안</h2>
+            <p>{work.recommendation}</p>
+          </>
+        )}
       </div>
 
       {work.ask && (
         <div className="rc__decide">
+          <h2 className="rc__h">결정 필요</h2>
+          <p>{work.decision ?? work.ask.question}</p>
           <div className="rc__choices">
             {work.ask.options.map((option) => (
               <button
@@ -182,24 +223,10 @@ function Reading({
         </div>
       )}
 
-      {work.artifact && (
-        <div className="rc__result">
-          <ol className="rc__ordered">
-            {work.artifact.sections.map((s) => (
-              <li key={s.heading}>
-                {s.heading.replace(/^\d+\.\s*/, "")}
-                <span className="rc__src">{naturalSource(s.body)}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {/* Supporting material. Present because the representative may check,
-          collapsed because checking is not the normal path. */}
+      {/* Collapsed by default: available to check, never in the way. */}
       {work.observations.length > 0 && (
         <details className="rc__more">
-          <summary>제가 확인한 것 {work.observations.length}가지</summary>
+          <summary>근거 · 출처 {work.observations.length}건</summary>
           <ul className="rc__facts">
             {work.observations.map((o) => (
               <li key={o.id}>
