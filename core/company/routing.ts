@@ -64,9 +64,9 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "home",
-    decisionSignals: ["장보기", "주문", "구매", "재고", "떨어졌", "다 썼"],
-    subjectSignals: ["냉장고", "집", "살림", "택배"],
-    capability: null,
+    decisionSignals: ["장보기", "주문", "구매", "재고", "떨어졌", "다 썼", "영수증", "마트", "장 봤"],
+    subjectSignals: ["냉장고", "집", "살림", "택배", "생필품"],
+    capability: "home",
   },
   {
     id: "health",

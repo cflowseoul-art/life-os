@@ -195,8 +195,8 @@ export const home: ReportTemplate = {
     if (!staffed) return notYetStaffed("살림 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
     const sections = [
-      ...section("지금 있는 것", facts),
-      ...section("떨어진 것", outcome),
+      ...section("구입 품목", facts),
+      ...section("재고 반영", outcome.filter((o) => !o.startsWith("지출 합계"))),
     ];
 
     if (state === "awaiting") {
@@ -208,8 +208,18 @@ export const home: ReportTemplate = {
       };
     }
 
+    if (state === "done") {
+      const spend = outcome.find((o) => o.startsWith("지출 합계")) ?? "";
+      return {
+        summary: `영수증 정리했습니다. ${String(facts.length)}개 품목을 재고에 반영했습니다.`,
+        sections,
+        recommendation: `${spend ? `${spend}은 재무팀에 넘겼습니다. ` : ""}${NO_DECISION}`,
+        decision: null,
+      };
+    }
+
     return {
-      summary: state === "done" ? "주문까지 마쳤습니다." : "재고를 기록에 맞춰 정리하고 있습니다.",
+      summary: "영수증을 읽고 품목을 정리하고 있습니다.",
       sections,
       recommendation: NO_DECISION,
       decision: null,

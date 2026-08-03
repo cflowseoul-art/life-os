@@ -18,6 +18,7 @@ import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
+import { advanceHome } from "./company/home-runner.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
@@ -137,7 +138,7 @@ function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskW
 
   const composed = template.compose({
     state,
-    staffed: hold.capability === "career",
+    staffed: hold.capability === "career" || hold.capability === "home",
     facts: hold.observations.map((o) => o.statement),
     outcome: (hold.artifact?.sections ?? []).map((sec) => sec.heading.replace(/^\d+\.\s*/, "")),
     question: hold.outstandingAsk?.question ?? null,
@@ -247,6 +248,29 @@ createServer((req, res) => {
       });
 
       const { company, role } = splitSubject(sent.subject ?? "");
+
+      // Home records receipts itself: no fork, so no engine round trip.
+      if (routed.capability === "home") {
+        log.append(
+          {
+            type: "HandedOver",
+            holdId: randomUUID(),
+            capability: "home",
+            handover: {
+              company: company === "" ? (sent.subject ?? "").trim() || "영수증" : company,
+              role: role === "" ? "영수증 정리" : role,
+              jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
+            },
+          },
+          { kind: "user" },
+          "home",
+          "computer",
+        );
+
+        advanceHome(log);
+        json(res, 200, { ok: true, desk: deskView(engine, log) });
+        return;
+      }
 
       // A department that cannot execute yet still owns the work and still
       // takes custody. Work is never refused for a missing capability (§3).
