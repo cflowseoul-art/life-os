@@ -40,149 +40,172 @@ export function flowOf(tx: LedgerTransaction, rules: Map<string, CategoryRule>):
   return "spending";
 }
 
+/** A statement, and what kind of statement it is. */
 export type Statement = {
   kind: "관찰" | "추론" | "제안";
   text: string;
-  /** 거래내역 rows behind it. Empty only for a 제안 the representative asked for. */
+  /** 거래내역 rows behind it. */
   rows: number[];
 };
 
-export type PolicyFinding = {
-  policy: string;
-  /** What the ledger currently shows. */
-  state: Statement;
-  /** The rule as the representative set it. */
-  expected: string;
-  /** The rows that demonstrate it. */
-  evidence: Statement[];
+export type Severity = "low" | "medium" | "high";
+
+/** Everything a policy is evaluated against. Read-only. */
+export type PolicyContext = {
+  transactions: LedgerTransaction[];
+  rules: Map<string, CategoryRule>;
+  month: string;
 };
 
-export type Policy = {
+/**
+ * A policy is data, not code.
+ *
+ * `condition` answers one question — does the rule hold? — and everything the
+ * report says is built from `evidence` and `template`. Adding a policy means
+ * adding an entry to the registry; no evaluation logic changes, and no
+ * department gains a special case.
+ *
+ * A policy may never propose a fix or perform an action. There is nowhere in
+ * this shape to put one (Art. 6).
+ */
+export type PolicyDefinition = {
   id: string;
-  /** Stated as the representative's rule, not as our opinion. */
+  title: string;
+  /** The department accountable for the rule. */
+  owner: string;
+  severity: Severity;
+  /** True when the representative's rule is being followed. */
+  condition(context: PolicyContext): boolean;
+  /** The rows that demonstrate the current state. */
+  evidence(context: PolicyContext): Statement[];
+  template: {
+    /** What the ledger currently shows. */
+    state(context: PolicyContext): string;
+    /** The rule, as the representative set it. */
+    expected: string;
+  };
+};
+
+export type PolicyResult = {
+  policy: PolicyDefinition;
+  passed: boolean;
+  state: Statement;
   expected: string;
-  check(
-    transactions: LedgerTransaction[],
-    rules: Map<string, CategoryRule>,
-    month: string,
-  ): PolicyFinding | null;
+  evidence: Statement[];
 };
 
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-/**
- * 월초 이월금은 0이어야 한다.
- *
- * A carried balance at the start of a month means the previous month did not
- * close out. The check states what is there and what the rule says, and stops.
- */
-export const carryoverIsZero: Policy = {
-  id: "carryover-zero",
-  expected: "월초 이월금은 0원이어야 합니다.",
-  check(transactions, rules, month) {
-    const carried = transactions.filter(
-      (tx) => tx.date.startsWith(month) && flowOf(tx, rules) === "carryover",
-    );
-
-    const total = carried.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-    if (total === 0) return null;
-
-    return {
-      policy: "월초 이월금 0원",
-      state: {
-        kind: "관찰",
-        text: `${month} 이월금이 ${won(total)} 기록돼 있습니다.`,
-        rows: carried.map((tx) => tx.row),
-      },
-      expected: "월초 이월금은 0원이어야 합니다.",
-      evidence: carried.map((tx) => ({
-        kind: "관찰" as const,
-        text: `${tx.date} · ${tx.description} · ${won(Math.abs(tx.amount))}`,
-        rows: [tx.row],
-      })),
-    };
-  },
-};
-
-/**
- * 이동은 통계에 잡히지 않아야 한다.
- *
- * If a transfer category is marked 통계포함 Y in 분류규칙, spending figures are
- * inflated by money that only moved. The ledger's own rules are the evidence.
- */
-export const transfersExcluded: Policy = {
-  id: "transfers-excluded",
-  expected: "저축·투자·카드대금 이동은 통계에서 제외돼야 합니다.",
-  check(transactions, rules, month) {
-    const wrong = [...rules.values()].filter(
-      (r) => r.type.includes("이동") && r.countsAsSpending,
-    );
-
-    if (wrong.length === 0) return null;
-
-    const affected = transactions.filter(
-      (tx) => tx.date.startsWith(month) && wrong.some((r) => r.category === tx.category.trim()),
-    );
-
-    return {
-      policy: "이동은 통계 제외",
-      state: {
-        kind: "관찰",
-        text: `분류규칙에서 ${wrong.map((r) => r.category).join(", ")}가 통계포함 Y로 돼 있습니다.`,
-        rows: affected.map((tx) => tx.row),
-      },
-      expected: "저축·투자·카드대금 이동은 통계에서 제외돼야 합니다.",
-      evidence: affected.map((tx) => ({
-        kind: "관찰" as const,
-        text: `${tx.date} · ${tx.description} · ${won(Math.abs(tx.amount))}`,
-        rows: [tx.row],
-      })),
-    };
-  },
-};
-
-/**
- * 분류가 비어 있으면 통계가 흔들린다.
- *
- * Uncategorised rows land in 미분류 and quietly distort every comparison. The
- * finding names them; what to do about them is the representative's call.
- */
-export const everyRowClassified: Policy = {
-  id: "rows-classified",
-  expected: "모든 거래에 분류가 있어야 합니다.",
-  check(transactions, _rules, month) {
-    const blank = transactions.filter((tx) => tx.date.startsWith(month) && tx.category.trim() === "");
-    if (blank.length === 0) return null;
-
-    return {
-      policy: "분류 누락 없음",
-      state: {
-        kind: "관찰",
-        text: `${month} 거래 중 ${String(blank.length)}건에 분류가 비어 있습니다.`,
-        rows: blank.map((tx) => tx.row),
-      },
-      expected: "모든 거래에 분류가 있어야 합니다.",
-      evidence: blank.slice(0, 5).map((tx) => ({
-        kind: "관찰" as const,
-        text: `${tx.date} · ${tx.description} · ${won(Math.abs(tx.amount))}`,
-        rows: [tx.row],
-      })),
-    };
-  },
-};
-
-export const POLICIES: Policy[] = [carryoverIsZero, transfersExcluded, everyRowClassified];
-
-/** Runs every policy. Returns only violations — a kept rule is not news. */
-export function checkPolicies(
-  transactions: LedgerTransaction[],
-  rules: Map<string, CategoryRule>,
-  month: string,
-): PolicyFinding[] {
-  return POLICIES.map((p) => p.check(transactions, rules, month)).filter(
-    (f): f is PolicyFinding => f !== null,
+/** Rows of a given flow in the month under review. */
+function rowsOfFlow(context: PolicyContext, flow: Flow): LedgerTransaction[] {
+  return context.transactions.filter(
+    (tx) => tx.date.startsWith(context.month) && flowOf(tx, context.rules) === flow,
   );
 }
+
+function asEvidence(transactions: LedgerTransaction[], limit = 5): Statement[] {
+  return transactions.slice(0, limit).map((tx) => ({
+    kind: "관찰" as const,
+    text: `${tx.date} · ${tx.description} · ${won(Math.abs(tx.amount))}`,
+    rows: [tx.row],
+  }));
+}
+
+/**
+ * The registry. Every operating rule the representative has set, as data.
+ */
+export const POLICIES: PolicyDefinition[] = [
+  {
+    id: "carryover-zero",
+    title: "월초 이월금 0원",
+    owner: "finance",
+    severity: "high",
+    condition: (ctx) => rowsOfFlow(ctx, "carryover").length === 0,
+    evidence: (ctx) => asEvidence(rowsOfFlow(ctx, "carryover")),
+    template: {
+      state: (ctx) => {
+        const carried = rowsOfFlow(ctx, "carryover");
+        const total = carried.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+        return `${ctx.month} 이월금이 ${won(total)} 기록돼 있습니다.`;
+      },
+      expected: "월초 이월금은 0원이어야 합니다.",
+    },
+  },
+  {
+    id: "transfers-excluded",
+    title: "이동은 통계 제외",
+    owner: "finance",
+    severity: "medium",
+    condition: (ctx) =>
+      [...ctx.rules.values()].every((r) => !r.type.includes("이동") || !r.countsAsSpending),
+    evidence: (ctx) => {
+      const wrong = [...ctx.rules.values()].filter((r) => r.type.includes("이동") && r.countsAsSpending);
+      return asEvidence(
+        ctx.transactions.filter(
+          (tx) => tx.date.startsWith(ctx.month) && wrong.some((r) => r.category === tx.category.trim()),
+        ),
+      );
+    },
+    template: {
+      state: (ctx) => {
+        const wrong = [...ctx.rules.values()].filter((r) => r.type.includes("이동") && r.countsAsSpending);
+        return `분류규칙에서 ${wrong.map((r) => r.category).join(", ")}가 통계포함 Y로 돼 있습니다.`;
+      },
+      expected: "저축·투자·카드대금 이동은 통계에서 제외돼야 합니다.",
+    },
+  },
+  {
+    id: "rows-classified",
+    title: "분류 누락 없음",
+    owner: "finance",
+    severity: "low",
+    condition: (ctx) =>
+      ctx.transactions.every((tx) => !tx.date.startsWith(ctx.month) || tx.category.trim() !== ""),
+    evidence: (ctx) =>
+      asEvidence(
+        ctx.transactions.filter((tx) => tx.date.startsWith(ctx.month) && tx.category.trim() === ""),
+      ),
+    template: {
+      state: (ctx) => {
+        const blank = ctx.transactions.filter(
+          (tx) => tx.date.startsWith(ctx.month) && tx.category.trim() === "",
+        );
+        return `${ctx.month} 거래 중 ${String(blank.length)}건에 분류가 비어 있습니다.`;
+      },
+      expected: "모든 거래에 분류가 있어야 합니다.",
+    },
+  },
+];
+
+/** Evaluates the registry. Order follows severity, worst first. */
+export function evaluatePolicies(context: PolicyContext, registry = POLICIES): PolicyResult[] {
+  const weight: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
+
+  return registry
+    .map((policy) => {
+      const passed = policy.condition(context);
+
+      return {
+        policy,
+        passed,
+        state: {
+          kind: "관찰" as const,
+          text: passed ? `${policy.title} — 정상입니다.` : policy.template.state(context),
+          rows: passed ? [] : policy.evidence(context).flatMap((e) => e.rows),
+        },
+        expected: policy.template.expected,
+        evidence: passed ? [] : policy.evidence(context),
+      };
+    })
+    .sort((a, b) => weight[a.policy.severity] - weight[b.policy.severity]);
+}
+
+/** Only the rules that are not being followed. A kept rule is not news. */
+export function violations(context: PolicyContext, registry = POLICIES): PolicyResult[] {
+  return evaluatePolicies(context, registry).filter((r) => !r.passed);
+}
+
+export const ALL_POLICIES_PASS = "대표님께서 설정하신 운영 기준은 모두 정상입니다.";
 
 /**
  * Whether the representative asked for a recommendation.
@@ -191,5 +214,5 @@ export function checkPolicies(
  * and it never acts.
  */
 export function recommendationRequested(text: string): boolean {
-  return /추천|제안|어떻게\s*할까|어떻게\s*하면|의견|조언|골라|정리해\s*줘\s*\?/.test(text);
+  return /추천|제안|어떻게\s*할까|어떻게\s*하면|의견|조언|골라/.test(text);
 }

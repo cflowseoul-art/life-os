@@ -12,7 +12,7 @@ import { EventLog } from "../events/log.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
 import { anomalies, baselines, onlySpending } from "../capabilities/finance/ledger.ts";
-import { checkPolicies, recommendationRequested } from "../capabilities/finance/policy.ts";
+import { ALL_POLICIES_PASS, recommendationRequested, violations } from "../capabilities/finance/policy.ts";
 import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
 
 type FinanceHold = {
@@ -110,15 +110,15 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
     // A month is only complete once the next one has begun.
     const monthComplete = months.some((m) => m.month > currentMonth);
     const found = anomalies(spending, currentMonth, 3, monthComplete);
-    const violations = checkPolicies(read.transactions, rules, currentMonth);
+    const failed = violations({ transactions: read.transactions, rules, month: currentMonth });
     const asked = recommendationRequested(hold.text);
 
     // Statements are recorded with their kind. Nothing normal is recorded:
     // a kept policy and an unremarkable month both produce silence (Art. 2).
     if (!hold.observed) {
       const statements = [
-        ...violations.flatMap((v) => [
-          { kind: "관찰", text: `${v.policy} — ${v.state.text}`, rows: v.state.rows },
+        ...failed.flatMap((v) => [
+          { kind: "관찰", text: `${v.policy.title} — ${v.state.text}`, rows: v.state.rows },
           { kind: "관찰", text: `운영 기준: ${v.expected}`, rows: [] as number[] },
         ]),
         ...found.map((a) => ({ kind: "추론", text: a.sentence, rows: a.rows })),
@@ -144,7 +144,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
       }
     }
 
-    const nothingToSay = violations.length === 0 && found.length === 0;
+    const nothingToSay = failed.length === 0 && found.length === 0;
 
     log.append(
       {
@@ -153,10 +153,11 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
         artifact: {
           id: `ledger-${currentMonth}`,
           title: nothingToSay
-            ? `${currentMonth} · 보고드릴 사항 없음`
-            : `${currentMonth} · 운영 기준 ${String(violations.length)}건 · 변화 ${String(found.length)}건`,
+            ? `${currentMonth} · ${ALL_POLICIES_PASS}`
+            : `${currentMonth} · 운영 기준 ${String(failed.length)}건 · 변화 ${String(found.length)}건`,
           sections: [
-            ...violations.flatMap((v) => [
+            // A passing policy renders nothing at all.
+            ...failed.flatMap((v) => [
               {
                 heading: `[관찰] ${v.state.text}`,
                 body: `운영 기준: ${v.expected}`,
@@ -174,7 +175,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
               derivedFrom: a.rows.map((r) => `거래내역 ${String(r)}행`),
             })),
             // A recommendation exists only when it was asked for.
-            ...(asked && (violations.length > 0 || found.length > 0)
+            ...(asked && (failed.length > 0 || found.length > 0)
               ? [{
                   heading: "[제안] 요청하신 의견입니다",
                   body: "판단에 필요한 사실만 위에 정리했습니다. 어떤 쪽을 보실지 말씀해 주시면 그 기준으로 다시 정리하겠습니다.",

@@ -155,9 +155,10 @@ export const finance: ReportTemplate = {
     }
 
     if (state === "done") {
+      // Every rule kept: the policy section is not rendered at all.
       if (policy.length === 0 && changes.length === 0) {
         return {
-          summary: "가계부 기준으로 특별히 보고드릴 사항이 없습니다.",
+          summary: "대표님께서 설정하신 운영 기준은 모두 정상입니다.",
           sections: [],
           recommendation: NO_DECISION,
           decision: null,
@@ -168,7 +169,7 @@ export const finance: ReportTemplate = {
         summary:
           policy.length > 0
             ? "운영 기준과 어긋난 항목이 있어 올립니다."
-            : "평소와 다른 항목이 있어 올립니다.",
+            : "대표님께서 설정하신 운영 기준은 모두 정상입니다. 다만 평소와 다른 항목이 있어 올립니다.",
         sections,
         recommendation: `모든 숫자는 거래내역 행으로 확인하실 수 있습니다. ${NO_DECISION}`,
         decision: null,
