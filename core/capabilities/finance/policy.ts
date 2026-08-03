@@ -145,7 +145,7 @@ export function violations(context: PolicyContext) {
 }
 
 /**
- * 부수입은 투자 가능 금액보다 커야 한다.
+ * 부수입은 투자 가능 금액을 넘지 않아야 한다.
  *
  * Both figures are the ledger's: 부수입 is summed from 거래내역 rows the ledger
  * classified as such, and 투자 가능 금액 is LOOKER_KPI's own column. Finance
@@ -153,19 +153,19 @@ export function violations(context: PolicyContext) {
  */
 financePolicies.register({
   id: "side-income-over-investable",
-  title: "부수입 > 투자 가능 금액",
+  title: "부수입 ≤ 투자 가능 금액",
   severity: "medium",
   condition: (ctx) => {
     const investable = ctx.kpi?.["투자 가능 금액"];
     if (investable === undefined) return true;
-    return sideIncome(ctx) > investable;
+    return sideIncome(ctx) <= investable;
   },
   evidence: (ctx) => asEvidence(sideIncomeRows(ctx)),
   template: {
     state: (ctx) =>
       `${ctx.month} 부수입은 ${won(sideIncome(ctx))}, 투자 가능 금액은 `
       + `${won(ctx.kpi?.["투자 가능 금액"] ?? 0)}입니다.`,
-    expected: "부수입이 투자 가능 금액보다 커야 합니다.",
+    expected: "부수입은 투자 가능 금액을 넘지 않아야 합니다.",
   },
 });
 
