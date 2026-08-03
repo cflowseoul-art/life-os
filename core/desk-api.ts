@@ -17,6 +17,7 @@ import { CustodyEngine } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
+import { continueProjects } from "./company/continuation.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
@@ -307,6 +308,10 @@ createServer((req, res) => {
         json(res, 400, result);
         return;
       }
+
+      // Work may have completed. The owning department starts whatever
+      // naturally follows, silently. Nothing about this is reported (§4).
+      continueProjects(log);
 
       json(res, 200, { ok: true, desk: deskView(engine, log) });
     });
