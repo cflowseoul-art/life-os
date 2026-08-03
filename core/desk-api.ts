@@ -18,6 +18,7 @@ import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
+import { advanceFinance, advanceFinanceFromLedger } from "./company/finance-runner.ts";
 import { advanceHome } from "./company/home-runner.ts";
 import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
 import { readReceipt } from "./capabilities/home/index.ts";
@@ -274,6 +275,33 @@ createServer((req, res) => {
         return;
       }
 
+      // Finance reads statements itself, same shape as Home.
+      if (routed.capability === "finance") {
+        log.append(
+          {
+            type: "HandedOver",
+            holdId: randomUUID(),
+            capability: "finance",
+            handover: {
+              company: company === "" ? (sent.subject ?? "").trim() || "명세" : company,
+              role: role === "" ? "정기 결제 정리" : role,
+              jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
+            },
+          },
+          { kind: "user" },
+          "finance",
+          "computer",
+        );
+
+        // Statement text advances locally; otherwise Finance reads the ledger.
+        advanceFinance(log);
+
+        void advanceFinanceFromLedger(log).then(() => {
+          json(res, 200, { ok: true, desk: deskView(engine, log) });
+        });
+        return;
+      }
+
       // A department that cannot execute yet still owns the work and still
       // takes custody. Work is never refused for a missing capability (§3).
       if (!isStaffed(routed)) {
@@ -391,6 +419,29 @@ createServer((req, res) => {
         optionId = String((JSON.parse(body || "{}") as { optionId?: unknown }).optionId ?? "");
       } catch {
         json(res, 400, { ok: false, reason: "요청을 읽을 수 없습니다." });
+        return;
+      }
+
+      // A department that runs outside the custody engine answers its own Ask;
+      // routing the answer through the engine would apply Career's logic to it.
+      const outstanding = engine.outstandingAsk();
+      const owner = engine.ledger().find((h) => h.id === outstanding?.holdId)?.capability;
+
+      if (outstanding && owner === "finance") {
+        if (!outstanding.options.some((o) => o.id === optionId)) {
+          json(res, 400, { ok: false, reason: "선택지에 없는 답변입니다." });
+          return;
+        }
+
+        log.append(
+          { type: "AskAnswered", holdId: outstanding.holdId, askId: outstanding.id, optionId },
+          { kind: "user" },
+          "finance",
+          "computer",
+        );
+
+        advanceFinance(log);
+        json(res, 200, { ok: true, desk: deskView(engine, log) });
         return;
       }
 

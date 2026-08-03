@@ -58,9 +58,9 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "finance",
-    decisionSignals: ["결제", "해지", "구독", "송금", "지출", "예산", "청구"],
+    decisionSignals: ["결제", "해지", "구독", "송금", "지출", "예산", "청구", "명세서", "자동이체"],
     subjectSignals: ["카드", "명세", "통장", "요금"],
-    capability: null,
+    capability: "finance",
   },
   {
     id: "home",

@@ -133,25 +133,36 @@ export const finance: ReportTemplate = {
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
+    const recurring = outcome.filter((o) => !o.includes("1회성"));
+    const once = outcome.filter((o) => o.includes("1회성"));
+
     const sections = [
-      ...section("핵심 수치", facts),
-      ...section("분석", outcome),
+      ...section("정기 결제", recurring),
+      ...section("1회성 지출", once),
+      ...section("명세에서 확인한 청구", facts),
     ];
 
     if (state === "awaiting") {
       return {
-        summary: "정리는 끝났고, 해지 여부만 정해 주시면 됩니다.",
+        summary: "정기 결제 정리는 끝났고, 짚어볼 건이 있어 올립니다.",
         sections,
-        recommendation: "금액이 나가는 건이라 제 선에서 처리하지 않고 올립니다.",
+        recommendation:
+          "해지는 제 선에서 하지 않습니다. 정리해 두면 대표님이 직접 진행하시면 됩니다.",
         decision: question,
       };
     }
 
+    if (state === "done") {
+      return {
+        summary: `정기 결제 ${String(recurring.length)}건을 정리했습니다.`,
+        sections,
+        recommendation: `주기와 금액은 기억해 두겠습니다. ${NO_DECISION}`,
+        decision: null,
+      };
+    }
+
     return {
-      summary:
-        state === "done"
-          ? "지출 정리를 마쳤습니다."
-          : "명세를 대조하며 나가는 돈을 정리하고 있습니다.",
+      summary: "명세를 읽으며 반복되는 결제를 가려내고 있습니다.",
       sections,
       recommendation: NO_DECISION,
       decision: null,
