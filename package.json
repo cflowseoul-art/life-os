@@ -14,7 +14,12 @@
     "start": "tsx src/main.ts",
     "desk": "tsx core/desk-api.ts",
     "db:schema": "bash scripts/db-schema.sh",
-    "db:seed": "bash scripts/db-seed.sh"
+    "db:seed": "bash scripts/db-seed.sh",
+    "build": "cd frontend && npm run build",
+    "serve": "node --import tsx core/desk-api.ts",
+    "start:web": "npm run build && npm run serve",
+    "db:lifeos": "bash -c 'psql \"$DATABASE_URL\" -f database/lifeos.sql'",
+    "db:migrate": "tsx core/infrastructure/db/migrate.ts"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

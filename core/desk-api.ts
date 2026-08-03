@@ -13,6 +13,8 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
+import { staticSite } from "./infrastructure/http/static.ts";
+
 import { verifyGoogleIdToken } from "./identity/google.ts";
 import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
 import { FileIdentityStore } from "./identity/store.ts";
@@ -358,8 +360,17 @@ function body(req: import("node:http").IncomingMessage): Promise<string> {
 
 const port = Number(process.env.PORT ?? 3000);
 
+// One origin: the API answers /api/*, the build answers everything else.
+const site = staticSite();
+console.log(site ? "web: frontend/dist" : "web: (build 없음 — Vite 개발 서버 사용)");
+
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
+
+  if (req.method === "GET" && url.pathname === "/healthz") {
+    json(res, 200, { ok: true, storage: STORAGE });
+    return;
+  }
 
   // ── Authentication ─────────────────────────────────────────────────────
   if (req.method === "POST" && url.pathname === "/api/auth/google") {
@@ -420,6 +431,9 @@ createServer((req, res) => {
     });
     return;
   }
+
+  // Anything that is not an API route is the application itself.
+  if (site?.(req, res, url)) return;
 
   json(res, 404, { ok: false, reason: "없는 경로입니다." });
 }).listen(port, process.env.HOST ?? "127.0.0.1", () => {
