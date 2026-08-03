@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Life OS — 대표님의 컴퓨터</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-drawer="false">
+
+<!-- =====================================================================
+     Prototype. No backend, no framework. Sample data is realistic but fixed.
+     ===================================================================== -->
+
+<header class="bar">
+  <button class="icon-btn menu-btn" type="button" aria-label="메뉴" onclick="openDrawer()">☰</button>
+  <span class="wordmark">Life&nbsp;OS <span>· 대표님의 컴퓨터</span></span>
+  <input class="search" type="search" placeholder="지시·보고 찾기" aria-label="지시·보고 찾기">
+  <span class="me" aria-label="대표님">대</span>
+</header>
+
+<div class="shell">
+
+  <aside class="rail">
+    <nav class="nav" id="rail-nav"></nav>
+    <p class="rail-note">
+      j · k 이동<br>
+      Enter 열기 · Esc 닫기<br>
+      1–5 자리 이동
+    </p>
+  </aside>
+
+  <main class="panel">
+
+    <!-- ── 1. Inbox ─────────────────────────────────────────────────── -->
+    <section class="screen" id="inbox" data-active="true">
+      <div class="screen-head">
+        <h1 class="screen-title">받은 보고</h1>
+        <p class="screen-sub">결정하실 것 하나, 나머지는 맡아 두었습니다.</p>
+      </div>
+
+      <p class="group-label">결정 필요</p>
+
+      <button class="row row--needs" type="button" onclick="openReport('resume')">
+        <span class="sprite" aria-hidden="true">박</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who"><span class="dot" aria-label="결정 필요"></span>박진로 <span class="title">선임</span></span>
+            <span class="state">결정 필요</span>
+            <span class="when">오전 9:12</span>
+          </span>
+          <span class="subject"><span class="dept">커리어팀 · </span>리멤버 · 시니어 디자이너</span>
+          <span class="snippet">첫 문단에 무엇을 앞세울지 하나만 정해 주시면, 이력서 정리는 끝납니다.</span>
+        </span>
+      </button>
+
+      <p class="group-label">맡아 둔 일</p>
+
+      <button class="row" type="button" onclick="openReport('finance')">
+        <span class="sprite" aria-hidden="true">김</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">김재무 <span class="title">팀장</span></span>
+            <span class="state">진행 중</span>
+            <span class="when">오전 8:40</span>
+          </span>
+          <span class="subject"><span class="dept">재무팀 · </span>2026년 8월 사용 내역</span>
+          <span class="snippet">운영 기준은 모두 정상입니다. 이번 달 사용 내역만 정리해 올립니다.</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('asset')">
+        <span class="sprite" aria-hidden="true">최</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">최자산 <span class="title">팀장</span></span>
+            <span class="state">진행 중</span>
+            <span class="when">어제</span>
+          </span>
+          <span class="subject"><span class="dept">자산관리팀 · </span>8월 1일 잔액 기록</span>
+          <span class="snippet">두콩이와 감자의 커플 통장 잔액은 630,356원입니다.</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('treasury')">
+        <span class="sprite" aria-hidden="true">오</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">오운용 <span class="title">팀장</span></span>
+            <span class="state">보류</span>
+            <span class="when">어제</span>
+          </span>
+          <span class="subject"><span class="dept">자산운용팀 · </span>운용 가능 금액 산정</span>
+          <span class="snippet">최소 잔고·비상금 기준을 정해 주시지 않아 계산하지 않았습니다.</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('health')">
+        <span class="sprite" aria-hidden="true">정</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">정건강 <span class="title">대리</span></span>
+            <span class="state">진행 중</span>
+            <span class="when">8/1</span>
+          </span>
+          <span class="subject"><span class="dept">건강팀 · </span>건강검진 예약</span>
+          <span class="snippet">가능한 날짜 세 개를 일정과 맞춰 보고 있습니다.</span>
+        </span>
+      </button>
+
+      <p class="group-label">끝난 일</p>
+
+      <button class="row" type="button" onclick="openReport('receipt')">
+        <span class="sprite" aria-hidden="true">한</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">한살림 <span class="title">선임</span></span>
+            <span class="state">완료</span>
+            <span class="when">8/2</span>
+          </span>
+          <span class="subject"><span class="dept">살림팀 · </span>이마트 성수점 영수증</span>
+          <span class="snippet">영수증 정리했습니다. 3개 품목을 재고에 반영했습니다.</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('career-done')">
+        <span class="sprite" aria-hidden="true">박</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">박진로 <span class="title">선임</span></span>
+            <span class="state">완료</span>
+            <span class="when">7/31</span>
+          </span>
+          <span class="subject"><span class="dept">커리어팀 · </span>토스 · 프로덕트 디자이너</span>
+          <span class="snippet">이력서 정리본이 준비됐습니다. 정해 주신 순서 그대로입니다.</span>
+        </span>
+      </button>
+    </section>
+
+    <!-- ── 2. Report Reader ─────────────────────────────────────────── -->
+    <section class="screen" id="reader">
+      <article class="reader">
+        <button class="back" type="button" onclick="show('inbox')">← 받은 보고</button>
+
+        <h1 id="rd-title">리멤버 · 시니어 디자이너</h1>
+        <p class="meta">
+          <b id="rd-who">박진로 선임</b><span id="rd-dept">· 커리어팀</span>
+          <span>· 8월 3일 오전 9:12</span><span id="rd-state">· 결정 필요</span>
+        </p>
+
+        <div id="rd-body">
+          <h2 class="h">요약</h2>
+          <p class="lead">첫 문단에 무엇을 앞세울지 하나만 정해 주시면, 이력서 정리는 끝납니다.</p>
+
+          <h2 class="h">공고 요건</h2>
+          <ul class="bullets">
+            <li>모바일 앱 UX 개선 경험</li>
+            <li>사용자 인터뷰 설계 및 진행 경험</li>
+            <li>디자인 시스템 운영 경험</li>
+          </ul>
+
+          <div class="attach">
+            <p class="attach-name">리멤버 공고 원문 · 12줄</p>
+            <pre class="attach-pre">자격 요건
+- 모바일 앱 UX 개선 경험
+- 사용자 인터뷰 설계 및 진행 경험
+- 디자인 시스템 운영 경험
+우대 사항
+- B2B 프로덕트 경험</pre>
+          </div>
+
+          <h2 class="h">제안</h2>
+          <p>두 가지로 좁혀 두었습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라 제가 정하지 않았습니다.</p>
+
+          <div class="decide">
+            <h2 class="h">결정 필요</h2>
+            <p>이력서 첫 문단에서 무엇을 앞세울까요?</p>
+            <div class="choices">
+              <button class="choice" type="button" aria-pressed="false" onclick="pick(this)">모바일 앱 UX 개선 경험</button>
+              <button class="choice" type="button" aria-pressed="false" onclick="pick(this)">사용자 인터뷰 설계 및 진행 경험</button>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" id="approve" disabled onclick="approve()">승인</button>
+              <button class="btn btn--ghost" type="button" disabled>수정 요청</button>
+            </div>
+          </div>
+
+          <details class="more">
+            <summary>근거 · 출처 3건</summary>
+            <ul class="facts">
+              <li>모바일 앱 UX 개선 경험<span class="src">보내주신 공고 2번째 줄 · 8월 3일 09:11에 확인</span></li>
+              <li>사용자 인터뷰 설계 및 진행 경험<span class="src">보내주신 공고 3번째 줄 · 8월 3일 09:11에 확인</span></li>
+              <li>디자인 시스템 운영 경험<span class="src">보내주신 공고 4번째 줄 · 8월 3일 09:11에 확인</span></li>
+            </ul>
+          </details>
+
+          <details class="more">
+            <summary>진행 과정</summary>
+            <ul class="facts">
+              <li>대표님 지시를 접수했습니다<span class="src">8월 3일 09:11 · 서비서 실장</span></li>
+              <li>커리어팀 박진로 선임에게 맡겼습니다<span class="src">8월 3일 09:11 · 서비서 실장</span></li>
+              <li>확인했습니다 — 모바일 앱 UX 개선 경험<span class="src">8월 3일 09:11 · 박진로</span></li>
+              <li>여쭤봤습니다 — 이력서 첫 문단에서 무엇을 앞세울까요?<span class="src">8월 3일 09:12 · 박진로</span></li>
+            </ul>
+          </details>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── 3. Reports ───────────────────────────────────────────────── -->
+    <section class="screen" id="reports">
+      <div class="screen-head">
+        <h1 class="screen-title">지난 보고</h1>
+        <p class="screen-sub">끝난 일은 그대로 남습니다. 언제든 되짚어 보실 수 있습니다.</p>
+      </div>
+
+      <p class="group-label">8월</p>
+
+      <button class="row" type="button" onclick="openReport('receipt')">
+        <span class="sprite" aria-hidden="true">한</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">한살림 <span class="title">선임</span></span><span class="state">완료</span><span class="when">8/2</span>
+          </span>
+          <span class="subject"><span class="dept">살림팀 · </span>이마트 성수점 영수증</span>
+          <span class="snippet">3개 품목 재고 반영 · 지출 18,500원 재무팀 전달</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('career-done')">
+        <span class="sprite" aria-hidden="true">박</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">박진로 <span class="title">선임</span></span><span class="state">완료</span><span class="when">7/31</span>
+          </span>
+          <span class="subject"><span class="dept">커리어팀 · </span>토스 · 프로덕트 디자이너</span>
+          <span class="snippet">이력서 정리본 · 3개 항목 배치</span>
+        </span>
+      </button>
+
+      <p class="group-label">7월</p>
+
+      <button class="row" type="button" onclick="openReport('finance')">
+        <span class="sprite" aria-hidden="true">김</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">김재무 <span class="title">팀장</span></span><span class="state">완료</span><span class="when">7/31</span>
+          </span>
+          <span class="subject"><span class="dept">재무팀 · </span>2026년 7월 사용 내역</span>
+          <span class="snippet">고정비 694,078원 · 변동비 1,560,327원 · 자산이동 1,230,000원</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('receipt')">
+        <span class="sprite" aria-hidden="true">한</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">한살림 <span class="title">선임</span></span><span class="state">완료</span><span class="when">7/28</span>
+          </span>
+          <span class="subject"><span class="dept">살림팀 · </span>홈플러스 잠실점 영수증</span>
+          <span class="snippet">2개 품목 재고 반영 · 지출 19,400원 재무팀 전달</span>
+        </span>
+      </button>
+    </section>
+
+    <!-- ── 4. Outbox ────────────────────────────────────────────────── -->
+    <section class="screen" id="outbox">
+      <div class="screen-head">
+        <h1 class="screen-title">보낸 지시</h1>
+        <p class="screen-sub">회사가 맡고 있는 지시입니다. 여기서 하실 일은 없습니다.</p>
+      </div>
+
+      <button class="row row--needs" type="button" onclick="openReport('resume')">
+        <span class="sprite" aria-hidden="true">박</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who"><span class="dot"></span>박진로 <span class="title">선임</span></span>
+            <span class="state">결정 필요</span><span class="when">8/3 09:11</span>
+          </span>
+          <span class="subject">“리멤버 공고 보고 이력서 좀 맞춰 줘”</span>
+          <span class="snippet">접수 → 커리어팀 배정 → 진행 → 결정 대기</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('health')">
+        <span class="sprite" aria-hidden="true">정</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">정건강 <span class="title">대리</span></span>
+            <span class="state">진행 중</span><span class="when">8/1 20:04</span>
+          </span>
+          <span class="subject">“다음 달 건강검진 예약 좀 잡아 줘”</span>
+          <span class="snippet">접수 → 건강팀 배정 → 진행 중</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('treasury')">
+        <span class="sprite" aria-hidden="true">오</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">오운용 <span class="title">팀장</span></span>
+            <span class="state">보류</span><span class="when">8/2 11:30</span>
+          </span>
+          <span class="subject">“여윳돈 얼마나 굴릴 수 있는지 봐 줘”</span>
+          <span class="snippet">접수 → 자산운용팀 배정 → 기준 미설정으로 보류</span>
+        </span>
+      </button>
+
+      <button class="row" type="button" onclick="openReport('ops')">
+        <span class="sprite" aria-hidden="true">강</span>
+        <span class="row-main">
+          <span class="row-top">
+            <span class="who">강총무 <span class="title">사원</span></span>
+            <span class="state">배정</span><span class="when">8/3 07:55</span>
+          </span>
+          <span class="subject">“이번 주말에 뭐 챙길 거 있는지 봐 줘”</span>
+          <span class="snippet">접수 → 담당 부서 확인 중</span>
+        </span>
+      </button>
+    </section>
+
+    <!-- ── 5. Calendar ──────────────────────────────────────────────── -->
+    <section class="screen" id="calendar">
+      <div class="screen-head">
+        <h1 class="screen-title">일정</h1>
+        <p class="screen-sub">시간이 정해진 것만 둡니다.</p>
+      </div>
+
+      <ul class="cal">
+        <li>
+          <span class="day">8월 5일<b>수요일</b></span>
+          <span class="what">리멤버 지원 마감<span>박진로 선임이 그 전에 정리해 둡니다</span></span>
+        </li>
+        <li>
+          <span class="day">8월 12일<b>수요일</b></span>
+          <span class="what">건강검진 예약 가능일<span>정건강 대리가 확인 중 · 아직 정해지지 않았습니다</span></span>
+        </li>
+        <li>
+          <span class="day">8월 25일<b>화요일</b></span>
+          <span class="what">넷플릭스 자동결제일 17,000원<span>김재무 팀장이 그 전에 짚어 올립니다</span></span>
+        </li>
+        <li>
+          <span class="day">9월 1일<b>화요일</b></span>
+          <span class="what">월초 운영 기준 점검<span>김재무 팀장 · 어긋난 항목이 있을 때만 보고합니다</span></span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── 6. Office ────────────────────────────────────────────────── -->
+    <section class="screen" id="office">
+      <div class="screen-head">
+        <h1 class="screen-title">사무실</h1>
+        <p class="screen-sub">지금 이 순간의 회사입니다. 여기서 하실 일은 없습니다.</p>
+      </div>
+
+      <div class="floor floor--top">
+        <div class="floor-head"><span class="floor-no">5F</span><span class="floor-teams">대표실</span></div>
+        <div class="desks">
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">서</span>
+            <div>
+              <p class="desk-name">서비서 <span class="title">실장</span></p>
+              <p class="desk-dept">대표실</p>
+              <p class="desk-work">지시를 접수하고 부서에 배정합니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+          <div class="desk desk--away">
+            <span class="sprite" aria-hidden="true">박</span>
+            <div>
+              <p class="desk-name">박진로 <span class="title">선임</span></p>
+              <p class="desk-dept">커리어팀 · 1F</p>
+              <p class="desk-work">리멤버 · 시니어 디자이너 건으로 결정을 기다리고 있습니다.</p>
+              <span class="desk-tag">보고 대기 중</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="floor">
+        <div class="floor-head"><span class="floor-no">4F</span><span class="floor-teams">재무팀 · 자산관리팀</span></div>
+        <div class="desks">
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">김</span>
+            <div>
+              <p class="desk-name">김재무 <span class="title">팀장</span></p>
+              <p class="desk-dept">재무팀</p>
+              <p class="desk-work">2026년 8월 사용 내역을 정리하고 있습니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">최</span>
+            <div>
+              <p class="desk-name">최자산 <span class="title">팀장</span></p>
+              <p class="desk-dept">자산관리팀</p>
+              <p class="desk-work">8월 1일 잔액 기록을 확인했습니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="floor">
+        <div class="floor-head"><span class="floor-no">3F</span><span class="floor-teams">자산운용팀 · 총무팀</span></div>
+        <div class="desks">
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">오</span>
+            <div>
+              <p class="desk-name">오운용 <span class="title">팀장</span></p>
+              <p class="desk-dept">자산운용팀</p>
+              <p class="desk-work">기준이 정해지길 기다리며 운용 가능액 산정을 멈춰 두었습니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">강</span>
+            <div>
+              <p class="desk-name">강총무 <span class="title">사원</span></p>
+              <p class="desk-dept">총무팀</p>
+              <p class="desk-work">주말 준비 건의 담당 부서를 확인하고 있습니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="floor">
+        <div class="floor-head"><span class="floor-no">2F</span><span class="floor-teams">살림팀 · 건강팀</span></div>
+        <div class="desks">
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">한</span>
+            <div>
+              <p class="desk-name">한살림 <span class="title">선임</span></p>
+              <p class="desk-dept">살림팀</p>
+              <p class="desk-work">장보기 목록을 정리해 두었습니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+          <div class="desk">
+            <span class="sprite" aria-hidden="true">정</span>
+            <div>
+              <p class="desk-name">정건강 <span class="title">대리</span></p>
+              <p class="desk-dept">건강팀</p>
+              <p class="desk-work">검진 가능일을 일정과 맞춰 보고 있습니다.</p>
+              <span class="desk-tag">자리에 있음</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="floor">
+        <div class="floor-head"><span class="floor-no">1F</span><span class="floor-teams">커리어팀</span></div>
+        <div class="desks">
+          <div class="desk desk--away">
+            <span class="sprite" aria-hidden="true">박</span>
+            <div>
+              <p class="desk-name">박진로 <span class="title">선임</span></p>
+              <p class="desk-dept">커리어팀</p>
+              <p class="desk-work">5층에 올라가 있습니다.</p>
+              <span class="desk-tag">자리 비움</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<button class="fab" type="button" onclick="openCompose()">✎ 업무 보내기</button>
+
+<div class="compose" id="compose" data-open="false">
+  <div class="compose-bar">
+    <button class="icon-btn" type="button" aria-label="닫기" onclick="closeCompose()">✕</button>
+    <span class="compose-title">업무 보내기</span>
+    <button class="btn" type="button" onclick="closeCompose()">보내기</button>
+  </div>
+  <div class="compose-body">
+    <div class="to"><span>받는 곳</span><span>우리 회사 · 서비서 실장</span></div>
+    <textarea class="write" rows="8" placeholder="무엇을 맡기시겠습니까? 평소 말씀하시듯 적어 주십시오."></textarea>
+    <div class="attach-zone">
+      <p class="attach-label">첨부</p>
+      <textarea class="attach-box" rows="6" placeholder="공고나 문서, 영수증 내용을 붙여 주십시오."></textarea>
+    </div>
+  </div>
+</div>
+
+<button class="scrim" type="button" aria-label="닫기" onclick="closeDrawer()"></button>
+<div class="drawer">
+  <p class="drawer-mark">Life OS</p>
+  <nav class="nav" id="drawer-nav"></nav>
+</div>
+
+<script>
+  const PLACES = [
+    { id: "inbox", label: "받은 보고", glyph: "📥" },
+    { id: "reports", label: "지난 보고", glyph: "📚" },
+    { id: "outbox", label: "보낸 지시", glyph: "📤" },
+    { id: "calendar", label: "일정", glyph: "📅" },
+    { id: "office", label: "사무실", glyph: "🏢" },
+  ];
+
+  const REPORTS = {
+    resume: { title: "리멤버 · 시니어 디자이너", who: "박진로 선임", dept: "· 커리어팀", state: "· 결정 필요" },
+    finance: { title: "2026년 8월 사용 내역", who: "김재무 팀장", dept: "· 재무팀", state: "· 진행 중" },
+    asset: { title: "8월 1일 잔액 기록", who: "최자산 팀장", dept: "· 자산관리팀", state: "· 진행 중" },
+    treasury: { title: "운용 가능 금액 산정", who: "오운용 팀장", dept: "· 자산운용팀", state: "· 보류" },
+    health: { title: "건강검진 예약", who: "정건강 대리", dept: "· 건강팀", state: "· 진행 중" },
+    receipt: { title: "이마트 성수점 영수증", who: "한살림 선임", dept: "· 살림팀", state: "· 완료" },
+    "career-done": { title: "토스 · 프로덕트 디자이너", who: "박진로 선임", dept: "· 커리어팀", state: "· 완료" },
+    ops: { title: "주말 준비 확인", who: "강총무 사원", dept: "· 총무팀", state: "· 배정" },
+  };
+
+  function renderNav() {
+    for (const id of ["rail-nav", "drawer-nav"]) {
+      const nav = document.getElementById(id);
+      nav.innerHTML = PLACES.map((p) =>
+        `<button class="nav-item" type="button" data-place="${p.id}" onclick="show('${p.id}')">
+           <span class="nav-glyph" aria-hidden="true">${p.glyph}</span>${p.label}
+         </button>`).join("");
+    }
+    markNav("inbox");
+  }
+
+  function markNav(place) {
+    document.querySelectorAll(".nav-item").forEach((el) => {
+      el.setAttribute("aria-current", el.dataset.place === place ? "true" : "false");
+    });
+  }
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.setAttribute("data-active", String(s.id === id)));
+    if (id !== "reader") markNav(id);
+    closeDrawer();
+    window.scrollTo({ top: 0 });
+  }
+
+  function openReport(key) {
+    const r = REPORTS[key];
+    if (r) {
+      document.getElementById("rd-title").textContent = r.title;
+      document.getElementById("rd-who").textContent = r.who;
+      document.getElementById("rd-dept").textContent = r.dept;
+      document.getElementById("rd-state").textContent = r.state;
+    }
+    show("reader");
+  }
+
+  function pick(el) {
+    document.querySelectorAll(".choice").forEach((c) => c.setAttribute("aria-pressed", "false"));
+    el.setAttribute("aria-pressed", "true");
+    document.getElementById("approve").disabled = false;
+  }
+
+  function approve() { show("inbox"); }
+
+  function openDrawer() { document.body.dataset.drawer = "true"; }
+  function closeDrawer() { document.body.dataset.drawer = "false"; }
+  function openCompose() { document.getElementById("compose").dataset.open = "true"; }
+  function closeCompose() { document.getElementById("compose").dataset.open = "false"; }
+
+  document.addEventListener("keydown", (e) => {
+    if (document.activeElement && ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+    if (e.key === "Escape") { closeDrawer(); closeCompose(); show("inbox"); }
+    const n = Number(e.key);
+    if (n >= 1 && n <= 5) show(PLACES[n - 1].id);
+  });
+
+  renderNav();
+</script>
+
+</body>
+</html>
