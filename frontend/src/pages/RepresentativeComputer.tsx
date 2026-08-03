@@ -45,6 +45,7 @@ type Work = {
   recommendation?: string;
   decision?: string | null;
   attachment?: { name: string; lines: number; preview: string[] } | null;
+  project?: { id: string; name: string } | null;
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -52,7 +53,37 @@ type Work = {
   withdrawnReason: string | null;
 };
 
-type Desk = { awaiting: Work[]; inProgress: Work[]; done: Work[] };
+type Project = {
+  id: string;
+  owner: string;
+  name: string;
+  members: { holdId: string; title: string; state: "awaiting" | "inProgress" | "done" }[];
+  reason: string;
+  lifecycle: "active" | "dormant" | "closed";
+};
+
+type Desk = { projects?: Project[]; awaiting: Work[]; inProgress: Work[]; done: Work[] };
+
+/** Departments as the representative would name them. */
+const DEPARTMENT: Record<string, string> = {
+  career: "커리어팀",
+  finance: "재무팀",
+  home: "살림팀",
+  health: "건강팀",
+  operations: "운영",
+};
+
+const LIFECYCLE: Record<Project["lifecycle"], string> = {
+  active: "진행 중",
+  dormant: "쉬는 중",
+  closed: "마무리",
+};
+
+const ITEM_STATE: Record<Project["members"][number]["state"], string> = {
+  awaiting: "결정 대기",
+  inProgress: "진행 중",
+  done: "완료",
+};
 
 type Place = "inbox" | "entrusted" | "past" | "schedule";
 
@@ -493,9 +524,36 @@ export default function RepresentativeComputer() {
           {place === "entrusted" && (
             <>
               <p className="rc__label">지금 저희가 맡고 있는 일입니다.</p>
-              {entrusted.length === 0
-                ? <p className="rc__none">지금 맡고 있는 일이 없습니다.</p>
-                : entrusted.map((w) => <Mail key={w.id} work={w} onOpen={() => { setOpenId(w.id); }} />)}
+
+              {(desk.projects ?? []).map((p) => (
+                <section className="rc__project" key={p.id}>
+                  <h3 className="rc__project-name">{p.name}</h3>
+                  <p className="rc__project-meta">
+                    {DEPARTMENT[p.owner] ?? p.owner} · {LIFECYCLE[p.lifecycle]}
+                  </p>
+                  <ul className="rc__project-items">
+                    {p.members.map((m) => (
+                      <li key={m.holdId}>
+                        <button
+                          type="button"
+                          className="rc__project-item"
+                          onClick={() => { setOpenId(m.holdId); }}
+                        >
+                          <span>{m.title}</span>
+                          <span className="rc__item-state">{ITEM_STATE[m.state]}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+
+              {(() => {
+                const loose = entrusted.filter((w) => !w.project);
+                return loose.length === 0 && (desk.projects ?? []).length === 0
+                  ? <p className="rc__none">지금 맡고 있는 일이 없습니다.</p>
+                  : loose.map((w) => <Mail key={w.id} work={w} onOpen={() => { setOpenId(w.id); }} />);
+              })()}
             </>
           )}
 

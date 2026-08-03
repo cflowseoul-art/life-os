@@ -555,3 +555,29 @@
 
 .rc__decide h2 { margin-top: 0; }
 .rc__decide p { font-size: 15px; line-height: 1.7; margin: 0 0 12px; }
+
+/* Projects — read-only, inferred by the company. */
+
+.rc__project { padding: 4px 16px 14px; border-bottom: 1px solid var(--line); }
+.rc__project-name { font-size: 16px; font-weight: 600; margin: 12px 0 2px; overflow-wrap: anywhere; }
+.rc__project-meta { font-size: 12.5px; color: var(--ink-3); margin: 0 0 10px; }
+.rc__project-items { list-style: none; margin: 0; padding: 0; }
+
+.rc__project-item {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rc__project-item:hover { color: var(--accent); }
+.rc__project-item span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rc__item-state { flex: none; font-size: 12px; color: var(--ink-3); }
