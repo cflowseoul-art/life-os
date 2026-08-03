@@ -19,6 +19,8 @@ import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
 import { advanceHome } from "./company/home-runner.ts";
+import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
+import { readReceipt } from "./capabilities/home/index.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
@@ -308,6 +310,73 @@ createServer((req, res) => {
       }
 
       json(res, 200, { ok: true, holdId: result.holdId, desk: deskView(engine, log) });
+    });
+    return;
+  }
+
+  // A receipt photo. OCR happens here, at the edge; everything downstream is
+  // the same text path the parser already handles.
+  if (req.method === "POST" && url.pathname === "/api/company/receipt") {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+    req.on("end", () => {
+      let sent: { store?: string; image?: string; extension?: string };
+
+      try {
+        sent = JSON.parse(body || "{}") as typeof sent;
+      } catch {
+        json(res, 400, { ok: false, reasons: ["사진을 읽지 못했습니다."] });
+        return;
+      }
+
+      if (!sent.image) {
+        json(res, 400, { ok: false, reasons: ["사진이 오지 않았습니다."] });
+        return;
+      }
+
+      let text: string;
+
+      try {
+        text = readImage(Buffer.from(sent.image, "base64"), sent.extension ?? ".jpg");
+      } catch (error) {
+        // Nothing is recorded. No hold, no inventory, no expense (Art. 3, 9).
+        const reason =
+          error instanceof OcrUnavailable
+            ? "이 컴퓨터에서는 사진을 읽을 수 없습니다. 영수증 내용을 붙여넣어 주시면 그대로 정리하겠습니다."
+            : error instanceof OcrFailed
+              ? "사진에서 글자를 읽지 못했습니다. 다시 찍어 보내주시거나, 내용을 붙여넣어 주십시오."
+              : "사진을 읽지 못했습니다.";
+
+        json(res, 400, { ok: false, reasons: [reason] });
+        return;
+      }
+
+      // Read but unparseable is also a failure: an empty receipt is not a
+      // purchase, and recording one would invent a fact.
+      if (readReceipt(text).items.length === 0) {
+        json(res, 400, {
+          ok: false,
+          reasons: ["영수증에서 품목을 찾지 못했습니다. 다시 찍어 보내주시거나, 내용을 붙여넣어 주십시오."],
+        });
+        return;
+      }
+
+      const store = (sent.store ?? "").trim() || text.split("\n")[0].trim() || "영수증";
+
+      log.append(
+        {
+          type: "HandedOver",
+          holdId: randomUUID(),
+          capability: "home",
+          handover: { company: store, role: "영수증 정리", jdText: text },
+        },
+        { kind: "user" },
+        "home",
+        "computer",
+      );
+
+      advanceHome(log);
+      json(res, 200, { ok: true, desk: deskView(engine, log) });
     });
     return;
   }

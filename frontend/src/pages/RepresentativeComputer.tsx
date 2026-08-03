@@ -278,11 +278,13 @@ function Reading({
 
 function Compose({
   onSend,
+  onPhoto,
   onClose,
   busy,
   refusals,
 }: {
   onSend: (v: { subject: string; request: string; attachment: string }) => void;
+  onPhoto: (file: File, store: string) => void;
   onClose: () => void;
   busy: boolean;
   refusals: string[];
@@ -328,6 +330,16 @@ function Compose({
 
         <div className="rc__attach">
           <p className="rc__attach-label">첨부</p>
+          <input
+            type="file"
+            accept="image/*"
+            className="rc__file"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onPhoto(file, text.split("\n")[0] ?? "");
+            }}
+          />
           <textarea
             className="rc__attach-box"
             rows={6}
@@ -365,6 +377,42 @@ export default function RepresentativeComputer() {
       .then((r) => r.json() as Promise<Desk>)
       .then(setDesk)
       .catch(() => { setError("지금은 열어드리지 못했습니다. 잠시 후 다시 들어와 주십시오."); });
+  }, []);
+
+  const sendPhoto = useCallback((file: File, store: string) => {
+    setBusy(true);
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const base64 = String(reader.result).split(",")[1] ?? "";
+      const dot = file.name.lastIndexOf(".");
+
+      fetch("/api/company/receipt", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          store,
+          image: base64,
+          extension: dot > -1 ? file.name.slice(dot) : ".jpg",
+        }),
+      })
+        .then((r) => r.json() as Promise<{ ok: boolean; desk?: Desk; reasons?: string[] }>)
+        .then((result) => {
+          if (result.ok && result.desk) {
+            setDesk(result.desk);
+            setRefusals([]);
+            setComposing(false);
+            setAccepted(true);
+          } else {
+            setRefusals(result.reasons ?? ["사진을 읽지 못했습니다."]);
+          }
+        })
+        .catch(() => { setRefusals(["사진을 읽지 못했습니다."]); })
+        .finally(() => { setBusy(false); });
+    };
+
+    reader.onerror = () => { setRefusals(["사진을 읽지 못했습니다."]); setBusy(false); };
+    reader.readAsDataURL(file);
   }, []);
 
   const send = useCallback((v: { subject: string; request: string; attachment: string }) => {
@@ -580,6 +628,7 @@ export default function RepresentativeComputer() {
           busy={busy}
           refusals={refusals}
           onSend={send}
+          onPhoto={sendPhoto}
           onClose={() => { setComposing(false); setRefusals([]); }}
         />
       )}

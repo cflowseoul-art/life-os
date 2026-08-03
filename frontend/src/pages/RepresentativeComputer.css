@@ -581,3 +581,5 @@
 .rc__project-item:hover { color: var(--accent); }
 .rc__project-item span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .rc__item-state { flex: none; font-size: 12px; color: var(--ink-3); }
+
+.rc__file { display: block; width: 100%; margin-bottom: 10px; font: inherit; font-size: 13px; color: var(--ink-3); }
