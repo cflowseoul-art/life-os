@@ -22,7 +22,7 @@
  */
 
 import type { Scope } from "../identity/types.ts";
-import { isEnabled, manifestFor } from "./manifest.ts";
+import { CAPABILITIES, isEnabled, manifestFor } from "./manifest.ts";
 
 export type DepartmentId =
   | "asset"
@@ -36,70 +36,26 @@ export type DepartmentId =
   /** Coordinates provisionally until a domain department is accountable. */
   | "operations";
 
+/** A department as routing sees it: an id and the words that reach it. */
 type Department = {
   id: DepartmentId;
-  /** Words that indicate the decision this work will produce. Strong. */
   decisionSignals: string[];
-  /** Words that indicate what the work is about. Weak. */
   subjectSignals: string[];
 };
 
 /**
- * Ownable departments. Function departments (Research, Planning, Operations)
- * are absent by construction: they cannot own work, so they can never be a
- * routing outcome. Operations appears only as a provisional holder, and
- * Planning only as a contributor on multi-department work.
+ * The departments that can own work, read from the manifest.
+ *
+ * Function departments (Research, Planning, Operations) are absent by
+ * construction: they declare no capability, so they can never be an outcome.
  */
-const DEPARTMENTS: Department[] = [
-  {
-    // State: what is owned or owed right now. Ambiguous "얼마나 있어?" is a
-    // question about state, so it belongs here rather than to Finance.
-    id: "asset",
-    decisionSignals: [
-      "잔액", "얼마나 있", "얼마 있", "자산", "순자산", "부채", "빚",
-      "예금", "적금", "통장에", "남아 있", "보유", "받을 돈", "예정 자산",
-    ],
-    subjectSignals: ["계좌", "통장", "포인트", "대출 잔액"],
-  },
-  {
-    // Capacity: what can be put to work. "얼마 있어"는 Asset, "얼마 쓸 수 있어"는 Treasury.
-    id: "treasury",
-    decisionSignals: [
-      "운용", "여윳돈", "여유 자금", "굴릴", "굴려", "투자할 수 있", "비상금",
-      "버틸 수 있", "몇 달", "여유가 얼마",
-    ],
-    subjectSignals: ["운용 가능", "비상 자금"],
-  },
-  {
-    id: "career",
-    decisionSignals: ["이력서", "지원", "공고", "채용", "포트폴리오", "면접", "오퍼", "이직"],
-    subjectSignals: ["회사", "직무", "경력", "연봉 협상"],
-  },
-  {
-    id: "finance",
-    decisionSignals: [
-      "결제", "해지", "구독", "송금", "지출", "예산", "청구", "명세서", "자동이체",
-      // How money was used — Finance's question, distinct from what is held.
-      "썼어", "쓴 돈", "많이 썼", "어디에 돈", "소비", "가계부", "고정비", "변동비",
-      "카테고리", "가맹점", "저축이동", "투자이동", "늘었", "줄었",
-    ],
-    subjectSignals: ["카드", "명세", "통장", "요금"],
-  },
-  {
-    id: "home",
-    decisionSignals: [
-      "장보기", "주문", "구매", "재고", "떨어졌", "다 썼", "영수증", "마트", "장 봤",
-      // A request to buy something for the house is Home's, and stops at the list.
-      "사줘", "사 줘", "사다 줘", "사놔", "사둬", "챙겨 줘", "떨어짐", "다 먹었",
-    ],
-    subjectSignals: ["냉장고", "집", "살림", "택배", "생필품"],
-  },
-  {
-    id: "health",
-    decisionSignals: ["예약", "검진", "진료", "처방"],
-    subjectSignals: ["병원", "건강", "약", "증상"],
-  },
-];
+function departments(): Department[] {
+  return CAPABILITIES.map((c) => ({
+    id: c.id as DepartmentId,
+    decisionSignals: c.routing.decisionSignals,
+    subjectSignals: c.routing.subjectSignals,
+  }));
+}
 
 export type RoutingDecision = {
   /** Exactly one. Never zero, never two (§3). */
@@ -138,7 +94,7 @@ function score(department: Department, text: string): { decision: number; subjec
 export function route(request: { subject?: string; body?: string; attachment?: string }): RoutingDecision {
   const text = [request.subject ?? "", request.body ?? "", request.attachment ?? ""].join("\n");
 
-  const scored = DEPARTMENTS.filter((d) => d.id !== "operations")
+  const scored = departments()
     .map((d) => ({ department: d, ...score(d, text) }))
     .filter((s) => s.decision > 0 || s.subject > 0)
     .sort((a, b) => b.decision - a.decision || b.subject - a.subject);
