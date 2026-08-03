@@ -40,7 +40,7 @@
     <section class="screen" id="inbox" data-active="true">
       <div class="screen-head">
         <h1 class="screen-title">대표님, 안녕하십니까.</h1>
-        <p class="screen-sub">8월 3일 월요일 · 오늘 확인하실 것은 한 건입니다.</p>
+        <p class="screen-sub">8월 3일 월요일 · 오늘 확인하실 것은 세 건입니다. 읽으신 보고는 보고서로 옮겨 둡니다.</p>
       </div>
 
       <p class="group-label">확인 필요</p>
@@ -55,6 +55,26 @@
         <span><span class="stamp">확인 필요</span><span class="when">오전 9:12</span></span>
       </button>
 
+      <button class="row" type="button" data-read-once="true" onclick="openReport('receipt', this)">
+        <span class="sprite" aria-hidden="true">한</span>
+        <span class="row-main">
+          <span class="who">한살림 <span class="title">선임</span></span>
+          <span class="row-dept">살림팀</span>
+          <span class="subject">이마트 성수점 영수증</span>
+          <span class="snippet">영수증 정리했습니다. 3개 품목을 재고에 반영했습니다.</span>
+        </span>
+        <span><span class="stamp">완료</span><span class="when">8/2</span></span>
+      </button>
+      <button class="row" type="button" data-read-once="true" onclick="openReport('career-done', this)">
+        <span class="sprite" aria-hidden="true">박</span>
+        <span class="row-main">
+          <span class="who">박진로 <span class="title">선임</span></span>
+          <span class="row-dept">커리어팀</span>
+          <span class="subject">토스 · 프로덕트 디자이너</span>
+          <span class="snippet">이력서 정리본이 준비됐습니다. 정해 주신 순서 그대로입니다.</span>
+        </span>
+        <span><span class="stamp">완료</span><span class="when">7/31</span></span>
+      </button>
       <p class="group-label">업무 진행 현황</p>
       <button class="row" type="button" onclick="openReport('finance')">
         <span class="sprite" aria-hidden="true">김</span>
@@ -185,13 +205,13 @@
     <!-- ── 3. Reports ───────────────────────────────────────────────── -->
     <section class="screen" id="reports">
       <div class="screen-head">
-        <h1 class="screen-title">지난 보고</h1>
-        <p class="screen-sub">마무리된 보고는 여기 그대로 남습니다. 언제든 꺼내 보실 수 있습니다.</p>
+        <h1 class="screen-title">보고서</h1>
+        <p class="screen-sub">읽으신 보고는 여기로 옮겨 둡니다. 언제든 다시 꺼내 보실 수 있습니다.</p>
       </div>
 
       <p class="group-label">2026년 8월</p>
 
-      <button class="row" type="button" onclick="openReport('receipt')">
+      <button class="row" type="button" onclick="openReport('receipt', this)">
         <span class="sprite" aria-hidden="true">한</span>
         <span class="row-main">
           <span class="who">한살림 <span class="title">선임</span></span>
@@ -202,7 +222,7 @@
         <span><span class="stamp">완료</span><span class="when">8/2</span></span>
       </button>
 
-      <button class="row" type="button" onclick="openReport('career-done')">
+      <button class="row" type="button" onclick="openReport('career-done', this)">
         <span class="sprite" aria-hidden="true">박</span>
         <span class="row-main">
           <span class="who">박진로 <span class="title">선임</span></span>
@@ -226,7 +246,7 @@
         <span><span class="stamp">완료</span><span class="when">7/31</span></span>
       </button>
 
-      <button class="row" type="button" onclick="openReport('receipt')">
+      <button class="row" type="button" onclick="openReport('receipt', this)">
         <span class="sprite" aria-hidden="true">한</span>
         <span class="row-main">
           <span class="who">한살림 <span class="title">선임</span></span>
@@ -469,7 +489,7 @@
 <script>
   const PLACES = [
     { id: "inbox", label: "받은 보고", glyph: "📥" },
-    { id: "reports", label: "지난 보고", glyph: "📚" },
+    { id: "reports", label: "보고서", glyph: "📚" },
     { id: "outbox", label: "보낸 지시", glyph: "📤" },
     { id: "calendar", label: "일정", glyph: "📅" },
   ];
@@ -514,7 +534,18 @@
   /** Two ways of looking at the same company. */
   function lens(which) { show(which === "office" ? "office" : "inbox"); }
 
-  function openReport(key) {
+  /**
+   * Reading a completed report is the end of its active life: it leaves the
+   * inbox for 보고서. Nothing is timed, and nothing waits for the next report.
+   */
+  function fileIfRead(el) {
+    if (!el || el.dataset.readOnce !== "true") return;
+    el.dataset.readOnce = "done";
+    el.remove();
+  }
+
+  function openReport(key, el) {
+    fileIfRead(el);
     const r = REPORTS[key];
     if (r) {
       const person = `${r.name} <span class="title">${r.title2}</span>`;
