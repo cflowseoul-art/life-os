@@ -198,6 +198,12 @@ button, input, textarea { font: inherit; color: inherit; }
 .subject { font-size: 14px; font-weight: 500; margin-top: 7px; white-space: normal; }
 .snippet { font-size: 13px; color: var(--ink-2); margin-top: 3px; line-height: 1.55; white-space: normal; }
 
+/* 보고서 안에서만 쓰는 표시. 받은 보고에는 존재하지 않습니다. */
+.stamp--new {
+  border: 2px solid var(--accent); background: var(--accent);
+  color: #fff; font-weight: 700; letter-spacing: 0.04em;
+}
+
 .empty { padding: 20px 16px; font-size: 14px; color: var(--ink-4); }
 
 /* ── Reader ──────────────────────────────────────────────────────────── */
