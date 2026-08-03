@@ -1,6 +1,11 @@
 /**
  * Finance's operating policies.
  *
+ * Finance's question is "돈이 어디에 쓰였는가": spending, savings, investments,
+ * income, category and merchant trends, and whether the representative's rules
+ * held. It does not model balances, cash timing, or asset state — those belong
+ * to Asset Management, and a policy needing them does not belong here.
+ *
  * Definitions only. Evaluation, ordering, and suppression of passing rules
  * belong to the company-wide policy engine — Finance is one consumer of it.
  *
@@ -52,8 +57,6 @@ export type PolicyContext = {
   transactions: LedgerTransaction[];
   rules: Map<string, CategoryRule>;
   month: string;
-  /** LOOKER_KPI figures for the month, as the ledger computed them. */
-  kpi?: Record<string, number>;
 };
 
 /** Finance's registry. The engine owns evaluation; Finance owns the rules. */
@@ -76,22 +79,12 @@ function asEvidence(transactions: LedgerTransaction[], limit = 5): Statement[] {
 }
 
 /** Every operating rule the representative has set for money, as data. */
-financePolicies.register({
-    id: "carryover-zero",
-    title: "월초 이월금 0원",
-    owner: "finance",
-    severity: "high",
-    condition: (ctx) => rowsOfFlow(ctx, "carryover").length === 0,
-    evidence: (ctx) => asEvidence(rowsOfFlow(ctx, "carryover")),
-    template: {
-      state: (ctx) => {
-        const carried = rowsOfFlow(ctx, "carryover");
-        const total = carried.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-        return `${ctx.month} 이월금이 ${won(total)} 기록돼 있습니다.`;
-      },
-      expected: "월초 이월금은 0원이어야 합니다.",
-    },
-});
+/*
+ * 월초 이월금 정책은 Finance에서 내려놓았습니다.
+ *
+ * 이월금은 잔액 스냅샷이지 수입이 아니고, 잔액·현금·자산 상태는 앞으로
+ * Asset Management의 몫입니다. Finance는 돈이 어디에 쓰였는지만 봅니다.
+ */
 
 financePolicies.register({
     id: "transfers-excluded",
@@ -144,38 +137,13 @@ export function violations(context: PolicyContext) {
   return financePolicies.evaluate(context);
 }
 
-/**
- * 부수입은 투자 가능 금액을 넘지 않아야 한다.
+/*
+ * 투자 가능 금액 정책도 내려놓았습니다.
  *
- * Both figures are the ledger's: 부수입 is summed from 거래내역 rows the ledger
- * classified as such, and 투자 가능 금액 is LOOKER_KPI's own column. Finance
- * computes neither.
+ * 원장에서 해당 KPI가 사라졌고, 비슷한 지표를 Finance가 다시 만들지 않습니다.
+ * 얼마를 투자할 수 있는지는 대표님의 결정이고, 그 판단에 필요한 상태 계산은
+ * Asset Management의 일입니다.
  */
-financePolicies.register({
-  id: "side-income-over-investable",
-  title: "부수입 ≤ 투자 가능 금액",
-  severity: "medium",
-  condition: (ctx) => {
-    const investable = ctx.kpi?.["투자 가능 금액"];
-    if (investable === undefined) return true;
-    return sideIncome(ctx) <= investable;
-  },
-  evidence: (ctx) => asEvidence(sideIncomeRows(ctx)),
-  template: {
-    state: (ctx) =>
-      `${ctx.month} 부수입은 ${won(sideIncome(ctx))}, 투자 가능 금액은 `
-      + `${won(ctx.kpi?.["투자 가능 금액"] ?? 0)}입니다.`,
-    expected: "부수입은 투자 가능 금액을 넘지 않아야 합니다.",
-  },
-});
-
-function sideIncomeRows(ctx: PolicyContext): LedgerTransaction[] {
-  return ctx.transactions.filter((tx) => tx.month === ctx.month && tx.category.trim() === "부수입");
-}
-
-function sideIncome(ctx: PolicyContext): number {
-  return sideIncomeRows(ctx).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-}
 
 export const ALL_POLICIES_PASS = "대표님께서 설정하신 운영 기준은 모두 정상입니다.";
 

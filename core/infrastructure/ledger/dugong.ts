@@ -262,42 +262,6 @@ async function fetchRows(range: string): Promise<string[][]> {
   return ((await response.json()) as { values?: string[][] }).values ?? [];
 }
 
-/**
- * LOOKER_KPI, as the ledger computes it.
- *
- * Derived sheet, read only. Finance never recomputes these figures — 투자 가능
- * 금액 is the ledger's own number for the month.
- */
-export async function readKpi(): Promise<Map<string, Record<string, number>>> {
-  const out = new Map<string, Record<string, number>>();
-
-  try {
-    const rows = await fetchRows(process.env.DUGONG_LEDGER_KPI_SHEET ?? "LOOKER_KPI");
-    if (rows.length < 2) return out;
-
-    const headers = rows[0].map((h) => h.trim());
-    const monthAt = headers.indexOf("기준월");
-    if (monthAt === -1) return out;
-
-    for (const cells of rows.slice(1)) {
-      const month = (cells[monthAt] ?? "").trim().replace(".", "-");
-      if (month === "") continue;
-
-      const figures: Record<string, number> = {};
-      headers.forEach((h, i) => {
-        const value = Number((cells[i] ?? "").replace(/[^\d.-]/g, ""));
-        if (h !== "기준월" && !Number.isNaN(value) && (cells[i] ?? "").trim() !== "") figures[h] = value;
-      });
-
-      out.set(month, figures);
-    }
-  } catch {
-    return out;
-  }
-
-  return out;
-}
-
 /** The ledger's classification rules. Empty map when the tab is absent. */
 export async function readCategoryRules(): Promise<Map<string, CategoryRule>> {
   try {

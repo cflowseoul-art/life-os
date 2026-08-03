@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 
 import { EventLog } from "../events/log.ts";
 import { violations } from "../capabilities/finance/policy.ts";
-import { readCategoryRules, readKpi, readLedger } from "../infrastructure/ledger/dugong.ts";
+import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
 import { advanceFinanceFromLedger } from "./finance-runner.ts";
 
 /** What the ledger looked like, cheaply. Changes when any row does. */
@@ -68,8 +68,7 @@ export async function checkFinancePolicies(log: EventLog, now = new Date()): Pro
   if (!monthStart && !changed) return { ran: false, reason: "none", reported: [], suppressed: [] };
 
   const rules = await readCategoryRules();
-  const kpi = await readKpi();
-  const failed = violations({ transactions: read.transactions, rules, month, kpi: kpi.get(month) });
+  const failed = violations({ transactions: read.transactions, rules, month });
 
   const open = openSignatures(log);
   const signatures = failed.map((f) => `${f.policy.id}@${month}`);
