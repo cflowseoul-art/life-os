@@ -48,8 +48,10 @@ export type DeskWork = {
   title: string;
   /** The person who signs this report. */
   contributor: string;
-  /** Their title, e.g. "Finance Manager". The department is metadata only. */
+  /** Their title, e.g. "팀장". The department is metadata only. */
   contributorTitle: string;
+  /** The department, as the representative reads it. Metadata. */
+  departmentLabel: string;
   /** Plain-language state, derived from the hold. */
   status: string;
   /** 1. Summary — the conclusion, in one sentence. */
@@ -177,6 +179,7 @@ function toWork(
     title,
     contributor: sign.name,
     contributorTitle: sign.title,
+    departmentLabel: sign.displayDepartment,
     status,
     report: composed.summary,
     sections: composed.sections,

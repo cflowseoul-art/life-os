@@ -583,3 +583,125 @@
 .rc__item-state { flex: none; font-size: 12px; color: var(--ink-3); }
 
 .rc__file { display: block; width: 100%; margin-bottom: 10px; font: inherit; font-size: 13px; color: var(--ink-3); }
+
+/* ── Approved model: rail · rows · reading blocks ───────────────────────── */
+
+.rc__bar { gap: 8px; border-bottom: 1px solid var(--line); }
+.rc__mark { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.rc__me { display: flex; align-items: center; justify-content: center; }
+
+.rc__body { display: block; }
+.rc__rail { display: none; }
+.rc__panel { min-width: 0; }
+
+.rc__nav { display: flex; flex-direction: column; padding: 8px 0; }
+
+.rc__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 18px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink-2);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rc__nav-item[aria-current="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.rc__nav-glyph { width: 18px; text-align: center; }
+
+/* Rows — mail density, tracker state, one dot that only a decision clears. */
+
+.rc__row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 12px;
+  width: 100%;
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rc__row:hover { background: #fafaf9; }
+.rc__row--needs { background: #fdfbf6; }
+.rc__row--active { box-shadow: inset 3px 0 0 var(--accent); }
+
+.rc__sprite {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rc__row--needs .rc__sprite { background: #f2e9d7; color: var(--mark); }
+
+.rc__row-main { min-width: 0; display: block; }
+.rc__row-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+
+.rc__who {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rc__title { font-weight: 400; color: var(--ink-3); }
+.rc__state { flex: none; font-size: 11.5px; color: var(--ink-3); }
+.rc__row--needs .rc__state { color: var(--mark); font-weight: 600; }
+.rc__when { flex: none; font-size: 11.5px; color: var(--ink-4); }
+
+.rc__subject,
+.rc__snippet {
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rc__subject { font-size: 13.5px; margin-top: 1px; }
+.rc__dept { color: var(--ink-3); }
+.rc__snippet { font-size: 12.5px; color: var(--ink-3); margin-top: 1px; }
+
+/* Reading — blocks, not cards. */
+
+.rc__read { padding: 8px 16px 48px; max-width: 720px; }
+.rc__read h1 { font-size: 20px; font-weight: 600; line-height: 1.4; margin: 8px 0 6px; overflow-wrap: anywhere; }
+.rc__meta { font-size: 12.5px; color: var(--ink-3); margin: 0 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.rc__blocks p { font-size: 15px; line-height: 1.8; margin: 0 0 12px; overflow-wrap: anywhere; }
+
+.rc__notice { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.rc__notice h2 { font-size: 14px; font-weight: 700; margin: 0 0 4px; }
+
+@media (min-width: 900px) {
+  .rc__menu { display: none; }
+  .rc__body { display: grid; grid-template-columns: 200px minmax(0, 1fr); max-width: 1040px; }
+  .rc__rail { display: block; border-right: 1px solid var(--line); min-height: 70vh; }
+  .rc__row { padding-left: 18px; }
+}
