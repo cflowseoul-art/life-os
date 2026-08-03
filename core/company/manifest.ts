@@ -36,6 +36,11 @@ export type CapabilityManifest = {
   /** Whether it has a desk at all. */
   appearsInOffice: boolean;
   scheduler: SchedulerKind;
+  /**
+   * Where this capability's runner lives. Required when enabled; a department
+   * that cannot execute yet declares none.
+   */
+  runnerModule?: string;
   /** Whether it can accept work today. A department may exist unstaffed. */
   enabled: boolean;
 };
@@ -58,6 +63,7 @@ export const CAPABILITIES: CapabilityManifest[] = [
     producesReports: true,
     appearsInOffice: true,
     scheduler: "none",
+    runnerModule: "../capabilities/career/runner.ts",
     enabled: true,
   },
   {
@@ -70,6 +76,7 @@ export const CAPABILITIES: CapabilityManifest[] = [
     producesReports: true,
     appearsInOffice: true,
     scheduler: "none",
+    runnerModule: "../capabilities/home/runner.ts",
     enabled: true,
   },
   {
@@ -81,7 +88,8 @@ export const CAPABILITIES: CapabilityManifest[] = [
     officeFloor: 2,
     producesReports: true,
     appearsInOffice: true,
-    scheduler: "personal",
+    // Scheduled work needs a runner. It becomes "personal" the day it has one.
+    scheduler: "none",
     enabled: false,
   },
   {
@@ -94,6 +102,7 @@ export const CAPABILITIES: CapabilityManifest[] = [
     producesReports: true,
     appearsInOffice: true,
     scheduler: "household",
+    runnerModule: "../capabilities/finance/runner.ts",
     enabled: true,
   },
   {
@@ -199,6 +208,12 @@ export function companyRoster(): {
  * Startup validation. The company refuses to start if its own description is
  * inconsistent — a silent misconfiguration would be discovered by a user.
  */
+export function runnerModuleFor(id: string): string {
+  const declared = manifestFor(id).runnerModule;
+  if (!declared) throw new Error(`${id}: 실행할 러너가 선언되지 않았습니다.`);
+  return declared;
+}
+
 export function validateManifest(): void {
   const problems: string[] = [];
   const seen = new Set<string>();
@@ -212,6 +227,12 @@ export function validateManifest(): void {
     if (!["none", "household", "personal"].includes(c.scheduler)) problems.push(`${c.id}: scheduler 값이 올바르지 않습니다`);
     if (!Number.isInteger(c.officeFloor) || c.officeFloor < 1 || c.officeFloor > 5) {
       problems.push(`${c.id}: 없는 층입니다 (${String(c.officeFloor)})`);
+    }
+
+    // An enabled capability must be able to run; a disabled one must not claim to.
+    if (c.enabled && !c.runnerModule) problems.push(`${c.id}: 러너가 선언되지 않았습니다`);
+    if (c.scheduler !== "none" && !c.runnerModule) {
+      problems.push(`${c.id}: 러너 없이 스케줄될 수 없습니다`);
     }
 
     const employee = employeeFor(c.department);

@@ -17,7 +17,25 @@ import { verifyGoogleIdToken } from "./identity/google.ts";
 import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
 import { FileIdentityStore } from "./identity/store.ts";
 import { FileEventStore } from "./storage/event-store.ts";
-import { companyRoster, isEnabled, producesReports, scopeOf, validateManifest } from "./company/manifest.ts";
+import {
+  CAPABILITIES,
+  companyRoster,
+  isEnabled,
+  producesReports,
+  runnerModuleFor,
+  scheduled,
+  scopeOf,
+  validateManifest,
+} from "./company/manifest.ts";
+import { loadRunner } from "./company/runner.ts";
+import { runSchedule } from "./company/schedule.ts";
+
+/** Loads every declared runner once, so a missing one fails at boot. */
+async function warmRunners(): Promise<void> {
+  for (const capability of CAPABILITIES.filter((c) => c.enabled)) {
+    await loadRunner(capability.id, runnerModuleFor(capability.id));
+  }
+}
 import type { ActorContext } from "./identity/types.ts";
 import {
   clearedCookie,
@@ -33,8 +51,6 @@ import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
-import { advanceFinanceFromLedger } from "./company/finance-runner.ts";
-import { advanceHome } from "./company/home-runner.ts";
 import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
 import { readReceipt } from "./capabilities/home/index.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
@@ -265,8 +281,10 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
   res.end(payload);
 }
 
-// The company refuses to start if its own description is inconsistent.
+// The company refuses to start if its own description is inconsistent, or if a
+// capability it says is runnable has no runner behind it.
 validateManifest();
+void warmRunners();
 
 const identity = new FileIdentityStore();
 const events = new FileEventStore();
@@ -284,6 +302,14 @@ function desk(actor: ActorContext) {
     /** Career is personal, so the custody engine runs on the personal stream. */
     engine: new CustodyEngine(personal),
     logFor: (capability: string) => (scopeOf(capability) === "household" ? household : personal),
+    /** The outstanding question and which capability raised it. */
+    outstandingAsk: () => {
+      const holds = [...project(readable.flatMap((l) => l.read())).values()];
+      const asking = holds.find((h) => h.outstandingAsk !== null);
+      return asking?.outstandingAsk
+        ? { ask: asking.outstandingAsk, capability: asking.capability }
+        : null;
+    },
     view: () => deskView(new CustodyEngine(personal), readable),
   };
 }
@@ -382,10 +408,13 @@ function handle(
 ): void {
   const ctx = desk(actor);
   const engine = ctx.engine;
-  const log = ctx.household;
 
   if (req.method === "GET" && url.pathname === "/api/desk") {
-    json(res, 200, ctx.view());
+    // Month start and ledger changes are noticed here, because this is where a
+    // household context exists. Which capabilities wake is the manifest's call.
+    void runSchedule("household", actor, ctx.logFor)
+      .catch(() => undefined)
+      .then(() => { json(res, 200, ctx.view()); });
     return;
   }
 
@@ -413,89 +442,52 @@ function handle(
 
       const { company, role } = splitSubject(sent.subject ?? "");
 
-      // Home records receipts itself: no fork, so no engine round trip.
-      if (routed.capability === "home") {
-        ctx.logFor("home").append(
-          {
-            type: "HandedOver",
-            holdId: randomUUID(),
-            capability: "home",
-            handover: {
-              company: company === "" ? (sent.subject ?? "").trim() || "영수증" : company,
-              role: role === "" ? "영수증 정리" : role,
-              jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
-            },
+      // The manifest names the runner; the desk never learns which capability
+      // answered. Adding a capability changes nothing here.
+      if (routed.capability) {
+        void loadRunner(routed.capability, runnerModuleFor(routed.capability))
+          .then((runner) =>
+            runner.accept({
+              actor,
+              log: ctx.logFor(routed.capability!),
+              subject: sent.subject ?? "",
+              request: sent.request ?? "",
+              attachment: sent.attachment ?? "",
+            }),
+          )
+          .then((result) => {
+            if (result.ok) json(res, 200, { ok: true, desk: ctx.view() });
+            else json(res, 400, result);
+          })
+          .catch((error: unknown) => {
+            json(res, 500, {
+              ok: false,
+              reasons: [error instanceof Error ? error.message : "처리하지 못했습니다."],
+            });
+          });
+        return;
+      }
+
+      // A department with no runner still owns the work and still reports that
+      // it cannot execute yet. Work is never refused for a missing capability,
+      // and its stream is the one its scope declares.
+      ctx.logFor(routed.owner).append(
+        {
+          type: "HandedOver",
+          holdId: randomUUID(),
+          capability: routed.owner,
+          handover: {
+            company: (sent.subject ?? "").trim() || "요청",
+            role: routed.owner,
+            jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
           },
-          { kind: "user" },
-          "home",
-          "ceo-office:accepted",
-        );
+        },
+        { kind: "user" },
+        routed.owner,
+        "ceo-office:accepted",
+      );
 
-        advanceHome(ctx.logFor("home"));
-        json(res, 200, { ok: true, desk: ctx.view() });
-        return;
-      }
-
-      // Finance reads statements itself, same shape as Home.
-      if (routed.capability === "finance") {
-        ctx.logFor("finance").append(
-          {
-            type: "HandedOver",
-            holdId: randomUUID(),
-            capability: "finance",
-            handover: {
-              company: company === "" ? (sent.subject ?? "").trim() || "명세" : company,
-              role: role === "" ? "정기 결제 정리" : role,
-              jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
-            },
-          },
-          { kind: "user" },
-          "finance",
-          "ceo-office:accepted",
-        );
-
-        void advanceFinanceFromLedger(ctx.logFor("finance")).then(() => {
-          json(res, 200, { ok: true, desk: ctx.view() });
-        });
-        return;
-      }
-
-      // A department that cannot execute yet still owns the work and still
-      // takes custody. Work is never refused for a missing capability (§3).
-      if (!isStaffed(routed)) {
-        ctx.logFor(routed.owner).append(
-          {
-            type: "HandedOver",
-            holdId: randomUUID(),
-            capability: routed.owner,
-            handover: {
-              company: company === "" ? (sent.subject ?? "").trim() || "요청" : company,
-              role,
-              jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
-            },
-          },
-          { kind: "user" },
-          routed.owner,
-          "computer",
-        );
-
-        json(res, 200, { ok: true, desk: ctx.view() });
-        return;
-      }
-
-      // The engine validates and records. This bridge proposes nothing.
-      const result = engine.handOver({
-        company,
-        role,
-        jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
-      });
-
-      if (!result.ok) {
-        json(res, 400, result);
-        return;
-      }
-
-      json(res, 200, { ok: true, holdId: result.holdId, desk: ctx.view() });
+      json(res, 200, { ok: true, desk: ctx.view() });
     });
     return;
   }
@@ -549,20 +541,21 @@ function handle(
 
       const store = (sent.store ?? "").trim() || text.split("\n")[0].trim() || "영수증";
 
-      log.append(
-        {
-          type: "HandedOver",
-          holdId: randomUUID(),
-          capability: "home",
-          handover: { company: store, role: "영수증 정리", jdText: text },
-        },
-        { kind: "user" },
-        "home",
-        "computer",
-      );
+      // OCR happens at the edge; the text is handed to whichever capability
+      // owns receipts, named by routing rather than by this file.
+      const owner = route({ subject: store, body: "영수증 정리", attachment: text }).capability;
 
-      advanceHome(ctx.logFor("home"));
-      json(res, 200, { ok: true, desk: ctx.view() });
+      if (!owner) {
+        json(res, 400, { ok: false, reasons: ["영수증을 맡을 팀이 준비되지 않았습니다."] });
+        return;
+      }
+
+      void loadRunner(owner, runnerModuleFor(owner))
+        .then((runner) =>
+          runner.accept({ actor, log: ctx.logFor(owner), subject: store, request: "영수증 정리", attachment: text }),
+        )
+        .then(() => { json(res, 200, { ok: true, desk: ctx.view() }); })
+        .catch(() => { json(res, 500, { ok: false, reasons: ["영수증을 정리하지 못했습니다."] }); });
     });
     return;
   }
@@ -580,43 +573,46 @@ function handle(
         return;
       }
 
-      // A department that runs outside the custody engine answers its own Ask;
-      // routing the answer through the engine would apply Career's logic to it.
-      const outstanding = engine.outstandingAsk();
-      const owner = engine.ledger().find((h) => h.id === outstanding?.holdId)?.capability;
+      // The capability that raised the question answers it. Which capability
+      // that is comes from the record; its runner comes from the manifest. The
+      // desk does not know, and does not need to.
+      const outstanding = ctx.outstandingAsk();
 
-      if (outstanding && owner === "finance") {
-        if (!outstanding.options.some((o) => o.id === optionId)) {
+      if (outstanding) {
+        if (!outstanding.ask.options.some((o) => o.id === optionId)) {
           json(res, 400, { ok: false, reason: "선택지에 없는 답변입니다." });
           return;
         }
 
-        log.append(
-          { type: "AskAnswered", holdId: outstanding.holdId, askId: outstanding.id, optionId },
-          { kind: "user" },
-          "finance",
-          "ceo-office:accepted",
-        );
+        const owner = outstanding.capability;
 
-        void advanceFinanceFromLedger(ctx.logFor("finance")).then(() => {
-          json(res, 200, { ok: true, desk: ctx.view() });
-        });
+        void loadRunner(owner, runnerModuleFor(owner))
+          .then((runner) =>
+            runner.answer?.({
+              actor,
+              log: ctx.logFor(owner),
+              ask: outstanding.ask,
+              optionId,
+            }),
+          )
+          .then(() => {
+            // Work may have completed. The owning department starts whatever
+            // naturally follows, silently (§4).
+            continueProjects(ctx.personal);
+            json(res, 200, { ok: true, desk: ctx.view() });
+          })
+          .catch((error: unknown) => {
+            json(res, 400, {
+              ok: false,
+              reason: error instanceof Error ? error.message : "정하신 것을 남기지 못했습니다.",
+            });
+          });
         return;
       }
 
-      // The engine validates and records. This bridge decides nothing.
-      const result = engine.answer(optionId);
+      json(res, 400, { ok: false, reason: "답변할 질문이 없습니다." });
+      return;
 
-      if (!result.ok) {
-        json(res, 400, result);
-        return;
-      }
-
-      // Work may have completed. The owning department starts whatever
-      // naturally follows, silently. Nothing about this is reported (§4).
-      continueProjects(ctx.personal);
-
-      json(res, 200, { ok: true, desk: ctx.view() });
     });
     return;
   }
