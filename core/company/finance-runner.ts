@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 
 import { EventLog } from "../events/log.ts";
+import type { Forbidden, ForbiddenForFinance } from "./boundaries.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
 import { anomalies, baselines, monthlyUse, onlySpending } from "../capabilities/finance/ledger.ts";
@@ -219,15 +220,45 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
  * type that grows a balance, net worth, liability balance, asset value, or
  * investable amount — a comment would not.
  */
-type ForbiddenForFinance = "balance" | "netWorth" | "liabilityBalance" | "assetValue" | "investableAmount";
-
-export type FinanceConclusion = {
+export type FinanceConclusion = Forbidden<ForbiddenForFinance> & {
   month: string;
   fixedSpending: number;
   variableSpending: number;
   income: number;
   assetMovement: number;
-} & { [K in ForbiddenForFinance]?: never };
+  rows: number[];
+  /** Complete months the ledger holds, so a consumer knows what a baseline rests on. */
+  completeMonths: number;
+};
+
+/**
+ * Finance's conclusion, for another department to quote.
+ *
+ * Finance states how money was used. What that means for capacity is Treasury's
+ * question, and nothing here answers it.
+ */
+export async function financeConclusion(month: string): Promise<FinanceConclusion> {
+  const read = await readLedger();
+
+  if (!read.ok) {
+    return { month, income: 0, fixedSpending: 0, variableSpending: 0, assetMovement: 0, rows: [], completeMonths: 0 };
+  }
+
+  const rules = await readCategoryRules();
+  const use = monthlyUse(read.transactions, month);
+  const months = baselines(onlySpending(read.transactions));
+  void rules;
+
+  return {
+    month,
+    income: use.income,
+    fixedSpending: use.fixed,
+    variableSpending: use.variable,
+    assetMovement: use.assetMovement,
+    rows: [...use.rows.fixed, ...use.rows.variable, ...use.rows.income, ...use.rows.assetMovement],
+    completeMonths: months.filter((m) => m.month < month).length,
+  };
+}
 
 export function advanceFinance(log: EventLog): void {
   for (const hold of financeHolds(log.read())) {

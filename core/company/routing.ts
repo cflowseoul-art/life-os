@@ -20,6 +20,7 @@
 
 export type DepartmentId =
   | "asset"
+  | "treasury"
   | "career"
   | "finance"
   | "home"
@@ -61,6 +62,16 @@ const DEPARTMENTS: Department[] = [
     ],
     subjectSignals: ["계좌", "통장", "포인트", "대출 잔액"],
     capability: "asset",
+  },
+  {
+    // Capacity: what can be put to work. "얼마 있어"는 Asset, "얼마 쓸 수 있어"는 Treasury.
+    id: "treasury",
+    decisionSignals: [
+      "운용", "여윳돈", "여유 자금", "굴릴", "굴려", "투자할 수 있", "비상금",
+      "버틸 수 있", "몇 달", "여유가 얼마",
+    ],
+    subjectSignals: ["운용 가능", "비상 자금"],
+    capability: "treasury",
   },
   {
     id: "career",

@@ -12,18 +12,19 @@
  */
 
 import { EventLog } from "../events/log.ts";
+import type { Forbidden, ForbiddenForAsset } from "./boundaries.ts";
 import { assetPolicies } from "../capabilities/asset/policy.ts";
 import { typeFromSource } from "../capabilities/asset/snapshot.ts";
 import type { AssetSnapshot, PendingAsset } from "../capabilities/asset/snapshot.ts";
 import { readBalanceRows, readPendingAssetRows } from "../infrastructure/ledger/dugong.ts";
 
-/** Asset's conclusions may not carry Finance's. Enforced by the compiler. */
-type ForbiddenForAsset = "fixedSpending" | "variableSpending" | "categoryAnomaly" | "merchantTrend";
-
-/** What Asset may say. No spending concepts exist in this shape. */
-export type AssetReport = { [K in ForbiddenForAsset]?: never } & {
+/** What Asset may say. No spending or capacity concepts exist in this shape. */
+export type AssetReport = Forbidden<ForbiddenForAsset> & {
   asOf: string;
   observations: { text: string; evidence: string }[];
+  /** The most recent snapshot per account — what is held now. */
+  current: AssetSnapshot[];
+  /** Every snapshot read, oldest included. History, not state. */
   snapshots: AssetSnapshot[];
   pending: PendingAsset[];
   violations: string[];
@@ -128,6 +129,7 @@ export async function readAssetState(): Promise<AssetReport> {
   return {
     asOf: [...latestByAccount.values()].map((s) => s.asOf).sort().at(-1) ?? "",
     observations,
+    current: [...latestByAccount.values()],
     snapshots,
     pending,
     violations: failed.map((f) => f.state.text),
