@@ -19,6 +19,7 @@ import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
 import { advanceFinance, advanceFinanceFromLedger } from "./company/finance-runner.ts";
+import { startFinanceSchedule } from "./company/finance-watch.ts";
 import { advanceHome } from "./company/home-runner.ts";
 import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
 import { readReceipt } from "./capabilities/home/index.ts";
@@ -217,6 +218,9 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
 
 const log = new EventLog(process.env.LIFE_OS_LOG);
 const engine = new CustodyEngine(log);
+
+// Month start, and the ledger changing. Nothing else wakes Finance.
+startFinanceSchedule(log);
 
 const port = Number(process.env.PORT ?? 3000);
 
