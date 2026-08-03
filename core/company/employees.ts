@@ -18,23 +18,41 @@
  * `Lee Jaemu (Staff)` differ by title alone.
  */
 
-export type Title = "Manager" | "Deputy Manager" | "Senior" | "Associate" | "Staff" | "Intern";
+export type EmployeeTitle =
+  | "Manager" | "Deputy Manager" | "Senior" | "Associate" | "Staff" | "Intern";
+
+/** Kept for the older import name. */
+export type Title = EmployeeTitle;
+
+export type Department =
+  | "finance" | "asset" | "treasury" | "strategy" | "data" | "audit"
+  | "ceo" | "career" | "home" | "health" | "operations";
 
 export type EmployeeStatus = "active" | "leave" | "retired";
 
 export type Employee = {
   /** Stable for the life of the employee. Names may change; this does not. */
   id: string;
+
+  /** Internal, developer-facing. Never shown to the representative. */
   surname: string;
-  /** The department's responsibility, as a name. */
   givenName: string;
   fullName: string;
+
+  /** What the representative actually reads. */
+  displaySurname: string;
+  displayGivenName: string;
+  displayName: string;
+
   /** Metadata. Reports are signed by a person, not by a department. */
-  department: string;
-  title: Title;
+  department: Department | string;
+  title: EmployeeTitle;
+  displayDepartment: string;
+  displayTitle: string;
+
   status: EmployeeStatus;
   /** Hold id currently carried, when the department runner sets one. */
-  currentWork: string | null;
+  currentWork?: string;
 };
 
 /**
@@ -55,6 +73,58 @@ export const GIVEN_NAME_BY_DEPARTMENT: Record<string, string> = {
   home: "Salim",          // 살림 — the household
   health: "Geongang",     // 건강
   operations: "Chongmu",  // 총무 — keeps the company running
+};
+
+/** Departments, as the representative reads them. */
+export const DEPARTMENT_LABEL: Record<string, string> = {
+  finance: "재무팀",
+  asset: "자산관리팀",
+  treasury: "자산운용팀",
+  strategy: "전략팀",
+  data: "데이터팀",
+  audit: "감사팀",
+  ceo: "대표실",
+  career: "커리어팀",
+  home: "살림팀",
+  health: "건강팀",
+  operations: "총무팀",
+};
+
+/** The same given names as the representative reads them. */
+export const DISPLAY_GIVEN_NAME: Record<string, string> = {
+  Jaemu: "재무",
+  Jasan: "자산",
+  Unyong: "운용",
+  Jeonryak: "전략",
+  Data: "데이터",
+  Gamsa: "감사",
+  Biseo: "비서",
+  Jinro: "진로",
+  Salim: "살림",
+  Geongang: "건강",
+  Chongmu: "총무",
+};
+
+export const DISPLAY_SURNAME: Record<string, string> = {
+  Kim: "김", Park: "박", Lee: "이", Choi: "최", Jung: "정",
+  Han: "한", Seo: "서", Kang: "강", Cho: "조", Yoon: "윤",
+  Oh: "오", Shin: "신", Im: "임", Bae: "배", Song: "송",
+  Nam: "남", Hwang: "황", Ahn: "안", Moon: "문", Baek: "백",
+};
+
+/** Seniority, as it is said out loud. */
+export const DISPLAY_TITLE: Record<EmployeeTitle, string> = {
+  Manager: "팀장",
+  "Deputy Manager": "부팀장",
+  Senior: "선임",
+  Associate: "대리",
+  Staff: "사원",
+  Intern: "인턴",
+};
+
+/** 대표실은 팀이 아니라 실이라, 같은 직급도 다르게 불립니다. */
+const TITLE_OVERRIDE: Record<string, Partial<Record<EmployeeTitle, string>>> = {
+  ceo: { Manager: "실장" },
 };
 
 /** Surnames, in assignment order. Extend the pool; never reorder it. */
@@ -80,19 +150,35 @@ const ROSTER: { id: string; department: string; surname: string; title: Title }[
   { id: "emp-ops-001", department: "operations", surname: "Kang", title: "Staff" },
 ];
 
-function build(entry: (typeof ROSTER)[number]): Employee {
-  const givenName = GIVEN_NAME_BY_DEPARTMENT[entry.department] ?? entry.department;
+function compose(
+  id: string,
+  department: string,
+  surname: string,
+  title: EmployeeTitle,
+): Employee {
+  const givenName = GIVEN_NAME_BY_DEPARTMENT[department] ?? department;
+  const displaySurname = DISPLAY_SURNAME[surname] ?? surname;
+  const displayGivenName = DISPLAY_GIVEN_NAME[givenName] ?? givenName;
 
   return {
-    id: entry.id,
-    surname: entry.surname,
+    id,
+    surname,
     givenName,
-    fullName: `${entry.surname} ${givenName}`,
-    department: entry.department,
-    title: entry.title,
+    fullName: `${surname} ${givenName}`,
+    // 김재무 — surname and responsibility, read as one name.
+    displaySurname,
+    displayGivenName,
+    displayName: `${displaySurname}${displayGivenName}`,
+    department,
+    title,
+    displayDepartment: DEPARTMENT_LABEL[department] ?? department,
+    displayTitle: TITLE_OVERRIDE[department]?.[title] ?? DISPLAY_TITLE[title],
     status: "active",
-    currentWork: null,
   };
+}
+
+function build(entry: (typeof ROSTER)[number]): Employee {
+  return compose(entry.id, entry.department, entry.surname, entry.title);
 }
 
 export const EMPLOYEES: Employee[] = ROSTER.map(build);
@@ -105,47 +191,33 @@ export function employeeFor(department: string): Employee {
   // An unstaffed department still has a name, so a report can still be signed.
   // The surname is derived from the department, so it is stable across runs and
   // two departments never end up with the same one by accident.
-  const givenName = GIVEN_NAME_BY_DEPARTMENT[department] ?? department;
   const taken = new Set(EMPLOYEES.map((e) => e.surname));
   const free = SURNAMES.filter((s) => !taken.has(s));
   const pool = free.length > 0 ? free : SURNAMES;
   const seed = [...department].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
   const surname = pool[seed % pool.length];
 
-  return {
-    id: `emp-${department}-000`,
-    surname,
-    givenName,
-    fullName: `${surname} ${givenName}`,
-    department,
-    title: "Staff",
-    status: "active",
-    currentWork: null,
-  };
+  return compose(`emp-${department}-000`, department, surname, "Staff");
 }
 
-/** Department labels, for places that show the department rather than a person. */
-export const DEPARTMENT_LABEL: Record<string, string> = {
-  finance: "Finance",
-  asset: "Asset Management",
-  treasury: "Treasury",
-  strategy: "Strategy",
-  data: "Data Office",
-  audit: "Audit",
-  ceo: "CEO Office",
-  career: "Career",
-  home: "Home",
-  health: "Health",
-  operations: "Operations",
-};
-
-/** How a report is signed: a person and their title, department as metadata. */
-export function signature(department: string): { name: string; title: string; department: string } {
+/**
+ * How a report is signed — 김재무 팀장.
+ *
+ * A person and a title, in the representative's language. The department is
+ * metadata; the romanized name stays internal.
+ */
+export function signature(department: string): {
+  name: string;
+  title: string;
+  department: string;
+  displayDepartment: string;
+} {
   const employee = employeeFor(department);
 
   return {
-    name: employee.fullName,
-    title: `${DEPARTMENT_LABEL[department] ?? department} ${employee.title}`,
+    name: employee.displayName,
+    title: employee.displayTitle,
     department,
+    displayDepartment: employee.displayDepartment,
   };
 }

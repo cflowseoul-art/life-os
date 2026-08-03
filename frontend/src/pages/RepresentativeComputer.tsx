@@ -69,9 +69,11 @@ type Desk = { projects?: Project[]; awaiting: Work[]; inProgress: Work[]; done: 
 const DEPARTMENT: Record<string, string> = {
   career: "커리어팀",
   finance: "재무팀",
+  asset: "자산관리팀",
+  treasury: "자산운용팀",
   home: "살림팀",
   health: "건강팀",
-  operations: "운영",
+  operations: "총무팀",
 };
 
 const LIFECYCLE: Record<Project["lifecycle"], string> = {
@@ -551,7 +553,7 @@ export default function RepresentativeComputer() {
         <div className="rc__list">
           {accepted && (
             <div className="rc__notice">
-              <h2>Seo Biseo · CEO Office Manager</h2>
+              <h2>서비서 실장</h2>
               <p>맡았습니다.</p>
               <p>현재 적절한 팀에 배정하고 있습니다.</p>
               <p className="rc__fine">대표님 판단이 필요한 때에 다시 올려드리겠습니다.</p>

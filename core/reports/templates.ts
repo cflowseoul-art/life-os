@@ -82,7 +82,7 @@ const NO_DECISION = "현재 대표님께 결정을 요청드릴 사항은 없습
 
 export const career: ReportTemplate = {
   capability: "career",
-  contributor: employeeFor("career").fullName,
+  contributor: employeeFor("career").displayName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("이 건은", "준비되는 대로 바로 올려드리겠습니다.");
 
@@ -131,7 +131,7 @@ export const career: ReportTemplate = {
 
 export const finance: ReportTemplate = {
   capability: "finance",
-  contributor: employeeFor("finance").fullName,
+  contributor: employeeFor("finance").displayName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -195,7 +195,7 @@ export const finance: ReportTemplate = {
 
 export const health: ReportTemplate = {
   capability: "health",
-  contributor: employeeFor("health").fullName,
+  contributor: employeeFor("health").displayName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("건강 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -224,7 +224,7 @@ export const health: ReportTemplate = {
 
 export const home: ReportTemplate = {
   capability: "home",
-  contributor: employeeFor("home").fullName,
+  contributor: employeeFor("home").displayName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("살림 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -279,7 +279,7 @@ export const home: ReportTemplate = {
 /** Operations holds a request only until a domain department is accountable. */
 export const operations: ReportTemplate = {
   capability: "operations",
-  contributor: employeeFor("operations").fullName,
+  contributor: employeeFor("operations").displayName,
   compose: () => notYetStaffed(
     "이 건은",
     "담당 부서가 정해지는 대로 그 팀이 이어받아 올려드리겠습니다.",
@@ -293,7 +293,7 @@ export function templateFor(capability: string): ReportTemplate {
   return (
     TEMPLATES.find((t) => t.capability === capability) ?? {
       capability,
-      contributor: employeeFor(capability).fullName,
+      contributor: employeeFor(capability).displayName,
       compose: ({ state, staffed, facts, question }) => (!staffed
         ? notYetStaffed("이 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.")
         : {
