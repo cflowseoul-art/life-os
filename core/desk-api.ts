@@ -27,6 +27,8 @@ import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
 import { signature } from "./company/employees.ts";
+import { projectWorkOrders, workOrderFor } from "./company/work-order.ts";
+import type { WorkOrder } from "./company/work-order.ts";
 import { templateFor } from "./reports/templates.ts";
 import type { ReportSection } from "./reports/templates.ts";
 
@@ -62,6 +64,8 @@ export type DeskWork = {
   attachment: { name: string; lines: number; preview: string[] } | null;
   /** The project this belongs to, when the company recognised one. */
   project: { id: string; name: string } | null;
+  /** Where this piece of work stands as a company work item. */
+  workOrder: { id: string; state: string; assignee: string; acceptedAt: string } | null;
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -70,6 +74,8 @@ export type DeskWork = {
 };
 
 export type DeskView = {
+  /** Every instruction the company took in, with where it stands. */
+  workOrders: WorkOrder[];
   /** Recognised by the company, never created by the representative. */
   projects: Project[];
   awaiting: DeskWork[];
@@ -124,7 +130,12 @@ function attachmentFor(
   };
 }
 
-function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskWork | null {
+function toWork(
+  hold: Hold,
+  events: EventEnvelope[],
+  projects: Project[],
+  orders: WorkOrder[],
+): DeskWork | null {
   if (hold.state === "withdrawn") return null;
 
   const contributor = contributorFor(hold.capability);
@@ -172,6 +183,12 @@ function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskW
     recommendation: composed.recommendation,
     decision: composed.decision,
     attachment,
+    workOrder: (() => {
+      const order = workOrderFor(orders, hold.id);
+      return order
+        ? { id: order.id, state: order.state, assignee: order.assignee.name, acceptedAt: order.acceptedAt }
+        : null;
+    })(),
     project: (() => {
       const p = projectFor(projects, hold.id);
       return p ? { id: p.id, name: p.name } : null;
@@ -187,12 +204,15 @@ function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskW
 export function deskView(engine: CustodyEngine, log: EventLog): DeskView {
   const events = log.read();
   const projects = detectProjects(events);
+  // The order exists before any department result is read.
+  const workOrders = projectWorkOrders(events);
   const works = engine
     .ledger()
-    .map((hold) => toWork(hold, events, projects))
+    .map((hold) => toWork(hold, events, projects, workOrders))
     .filter((w): w is DeskWork => w !== null);
 
   return {
+    workOrders,
     projects,
     awaiting: works.filter((w) => w.section === "awaiting"),
     inProgress: works.filter((w) => w.section === "inProgress"),
@@ -277,7 +297,7 @@ createServer((req, res) => {
           },
           { kind: "user" },
           "home",
-          "computer",
+          "ceo-office:accepted",
         );
 
         advanceHome(log);
@@ -300,7 +320,7 @@ createServer((req, res) => {
           },
           { kind: "user" },
           "finance",
-          "computer",
+          "ceo-office:accepted",
         );
 
         // Statement text advances locally; otherwise Finance reads the ledger.
@@ -447,7 +467,7 @@ createServer((req, res) => {
           { type: "AskAnswered", holdId: outstanding.holdId, askId: outstanding.id, optionId },
           { kind: "user" },
           "finance",
-          "computer",
+          "ceo-office:accepted",
         );
 
         advanceFinance(log);
