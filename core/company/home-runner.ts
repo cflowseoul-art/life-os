@@ -55,9 +55,9 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
     if (hold.kept) continue;
 
     const text = ocr(hold.text);
-    const items = home.readReceipt(text);
+    const receipt = home.readReceipt(text);
 
-    if (items.length === 0) continue;
+    if (receipt.items.length === 0) continue;
 
     const actor = { kind: "capability" as const, id: home.CAPABILITY_ID };
 
@@ -73,7 +73,7 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
     }
 
     log.append(
-      { type: "ArtifactKept", holdId: hold.holdId, artifact: home.proposeArtifact(hold.store, items) },
+      { type: "ArtifactKept", holdId: hold.holdId, artifact: home.proposeArtifact(hold.store, receipt) },
       actor,
       home.CAPABILITY_ID,
       "home",
@@ -89,10 +89,14 @@ export function inventory(events: EventEnvelope[]): { name: string; quantity: nu
     const { event } = envelope;
     if (event.type !== "ObservationRecorded" || envelope.capability !== home.CAPABILITY_ID) continue;
 
-    const [name, rest] = event.observation.statement.split(" ");
-    const quantity = Number(/(\d+)개/.exec(rest ?? "")?.[1] ?? 1);
+    // name · quantity+unit · amount. Discounts are not inventory.
+    const [name, count] = event.observation.statement.split(" · ");
+    if (name === undefined || count === undefined || count === "할인") continue;
+
+    const quantity = Number(/^(\d+)/.exec(count)?.[1] ?? 1);
     const existing = byName.get(name);
 
+    // Merged on the full printed name, so 1L and 900ml stay apart.
     byName.set(name, {
       name,
       quantity: (existing?.quantity ?? 0) + quantity,

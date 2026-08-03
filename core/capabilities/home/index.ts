@@ -25,35 +25,103 @@ export type Ocr = (input: string) => string;
 export const passthroughOcr: Ocr = (input) => input;
 
 export type ReceiptItem = {
+  /** The product as printed, size included. `서울우유 1L`, never `서울우유`. */
   name: string;
   quantity: number;
+  /** The counting unit as printed: 개, 봉, 팩, 병, 캔, 줄… `null` when bare. */
+  unit: string | null;
   /** Won. Read from the line, never computed from a unit price. */
   amount: number;
   /** Which line of the receipt this came from. */
   line: number;
 };
 
+export type Receipt = {
+  items: ReceiptItem[];
+  /** Discounts as printed, kept separate from purchases. */
+  discounts: { label: string; amount: number; line: number }[];
+  /** Sum of items less discounts. Computed from lines actually read. */
+  total: number;
+};
+
+/** Lines that are not purchases. */
+const NOT_AN_ITEM =
+  /^(합계|총액|소계|결제|카드|현금|받은|거스름|부가세|과세|면세|승인|포인트|적립|잔액|매출|주소|전화|사업자)/;
+
+/** Discount lines. Real, but they take money off rather than adding an item. */
+const DISCOUNT = /^(할인|행사할인|쿠폰|에누리|즉시할인|멤버십할인|카드할인)/;
+
+/** A date or a time ends in digits and buys nothing. */
+const DATE_OR_TIME = /^\d{2,4}[-./]\d{1,2}[-./]\d{1,2}|^\d{1,2}:\d{2}/;
+
 const AMOUNT = /(-?[\d,]+)\s*원?$/;
-const QUANTITY = /(?:^|\s)(?:x|X|\*)?\s*(\d+)\s*(?:개|팩|병|봉|입)?\s+(?=[\d,]+\s*원?$)/;
 
 /**
- * Reads a receipt into items.
+ * Counting units. A number carrying one of these is *how many* were bought.
  *
- * A line counts only when it ends in an amount. Everything else — store name,
- * date, card footer, totals — is left alone rather than half-understood.
+ * `구` is deliberately absent: 30구 is the size of an egg carton, not a count of
+ * cartons. It stays in the product name, where it belongs.
  */
-export function readReceipt(text: string): ReceiptItem[] {
+const COUNT_UNITS = ["개", "봉", "팩", "병", "캔", "입", "박스", "세트", "줄", "장", "롤", "포"];
+
+/** Size units. Always part of the product's identity, never a quantity. */
+const SIZE_UNITS = ["L", "l", "ml", "mL", "ML", "g", "G", "kg", "Kg", "KG", "cc", "구", "매"];
+
+const COUNT_TAIL = new RegExp(`^(.*?)[\\s]*(?:x|X|\\*)?\\s*(\\d+)\\s*(${COUNT_UNITS.join("|")})$`);
+const BARE_TAIL = /^(.*?)\s+(?:x|X|\*)\s*(\d+)$|^(.*?)\s+(\d+)$/;
+
+function isSizeToken(token: string): boolean {
+  return SIZE_UNITS.some((u) => new RegExp(`^\\d+(?:\\.\\d+)?${u}$`).test(token));
+}
+
+/**
+ * Splits the text before the amount into a product and a quantity.
+ *
+ * The quantity is only ever the *last* token, and only when it counts things.
+ * Everything before it — including sizes and pack counts — is the product's
+ * identity, so `서울우유 1L` and `서울우유 900ml` never merge.
+ */
+function splitQuantity(head: string): { name: string; quantity: number; unit: string | null } {
+  const counted = COUNT_TAIL.exec(head);
+
+  if (counted && counted[1].trim() !== "") {
+    return { name: counted[1].trim(), quantity: Number(counted[2]), unit: counted[3] };
+  }
+
+  const tokens = head.split(/\s+/);
+  const last = tokens[tokens.length - 1] ?? "";
+
+  // A bare trailing integer is a count — unless it is a size (500g) or the
+  // whole product name (계란 30구 → 계란 30구, one carton).
+  if (tokens.length > 1 && /^(?:x|X|\*)?\d+$/.test(last) && !isSizeToken(last)) {
+    return {
+      name: tokens.slice(0, -1).join(" "),
+      quantity: Number(last.replace(/^[xX*]/, "")),
+      unit: null,
+    };
+  }
+
+  return { name: head, quantity: 1, unit: null };
+}
+
+/**
+ * Reads a receipt.
+ *
+ * A line counts only when it ends in an amount. Store name, date, totals, card
+ * footers and blank lines are left alone rather than half-understood, and a
+ * line whose product name would be empty is skipped rather than guessed.
+ *
+ * Identical lines are kept as separate purchases: two of the same item rung up
+ * twice is what the receipt says, and collapsing them would invent a fact.
+ * Inventory merges them later by name, where merging is correct.
+ */
+export function readReceipt(text: string): Receipt {
   const items: ReceiptItem[] = [];
+  const discounts: { label: string; amount: number; line: number }[] = [];
 
   text.split("\n").forEach((raw, index) => {
     const line = raw.trim();
-    if (line === "") return;
-
-    // Totals are not purchases. They are the sum of purchases.
-    if (/^(합계|총액|결제|카드|받은돈|거스름|부가세)/.test(line)) return;
-
-    // Dates and times end in digits but buy nothing.
-    if (/^\d{2,4}[-./]\d{1,2}[-./]\d{1,2}/.test(line) || /^\d{1,2}:\d{2}/.test(line)) return;
+    if (line === "" || NOT_AN_ITEM.test(line) || DATE_OR_TIME.test(line)) return;
 
     const amountMatch = AMOUNT.exec(line);
     if (!amountMatch) return;
@@ -62,27 +130,48 @@ export function readReceipt(text: string): ReceiptItem[] {
     if (Number.isNaN(amount)) return;
 
     const head = line.slice(0, amountMatch.index).trim();
-    const quantityMatch = QUANTITY.exec(`${head} 0`);
-    const quantity = quantityMatch ? Number(quantityMatch[1]) : 1;
-    const name = head.replace(/(?:x|X|\*)?\s*\d+\s*(?:개|팩|병|봉|입)?$/, "").trim();
+    if (head === "") return;
 
-    if (name === "") return;
+    // A discount line, or any negative amount, takes money off.
+    if (DISCOUNT.test(line) || amount < 0) {
+      discounts.push({ label: head, amount: Math.abs(amount), line: index + 1 });
+      return;
+    }
 
-    items.push({ name, quantity, amount, line: index + 1 });
+    const { name, quantity, unit } = splitQuantity(head);
+    if (name === "" || /^[\d,.\s]+$/.test(name)) return;
+
+    items.push({ name, quantity, unit, amount, line: index + 1 });
   });
 
-  return items;
+  const total =
+    items.reduce((sum, item) => sum + item.amount, 0)
+    - discounts.reduce((sum, d) => sum + d.amount, 0);
+
+  return { items, discounts, total };
 }
 
 /** One observation per item, each pointing at the line it came from (Art. 10). */
 export function observe(text: string, acquiredAt: string): Observation[] {
-  return readReceipt(text).map((item, index) => ({
-    id: `item-${String(index + 1)}`,
-    statement: `${item.name} ${String(item.quantity)}개 · ${item.amount.toLocaleString("ko-KR")}원`,
-    source: `receipt:${String(item.line)}`,
-    acquiredAt,
-    confidence: 1,
-  }));
+  const { items, discounts } = readReceipt(text);
+
+  return [
+    ...items.map((item, index) => ({
+      id: `item-${String(index + 1)}`,
+      // Stable shape: name · quantity · amount. Read back by inventory.
+      statement: `${item.name} · ${String(item.quantity)}${item.unit ?? "개"} · ${item.amount.toLocaleString("ko-KR")}원`,
+      source: `receipt:${String(item.line)}`,
+      acquiredAt,
+      confidence: 1,
+    })),
+    ...discounts.map((d, index) => ({
+      id: `discount-${String(index + 1)}`,
+      statement: `${d.label} · 할인 · -${d.amount.toLocaleString("ko-KR")}원`,
+      source: `receipt:${String(d.line)}`,
+      acquiredAt,
+      confidence: 1,
+    })),
+  ];
 }
 
 /**
@@ -92,17 +181,22 @@ export function observe(text: string, acquiredAt: string): Observation[] {
  * total is the sum of lines actually read, never a total printed on the
  * receipt that we did not verify item by item.
  */
-export function proposeArtifact(store: string, items: ReceiptItem[]): Artifact {
-  const total = items.reduce((sum, item) => sum + item.amount, 0);
+export function proposeArtifact(store: string, receipt: Receipt): Artifact {
+  const { items, discounts, total } = receipt;
 
   return {
     id: `receipt-${store}`.replace(/\s+/g, "-"),
     title: `${store} 영수증 정리`,
     sections: [
       ...items.map((item, index) => ({
-        heading: `${item.name} ${String(item.quantity)}개`,
+        heading: `${item.name} ${String(item.quantity)}${item.unit ?? "개"}`,
         body: `영수증 ${String(item.line)}번째 줄 · ${item.amount.toLocaleString("ko-KR")}원`,
         derivedFrom: [`item-${String(index + 1)}`],
+      })),
+      ...discounts.map((d, index) => ({
+        heading: `${d.label} -${d.amount.toLocaleString("ko-KR")}원`,
+        body: `영수증 ${String(d.line)}번째 줄`,
+        derivedFrom: [`discount-${String(index + 1)}`],
       })),
       {
         heading: `지출 합계 ${total.toLocaleString("ko-KR")}원`,
@@ -114,8 +208,11 @@ export function proposeArtifact(store: string, items: ReceiptItem[]): Artifact {
 }
 
 /** Art. 9 enforcement input: the only numbers this capability may state. */
-export function factualNumbers(items: ReceiptItem[]): Set<number> {
-  const allowed = new Set<number>([items.length, items.reduce((s, i) => s + i.amount, 0)]);
+export function factualNumbers(receipt: Receipt): Set<number> {
+  const { items, discounts, total } = receipt;
+  const allowed = new Set<number>([items.length, total]);
+
+  discounts.forEach((d) => { allowed.add(d.amount); allowed.add(d.line); });
 
   items.forEach((item, index) => {
     allowed.add(item.amount);
