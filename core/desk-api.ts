@@ -182,11 +182,11 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     status: observed === 0 ? "보내주신 공고를 읽고 있습니다" : `공고에서 요건 ${String(observed)}개를 확인했습니다`,
     report:
       observed === 0
-        ? "보내주신 공고를 읽는 중이라, 아직 말씀드릴 결과가 없습니다."
-        : "아직 대표님 판단이 필요한 지점은 나오지 않았습니다.",
+        ? "보내주신 공고를 읽으며 요건을 뽑고 있습니다."
+        : `공고 요건을 정리하고 있습니다. 지금까지 ${String(observed)}개를 뽑았습니다.`,
     findings,
     recommendation:
-      "판단이 필요한 지점이 나오면 그때 올려드리겠습니다. 현재 대표님께 결정을 요청드릴 사항은 없습니다.",
+      "지금 대표님께서 하실 일은 없습니다. 첫 문단 순서를 정하실 시점이 오면 바로 올려드리겠습니다.",
     decision: null,
     attachment,
     ask: null,
