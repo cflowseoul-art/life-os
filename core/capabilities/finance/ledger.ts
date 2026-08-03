@@ -8,7 +8,27 @@
  * one. Below that, the figure is null and the sentence is written without it.
  */
 
-import type { LedgerTransaction } from "../../infrastructure/ledger/dugong.ts";
+import type { CategoryRule, LedgerTransaction } from "../../infrastructure/ledger/dugong.ts";
+
+/**
+ * Spending, as the ledger itself defines it.
+ *
+ * 분류규칙 marks card settlements, transfers, and carried balances with
+ * 통계포함 = N. Those are money moving, not money spent, and counting them
+ * would overstate every figure Finance states. When no rule exists for a
+ * category, it counts — the ledger's silence is not a licence to drop a row.
+ */
+export function isSpending(tx: LedgerTransaction, rules: Map<string, CategoryRule>): boolean {
+  const rule = rules.get(tx.category.trim());
+  return rule ? rule.countsAsSpending : true;
+}
+
+export function onlySpending(
+  transactions: LedgerTransaction[],
+  rules: Map<string, CategoryRule>,
+): LedgerTransaction[] {
+  return transactions.filter((tx) => isSpending(tx, rules));
+}
 
 /** Money out, as a positive figure. The ledger's sign convention stays there. */
 function spend(tx: LedgerTransaction): number {
@@ -23,6 +43,8 @@ export type MonthlyBaseline = {
   month: string;
   total: number;
   byCategory: Record<string, number>;
+  /** 거래내역 row numbers behind each category, so any figure can be checked. */
+  rowsByCategory: Record<string, number[]>;
 };
 
 /** Every month present in the ledger, oldest first. */
@@ -31,11 +53,12 @@ export function baselines(transactions: LedgerTransaction[]): MonthlyBaseline[] 
 
   for (const tx of transactions) {
     const key = month(tx.date);
-    const entry = months.get(key) ?? { month: key, total: 0, byCategory: {} };
+    const entry = months.get(key) ?? { month: key, total: 0, byCategory: {}, rowsByCategory: {} };
     const category = tx.category.trim() === "" ? "미분류" : tx.category.trim();
 
     entry.total += spend(tx);
     entry.byCategory[category] = (entry.byCategory[category] ?? 0) + spend(tx);
+    entry.rowsByCategory[category] = [...(entry.rowsByCategory[category] ?? []), tx.row];
     months.set(key, entry);
   }
 
@@ -51,17 +74,29 @@ export type Anomaly = {
   months: number;
   /** Signed percentage against the baseline. */
   changePercent: number;
+  /** 거래내역 rows that make up this month's figure. */
+  rows: number[];
   sentence: string;
 };
+
+/** 받침 decides the subject particle. "식료품이", not "식료품가". */
+function subject(word: string): string {
+  const last = word.charCodeAt(word.length - 1);
+  const hasFinal = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0;
+  return `${word}${hasFinal ? "이" : "가"}`;
+}
 
 /**
  * Meaningful changes only.
  *
- * Three gates, all of which must pass, so the representative is never told
- * about noise (Art. 1):
- *   - at least two complete months of history for that category
+ * Gates, all of which must pass, so the representative is never told about
+ * noise (Art. 1):
+ *   - at least one complete prior month for that category
  *   - the change is at least 15%
  *   - and at least 30,000원 in absolute terms
+ *   - and, while the month is still running, only *increases* are reported:
+ *     an unfinished month is naturally below a finished one, and reporting
+ *     that as a drop would be a false alarm every time.
  *
  * A 40% rise on a 3,000원 category is arithmetic, not news.
  */
@@ -69,20 +104,22 @@ export function anomalies(
   transactions: LedgerTransaction[],
   currentMonth: string,
   lookback = 3,
+  monthComplete = false,
 ): Anomaly[] {
   const months = baselines(transactions);
   const current = months.find((m) => m.month === currentMonth);
   if (!current) return [];
 
+  // However many complete months exist, up to `lookback`. The sentence always
+  // names how many were used, so a two-month average is never read as three.
   const previous = months.filter((m) => m.month < currentMonth).slice(-lookback);
-  if (previous.length < 2) return [];
+  if (previous.length < 1) return [];
 
   const found: Anomaly[] = [];
 
   for (const [category, amount] of Object.entries(current.byCategory)) {
     const history = previous.map((m) => m.byCategory[category] ?? 0);
-    const withSpend = history.filter((v) => v > 0);
-    if (withSpend.length < 2) continue;
+    if (history.filter((v) => v > 0).length < 1) continue;
 
     const baseline = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
     if (baseline === 0) continue;
@@ -91,6 +128,7 @@ export function anomalies(
     const gap = Math.abs(amount - baseline);
 
     if (Math.abs(change) < 15 || gap < 30_000) continue;
+    if (!monthComplete && change < 0) continue;
 
     found.push({
       category,
@@ -99,8 +137,9 @@ export function anomalies(
       baseline,
       months: previous.length,
       changePercent: change,
+      rows: current.rowsByCategory[category] ?? [],
       sentence:
-        `이번 달 ${category}가 최근 ${String(previous.length)}개월 평균보다 `
+        `이번 달 ${subject(category)} 최근 ${String(previous.length)}개월 평균보다 `
         + `${String(Math.abs(change))}% ${change > 0 ? "높습니다" : "낮습니다"} `
         + `(${amount.toLocaleString("ko-KR")}원 · 평균 ${baseline.toLocaleString("ko-KR")}원).`,
     });

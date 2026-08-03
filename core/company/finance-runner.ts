@@ -11,8 +11,8 @@ import { randomUUID } from "node:crypto";
 import { EventLog } from "../events/log.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
-import { anomalies, baselines } from "../capabilities/finance/ledger.ts";
-import { readLedger } from "../infrastructure/ledger/dugong.ts";
+import { anomalies, baselines, onlySpending } from "../capabilities/finance/ledger.ts";
+import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
 
 type FinanceHold = {
   holdId: string;
@@ -76,6 +76,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
   if (holds.length === 0) return;
 
   const read = await readLedger();
+  const rules = await readCategoryRules();
   const actor = { kind: "capability" as const, id: finance.CAPABILITY_ID };
   const now = today.toISOString();
   const currentMonth = now.slice(0, 7);
@@ -102,8 +103,11 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
       continue;
     }
 
-    const found = anomalies(read.transactions, currentMonth);
-    const months = baselines(read.transactions);
+    // The ledger's own rules decide what is spending (분류규칙 · 통계포함).
+    const spending = onlySpending(read.transactions, rules);
+    // A month is only complete once the next one has begun.
+    const monthComplete = months.some((m) => m.month > currentMonth);
+    const found = anomalies(spending, currentMonth, 3, monthComplete);
     const thisMonth = months.find((m) => m.month === currentMonth);
 
     if (!hold.observed) {
@@ -115,7 +119,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
             observation: {
               id: `anomaly-${String(index + 1)}`,
               statement: anomaly.sentence,
-              source: `거래내역 · ${anomaly.month}`,
+              source: `거래내역 ${anomaly.rows.join(", ")}행`,
               acquiredAt: now,
               confidence: 1,
             },
@@ -139,14 +143,16 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
           sections: [
             ...found.map((a, i) => ({
               heading: a.sentence,
-              body: `평균은 최근 ${String(a.months)}개월 기준입니다.`,
+              body: `거래내역 ${a.rows.join(", ")}행 · 평균은 최근 ${String(a.months)}개월 기준입니다.`,
               derivedFrom: [`anomaly-${String(i + 1)}`],
             })),
-            ...Object.entries(thisMonth?.byCategory ?? {}).map(([category, amount]) => ({
-              heading: `${category} ${amount.toLocaleString("ko-KR")}원`,
-              body: "거래내역에서 합산했습니다.",
-              derivedFrom: [],
-            })),
+            ...Object.entries(thisMonth?.byCategory ?? {})
+              .sort((a, b) => b[1] - a[1])
+              .map(([category, amount]) => ({
+                heading: `${category} ${amount.toLocaleString("ko-KR")}원`,
+                body: `거래내역 ${(thisMonth?.rowsByCategory[category] ?? []).join(", ")}행`,
+                derivedFrom: [],
+              })),
           ],
         },
       },

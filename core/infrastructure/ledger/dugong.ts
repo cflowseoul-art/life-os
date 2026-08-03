@@ -133,6 +133,42 @@ export function parseLedgerRows(rows: string[][]): LedgerTransaction[] {
   return transactions;
 }
 
+/**
+ * The ledger's own classification rules (분류규칙).
+ *
+ * 통계포함 = N marks movements that are not spending — card settlements,
+ * transfers to savings or investments, carried-over balances. Finance uses the
+ * ledger's judgment here rather than inventing its own list of what counts.
+ */
+export type CategoryRule = { category: string; type: string; countsAsSpending: boolean };
+
+export function parseCategoryRules(rows: string[][]): Map<string, CategoryRule> {
+  const rules = new Map<string, CategoryRule>();
+  if (rows.length < 2) return rules;
+
+  const headers = rows[0].map((h) => h.trim());
+  const at = {
+    category: headers.indexOf("분류"),
+    type: headers.indexOf("거래유형"),
+    include: headers.indexOf("통계포함"),
+  };
+
+  if (at.category === -1) return rules;
+
+  for (const cells of rows.slice(1)) {
+    const category = (cells[at.category] ?? "").trim();
+    if (category === "" || rules.has(category)) continue;
+
+    rules.set(category, {
+      category,
+      type: at.type === -1 ? "" : (cells[at.type] ?? "").trim(),
+      countsAsSpending: at.include === -1 ? true : (cells[at.include] ?? "").trim().toUpperCase() !== "N",
+    });
+  }
+
+  return rules;
+}
+
 /** Read-only. The one scope this module ever asks for. */
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 
@@ -182,11 +218,9 @@ async function accessToken(account: ServiceAccount): Promise<string> {
   return body.access_token;
 }
 
-/** Reads the tab as rows. Never writes: no write method exists here. */
-async function readSheet(): Promise<LedgerTransaction[]> {
+async function fetchRows(range: string): Promise<string[][]> {
   const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   const spreadsheetId = process.env.DUGONG_LEDGER_SPREADSHEET_ID;
-  const sheetName = process.env.DUGONG_LEDGER_SHEET_NAME ?? "거래내역";
 
   if (!keyFile) throw new Error("GOOGLE_APPLICATION_CREDENTIALS가 설정되지 않았습니다.");
   if (!existsSync(keyFile)) throw new Error(`인증 파일을 찾지 못했습니다: ${keyFile}`);
@@ -195,19 +229,33 @@ async function readSheet(): Promise<LedgerTransaction[]> {
   const account = JSON.parse(readFileSync(keyFile, "utf8")) as ServiceAccount;
   const token = await accessToken(account);
 
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`
-    + `/values/${encodeURIComponent(sheetName)}?majorDimension=ROWS`;
-
-  const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?majorDimension=ROWS`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
 
   if (!response.ok) {
     const detail = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
     throw new Error(detail.error?.message ?? `시트를 읽지 못했습니다 (${String(response.status)})`);
   }
 
-  const body = (await response.json()) as { values?: string[][] };
-  return parseLedgerRows(body.values ?? []);
+  return ((await response.json()) as { values?: string[][] }).values ?? [];
+}
+
+/** The ledger's classification rules. Empty map when the tab is absent. */
+export async function readCategoryRules(): Promise<Map<string, CategoryRule>> {
+  try {
+    return parseCategoryRules(await fetchRows(process.env.DUGONG_LEDGER_RULES_SHEET ?? "분류규칙"));
+  } catch {
+    return new Map();
+  }
+}
+
+/** Reads the tab as rows. Never writes: no write method exists here. */
+async function readSheet(): Promise<LedgerTransaction[]> {
+  const sheetName = process.env.DUGONG_LEDGER_SHEET_NAME ?? "거래내역";
+
+  return parseLedgerRows(await fetchRows(sheetName));
 }
 
 /**
