@@ -16,7 +16,11 @@ import { createServer } from "node:http";
 import { verifyGoogleIdToken } from "./identity/google.ts";
 import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
 import { FileIdentityStore } from "./identity/store.ts";
+import type { IdentityStore } from "./identity/store.ts";
 import { FileEventStore } from "./storage/event-store.ts";
+import type { EventStore } from "./storage/event-store.ts";
+import { PostgresIdentityStore } from "./infrastructure/db/identity-store.ts";
+import { PostgresEventStore, markReportRead, readReports } from "./infrastructure/db/event-store.ts";
 import {
   CAPABILITIES,
   companyRoster,
@@ -286,19 +290,35 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
 validateManifest();
 void warmRunners();
 
-const identity = new FileIdentityStore();
-const events = new FileEventStore();
+/**
+ * The composition root.
+ *
+ * `LIFE_OS_STORAGE=postgres` runs on the hosted database; `file` keeps the
+ * local development adapters. Domain behaviour is identical either way — only
+ * where the bytes live differs.
+ */
+const STORAGE = process.env.LIFE_OS_STORAGE ?? "file";
+const hosted = STORAGE === "postgres";
+
+const identity: IdentityStore = hosted ? new PostgresIdentityStore() : new FileIdentityStore();
+const events: EventStore = hosted ? new PostgresEventStore() : new FileEventStore();
+
+console.log(`storage: ${STORAGE}`);
 
 /** Everything a request needs, resolved from the actor and nothing else. */
 function desk(actor: ActorContext) {
   const household = events.logFor(actor, "household");
   const personal = events.logFor(actor, "personal");
   const readable = events.readableFor(actor);
+  const streams = events.prepare(actor);
 
   return {
     household,
     personal,
     readable,
+    /** Load before, flush after. A file adapter does nothing for either. */
+    load: () => streams.load(),
+    flush: () => streams.flush(),
     /** Career is personal, so the custody engine runs on the personal stream. */
     engine: new CustodyEngine(personal),
     logFor: (capability: string) => (scopeOf(capability) === "household" ? household : personal),
@@ -389,14 +409,21 @@ createServer((req, res) => {
   if (url.pathname.startsWith("/api/")) {
     void actorFrom(req).then((context) => {
       if (!context) { json(res, 401, { ok: false, reason: "로그인이 필요합니다." }); return; }
-      handle(req, res, url, context);
+
+      // Streams are loaded before any runner reads them, and flushed after the
+      // response is composed. Runners stay synchronous and know nothing of it.
+      const ctx = desk(context);
+      void ctx
+        .load()
+        .then(() => { handle(req, res, url, context, ctx); })
+        .catch(() => { json(res, 500, { ok: false, reason: "지금은 열어드리지 못했습니다." }); });
     });
     return;
   }
 
   json(res, 404, { ok: false, reason: "없는 경로입니다." });
-}).listen(port, "127.0.0.1", () => {
-  console.log(`desk api: http://127.0.0.1:${String(port)}/api/desk`);
+}).listen(port, process.env.HOST ?? "127.0.0.1", () => {
+  console.log(`desk api: :${String(port)}/api/desk`);
 });
 
 /** Domain routes. They receive the actor; they never parse a request for it. */
@@ -405,15 +432,38 @@ function handle(
   res: import("node:http").ServerResponse,
   url: URL,
   actor: ActorContext,
+  ctx: ReturnType<typeof desk>,
 ): void {
-  const ctx = desk(actor);
   const engine = ctx.engine;
+
+  if (req.method === "POST" && url.pathname === "/api/desk/read") {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+    req.on("end", () => {
+      const holdId = String((JSON.parse(body || "{}") as { holdId?: unknown }).holdId ?? "");
+
+      if (!hosted || holdId === "") { json(res, 200, { ok: true }); return; }
+
+      void markReportRead(actor.user.id, holdId)
+        .then(() => { json(res, 200, { ok: true }); })
+        .catch(() => { json(res, 200, { ok: true }); });
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/desk/read") {
+    void (hosted ? readReports(actor.user.id) : Promise.resolve([]))
+      .then((holdIds) => { json(res, 200, { ok: true, holdIds }); })
+      .catch(() => { json(res, 200, { ok: true, holdIds: [] }); });
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/api/desk") {
     // Month start and ledger changes are noticed here, because this is where a
     // household context exists. Which capabilities wake is the manifest's call.
     void runSchedule("household", actor, ctx.logFor)
       .catch(() => undefined)
+      .then(() => ctx.flush())
       .then(() => { json(res, 200, ctx.view()); });
     return;
   }
@@ -456,7 +506,7 @@ function handle(
             }),
           )
           .then((result) => {
-            if (result.ok) json(res, 200, { ok: true, desk: ctx.view() });
+            if (result.ok) void ctx.flush().then(() => { json(res, 200, { ok: true, desk: ctx.view() }); });
             else json(res, 400, result);
           })
           .catch((error: unknown) => {
@@ -487,7 +537,7 @@ function handle(
         "ceo-office:accepted",
       );
 
-      json(res, 200, { ok: true, desk: ctx.view() });
+      void ctx.flush().then(() => { json(res, 200, { ok: true, desk: ctx.view() }); });
     });
     return;
   }
@@ -520,7 +570,7 @@ function handle(
         // Nothing is recorded. No hold, no inventory, no expense (Art. 3, 9).
         const reason =
           error instanceof OcrUnavailable
-            ? "이 컴퓨터에서는 사진을 읽을 수 없습니다. 영수증 내용을 붙여넣어 주시면 그대로 정리하겠습니다."
+            ? "지금 서버에서는 사진을 읽지 못합니다. 영수증 내용을 붙여넣어 주시면 그대로 정리하겠습니다."
             : error instanceof OcrFailed
               ? "사진에서 글자를 읽지 못했습니다. 다시 찍어 보내주시거나, 내용을 붙여넣어 주십시오."
               : "사진을 읽지 못했습니다.";
@@ -554,7 +604,7 @@ function handle(
         .then((runner) =>
           runner.accept({ actor, log: ctx.logFor(owner), subject: store, request: "영수증 정리", attachment: text }),
         )
-        .then(() => { json(res, 200, { ok: true, desk: ctx.view() }); })
+        .then(() => { void ctx.flush().then(() => { json(res, 200, { ok: true, desk: ctx.view() }); }); })
         .catch(() => { json(res, 500, { ok: false, reasons: ["영수증을 정리하지 못했습니다."] }); });
     });
     return;
@@ -599,7 +649,7 @@ function handle(
             // Work may have completed. The owning department starts whatever
             // naturally follows, silently (§4).
             continueProjects(ctx.personal);
-            json(res, 200, { ok: true, desk: ctx.view() });
+            void ctx.flush().then(() => { json(res, 200, { ok: true, desk: ctx.view() }); });
           })
           .catch((error: unknown) => {
             json(res, 400, {

@@ -10,7 +10,7 @@
  * by name.
  */
 
-import type { EventLog } from "../events/log.ts";
+import type { EventStream } from "../storage/event-store.ts";
 import type { Ask } from "../events/types.ts";
 import type { ActorContext } from "../identity/types.ts";
 
@@ -18,7 +18,7 @@ import type { ActorContext } from "../identity/types.ts";
 export type AcceptInput = {
   actor: ActorContext;
   /** The stream for this capability's scope. Chosen by the store, not the runner. */
-  log: EventLog;
+  log: EventStream;
   subject: string;
   request: string;
   attachment: string;
@@ -27,7 +27,7 @@ export type AcceptInput = {
 /** What a capability is given when the representative answers its question. */
 export type AnswerInput = {
   actor: ActorContext;
-  log: EventLog;
+  log: EventStream;
   ask: Ask;
   optionId: string;
 };
@@ -35,7 +35,7 @@ export type AnswerInput = {
 /** What a capability is given when the schedule wakes it. */
 export type TickInput = {
   actor: ActorContext;
-  log: EventLog;
+  log: EventStream;
   now: Date;
 };
 

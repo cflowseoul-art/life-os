@@ -13,16 +13,34 @@
 import { existsSync } from "node:fs";
 
 import { EventLog } from "../events/log.ts";
+
 import type { ActorContext, Scope } from "../identity/types.ts";
+
+/**
+ * A stream of events: read what is there, append what happens.
+ *
+ * `EventLog` satisfies this structurally, and so does the hosted adapter — the
+ * domain never learns which one it holds.
+ */
+export type EventStream = Pick<EventLog, "read" | "append">;
+
+export type PreparedStreams = {
+  /** Loads whatever the streams need before a synchronous runner touches them. */
+  load(): Promise<void>;
+  /** Persists whatever the runners appended. */
+  flush(): Promise<void>;
+};
 
 export interface EventStore {
   /** The stream a capability of this scope writes to and reads from. */
-  logFor(context: ActorContext, scope: Scope): EventLog;
+  logFor(context: ActorContext, scope: Scope): EventStream;
   /**
    * Everything this person may read: the household stream plus their own.
    * Another member's personal stream is not in this list and cannot be.
    */
-  readableFor(context: ActorContext): EventLog[];
+  readableFor(context: ActorContext): EventStream[];
+  /** Called once per request, before and after the runners. */
+  prepare(context: ActorContext): PreparedStreams;
 }
 
 /**
@@ -31,10 +49,16 @@ export interface EventStore {
  * The path convention is this file's business only. A hosted implementation
  * keys the same two streams by (householdId) and (householdId, userId).
  */
+/** Files need no preparation: reads hit the disk when they happen. */
+export const NO_PREPARATION: PreparedStreams = {
+  load: () => Promise.resolve(),
+  flush: () => Promise.resolve(),
+};
+
 export class FileEventStore implements EventStore {
   constructor(private readonly root = process.env.LIFE_OS_ROOT ?? ".life-os") {}
 
-  logFor(context: ActorContext, scope: Scope): EventLog {
+  logFor(context: ActorContext, scope: Scope): EventStream {
     const household = context.household.id;
 
     return new EventLog(
@@ -45,7 +69,11 @@ export class FileEventStore implements EventStore {
     );
   }
 
-  readableFor(context: ActorContext): EventLog[] {
+  prepare(): PreparedStreams {
+    return NO_PREPARATION;
+  }
+
+  readableFor(context: ActorContext): EventStream[] {
     const streams = [this.logFor(context, "household"), this.logFor(context, "personal")];
 
     // Work recorded before identity existed belongs to the household owner, and
@@ -68,11 +96,15 @@ export class FileEventStore implements EventStore {
 export class LegacyEventStore implements EventStore {
   constructor(private readonly log = new EventLog(process.env.LIFE_OS_LOG)) {}
 
-  logFor(): EventLog {
+  logFor(): EventStream {
     return this.log;
   }
 
-  readableFor(): EventLog[] {
+  readableFor(): EventStream[] {
     return [this.log];
+  }
+
+  prepare(): PreparedStreams {
+    return NO_PREPARATION;
   }
 }

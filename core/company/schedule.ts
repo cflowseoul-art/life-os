@@ -12,13 +12,13 @@
 import { scheduled } from "./manifest.ts";
 import { loadRunner } from "./runner.ts";
 import { runnerModuleFor } from "./manifest.ts";
-import type { EventLog } from "../events/log.ts";
+import type { EventStream } from "../storage/event-store.ts";
 import type { ActorContext } from "../identity/types.ts";
 
 export async function runSchedule(
   kind: "household" | "personal",
   actor: ActorContext,
-  logFor: (capability: string) => EventLog,
+  logFor: (capability: string) => EventStream,
   now = new Date(),
 ): Promise<string[]> {
   const woken: string[] = [];

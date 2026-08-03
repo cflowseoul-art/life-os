@@ -355,6 +355,8 @@ function Compose({
 
         <div className="attach-zone">
           <p className="attach-label">첨부</p>
+          {/* OCR runs on the machine the server sits on; hosted deployments
+              have none yet, and the refusal says so rather than failing. */}
           <input
             type="file"
             accept="image/*"
@@ -485,6 +487,17 @@ export default function RepresentativeComputer() {
 
   useEffect(loadMe, [loadMe]);
 
+  // Which reports this person has already read. Per user, kept by the server
+  // when it has somewhere to keep it.
+  useEffect(() => {
+    if (!me?.ok) return;
+
+    fetch("/api/desk/read")
+      .then((r) => r.json() as Promise<{ ok: boolean; holdIds?: string[] }>)
+      .then((result) => { setRead(new Set(result.holdIds ?? [])); })
+      .catch(() => undefined);
+  }, [me]);
+
   useEffect(() => {
     if (!me?.ok) return;
 
@@ -567,8 +580,16 @@ export default function RepresentativeComputer() {
 
   const openWork = useCallback((work: Work) => {
     setOpenId(work.id);
+
     // Opening a finished report only clears its NEW mark. Nothing moves.
-    if (work.section === "done") setRead((r) => new Set(r).add(work.id));
+    if (work.section !== "done") return;
+
+    setRead((r) => new Set(r).add(work.id));
+    void fetch("/api/desk/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ holdId: work.id }),
+    }).catch(() => undefined);
   }, []);
 
   // j / k / Enter / Esc / 1–4 / O. Nothing destructive is bound.
