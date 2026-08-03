@@ -17,6 +17,8 @@ import { CustodyEngine } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
+import { detectProjects, projectFor } from "./company/projects.ts";
+import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
 import { templateFor } from "./reports/templates.ts";
 import type { ReportSection } from "./reports/templates.ts";
@@ -48,6 +50,8 @@ export type DeskWork = {
   decision: string | null;
   /** What the representative handed over, shown as an attachment. */
   attachment: { name: string; lines: number; preview: string[] } | null;
+  /** The project this belongs to, when the company recognised one. */
+  project: { id: string; name: string } | null;
   ask: Ask | null;
   artifact: Artifact | null;
   observations: Observation[];
@@ -56,6 +60,8 @@ export type DeskWork = {
 };
 
 export type DeskView = {
+  /** Recognised by the company, never created by the representative. */
+  projects: Project[];
   awaiting: DeskWork[];
   inProgress: DeskWork[];
   done: DeskWork[];
@@ -108,7 +114,7 @@ function attachmentFor(
   };
 }
 
-function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
+function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskWork | null {
   if (hold.state === "withdrawn") return null;
 
   const contributor = contributorFor(hold.capability);
@@ -154,6 +160,10 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     recommendation: composed.recommendation,
     decision: composed.decision,
     attachment,
+    project: (() => {
+      const p = projectFor(projects, hold.id);
+      return p ? { id: p.id, name: p.name } : null;
+    })(),
     ask: hold.outstandingAsk,
     artifact: hold.artifact,
     observations: hold.observations,
@@ -164,12 +174,14 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
 
 export function deskView(engine: CustodyEngine, log: EventLog): DeskView {
   const events = log.read();
+  const projects = detectProjects(events);
   const works = engine
     .ledger()
-    .map((hold) => toWork(hold, events))
+    .map((hold) => toWork(hold, events, projects))
     .filter((w): w is DeskWork => w !== null);
 
   return {
+    projects,
     awaiting: works.filter((w) => w.section === "awaiting"),
     inProgress: works.filter((w) => w.section === "inProgress"),
     done: works.filter((w) => w.section === "done"),
