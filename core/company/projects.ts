@@ -54,14 +54,63 @@ const CONTINUITY_SIGNALS = [
 const ONE_OFF_SIGNALS = ["한 번만", "이번만", "지금만"];
 
 /**
- * The grouping key. Two requests belong to the same project when the same
- * department owns them and they concern the same subject.
+ * Goals, per department.
  *
- * Subject is taken from what the representative wrote, not from an internal id,
- * so the identity survives re-implementation of everything below it.
+ * A project is the representative's *goal*, not the subject line they happened
+ * to write. 토스 지원, 당근 지원, 이력서 수정, 면접 준비 are four subjects and
+ * one goal: 이직 준비. The subject stays as the work item inside it.
+ *
+ * Goals are literal and few — a department has a handful of things a person
+ * pursues, not one per request. Signals are matched against everything the
+ * representative wrote, so a goal is recognised from their words, never from a
+ * question we ask them.
  */
-export function subjectKey(owner: string, company: string): string {
-  return `${owner}:${company.trim().toLowerCase()}`;
+const GOALS: { owner: string; id: string; name: string; signals: string[] }[] = [
+  {
+    owner: "career",
+    id: "job-search",
+    name: "이직 준비",
+    signals: ["공고", "지원", "채용", "이력서", "포트폴리오", "면접", "오퍼", "이직", "경력기술"],
+  },
+  {
+    owner: "home",
+    id: "household",
+    name: "살림",
+    signals: ["장보기", "주문", "재고", "냉장고", "떨어졌", "다 썼", "생필품", "살림"],
+  },
+  {
+    owner: "finance",
+    id: "spending",
+    name: "지출 정리",
+    signals: ["구독", "해지", "지출", "결제", "명세", "예산", "청구", "요금"],
+  },
+  {
+    owner: "health",
+    id: "health-care",
+    name: "건강 관리",
+    signals: ["검진", "예약", "진료", "처방", "병원", "건강"],
+  },
+];
+
+/**
+ * The grouping key: the goal the work serves, when one is recognisable.
+ *
+ * Falls back to the literal subject, so work whose goal is not yet legible
+ * still groups sensibly with its own repeats rather than being forced into
+ * someone else's project.
+ */
+export function groupKey(
+  owner: string,
+  company: string,
+  text: string,
+): { key: string; name: string; byGoal: boolean } {
+  const goal = GOALS.find(
+    (g) => g.owner === owner && g.signals.some((sig) => text.includes(sig)),
+  );
+
+  return goal
+    ? { key: `${owner}:${goal.id}`, name: goal.name, byGoal: true }
+    : { key: `${owner}:${company.trim().toLowerCase()}`, name: company, byGoal: false };
 }
 
 type HoldFacts = {
@@ -128,7 +177,7 @@ function shapeOf(fact: HoldFacts, siblings: number): { shape: WorkShape; reason:
   if (siblings > 1) {
     return {
       shape: "project",
-      reason: "같은 주제로 요청이 여러 건 이어져, 한 갈래로 묶었습니다.",
+      reason: "같은 목표로 요청이 여러 건 이어져, 한 갈래로 묶었습니다.",
     };
   }
 
@@ -161,15 +210,17 @@ function shapeOf(fact: HoldFacts, siblings: number): { shape: WorkShape; reason:
 export function detectProjects(events: EventEnvelope[]): Project[] {
   const facts = holdFacts(events);
 
-  const groups = new Map<string, HoldFacts[]>();
+  const groups = new Map<string, { name: string; members: HoldFacts[] }>();
+
   for (const fact of facts) {
-    const key = subjectKey(fact.owner, fact.company);
-    groups.set(key, [...(groups.get(key) ?? []), fact]);
+    const { key, name } = groupKey(fact.owner, fact.company, fact.text);
+    const existing = groups.get(key);
+    groups.set(key, { name, members: [...(existing?.members ?? []), fact] });
   }
 
   const projects: Project[] = [];
 
-  for (const [key, members] of groups) {
+  for (const [key, { name, members }] of groups) {
     const shapes = members.map((m) => shapeOf(m, members.length));
     const project = shapes.find((s) => s.shape === "project");
 
@@ -180,8 +231,9 @@ export function detectProjects(events: EventEnvelope[]): Project[] {
     projects.push({
       id: key,
       owner: members[0].owner,
-      // The representative's own words, never a generated title.
-      name: members[0].company,
+      // The goal, in the representative's own vocabulary. Never generated,
+      // never renamed, never asked for.
+      name,
       members: members.map((m) => ({ holdId: m.holdId, title: m.title, state: m.state })),
       reason: project.reason,
       lifecycle: open.length > 0 ? "active" : members.length > 1 ? "dormant" : "closed",
