@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { EventLog } from "../events/log.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
-import { anomalies, baselines, onlySpending } from "../capabilities/finance/ledger.ts";
+import { anomalies, baselines, monthlyUse, onlySpending } from "../capabilities/finance/ledger.ts";
 import { ALL_POLICIES_PASS, recommendationRequested, violations } from "../capabilities/finance/policy.ts";
 import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
 
@@ -110,6 +110,7 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
     // A month is only complete once the next one has begun.
     const monthComplete = months.some((m) => m.month > currentMonth);
     const found = anomalies(spending, currentMonth, 3, monthComplete);
+    const use = monthlyUse(read.transactions, currentMonth);
     const failed = violations({
       transactions: read.transactions,
       rules,
@@ -173,6 +174,21 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
                 derivedFrom: e.rows.map((r) => `거래내역 ${String(r)}행`),
               })),
             ]),
+            // How the money was used. No balance, no reserve, no remainder.
+            ...(use.income + use.fixed + use.variable + use.assetMovement === 0
+              ? []
+              : [
+                  {
+                    heading: `[관찰] 고정비 ${use.fixed.toLocaleString("ko-KR")}원 · 변동비 ${use.variable.toLocaleString("ko-KR")}원`,
+                    body: `거래내역 ${[...use.rows.fixed, ...use.rows.variable].join(", ")}행`,
+                    derivedFrom: [],
+                  },
+                  {
+                    heading: `[관찰] 수입 ${use.income.toLocaleString("ko-KR")}원 · 자산이동 ${use.assetMovement.toLocaleString("ko-KR")}원`,
+                    body: `거래내역 ${[...use.rows.income, ...use.rows.assetMovement].join(", ")}행`,
+                    derivedFrom: [],
+                  },
+                ]),
             ...found.map((a) => ({
               heading: `[추론] ${a.sentence}`,
               body: `최근 ${String(a.months)}개월 평균과 비교했습니다 · 거래내역 ${a.rows.join(", ")}행`,

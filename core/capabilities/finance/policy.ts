@@ -31,24 +31,28 @@ export type { Severity, Statement };
 /**
  * Flow, as the ledger states it.
  *
- * 거래유형 (O) is decided when the row is recorded and is the ledger's own
- * word for what this money did. Finance reads it; it does not re-derive it from
- * category names, amounts, or 분류규칙. Where Finance and the ledger could
- * disagree, there is now nothing to disagree with.
+ * 거래유형 (O), 상태 (K), 통계포함 (P) and 분류 (J) are decided when the row is
+ * recorded. Finance reads them and never re-derives them from merchant names,
+ * amounts, or 분류규칙.
  */
-export type Flow = "spending" | "transfer" | "income" | "carryover";
+export type Flow = "spending" | "assetMovement" | "income" | "snapshot";
+
+/** 저축이동 · 투자이동. Money moved, not money used. */
+const ASSET_MOVEMENT_CATEGORIES = ["저축이동", "투자이동"];
+
+/**
+ * A balance snapshot, identified only by ledger fields — never by merchant name
+ * or amount. Snapshots belong to Asset Management; Finance ignores them.
+ */
+export function isSnapshot(tx: LedgerTransaction): boolean {
+  return tx.type.trim() === "스냅샷" || tx.status.trim() === "스냅샷" || !tx.countsInStats;
+}
 
 export function flowOf(tx: LedgerTransaction): Flow {
-  const type = tx.type.trim();
+  if (isSnapshot(tx)) return "snapshot";
+  if (ASSET_MOVEMENT_CATEGORIES.includes(tx.category.trim())) return "assetMovement";
+  if (tx.type.trim() === "입금") return "income";
 
-  if (type.includes("이동")) return "transfer";
-  // The ledger has no 거래유형 for a carried balance — it records it as 입금
-  // with 분류 이월금. 분류 is a ledger field too, so this reads, not infers.
-  if (tx.category.trim() === "이월금") return "carryover";
-  if (type === "입금" || tx.status.trim() === "입금") return "income";
-  if (type === "지출" || tx.status.trim() === "출금") return "spending";
-
-  // Unknown word from the ledger: counted, never silently dropped.
   return "spending";
 }
 
@@ -79,13 +83,6 @@ function asEvidence(transactions: LedgerTransaction[], limit = 5): Statement[] {
 }
 
 /** Every operating rule the representative has set for money, as data. */
-/*
- * 월초 이월금 정책은 Finance에서 내려놓았습니다.
- *
- * 이월금은 잔액 스냅샷이지 수입이 아니고, 잔액·현금·자산 상태는 앞으로
- * Asset Management의 몫입니다. Finance는 돈이 어디에 쓰였는지만 봅니다.
- */
-
 financePolicies.register({
     id: "transfers-excluded",
     title: "이동은 통계 제외",
@@ -94,18 +91,18 @@ financePolicies.register({
     // The ledger's own per-row 통계포함 (P) is what actually counts.
     condition: (ctx) =>
       ctx.transactions.every(
-        (tx) => tx.month !== ctx.month || flowOf(tx) !== "transfer" || !tx.countsInStats,
+        (tx) => tx.month !== ctx.month || flowOf(tx) !== "assetMovement" || !tx.countsInStats,
       ),
     evidence: (ctx) =>
       asEvidence(
         ctx.transactions.filter(
-          (tx) => tx.month === ctx.month && flowOf(tx) === "transfer" && tx.countsInStats,
+          (tx) => tx.month === ctx.month && flowOf(tx) === "assetMovement" && tx.countsInStats,
         ),
       ),
     template: {
       state: (ctx) => {
         const wrong = ctx.transactions.filter(
-          (tx) => tx.month === ctx.month && flowOf(tx) === "transfer" && tx.countsInStats,
+          (tx) => tx.month === ctx.month && flowOf(tx) === "assetMovement" && tx.countsInStats,
         );
         return `이동 거래 ${String(wrong.length)}건이 통계포함 Y로 기록돼 있습니다.`;
       },
@@ -118,7 +115,10 @@ financePolicies.register({
     title: "분류 누락 없음",
     owner: "finance",
     severity: "low",
-    condition: (ctx) => ctx.transactions.every((tx) => tx.month !== ctx.month || tx.category.trim() !== ""),
+    condition: (ctx) =>
+      ctx.transactions.every(
+        (tx) => tx.month !== ctx.month || isSnapshot(tx) || tx.category.trim() !== "",
+      ),
     evidence: (ctx) =>
       asEvidence(ctx.transactions.filter((tx) => tx.month === ctx.month && tx.category.trim() === "")),
     template: {
@@ -136,14 +136,6 @@ financePolicies.register({
 export function violations(context: PolicyContext) {
   return financePolicies.evaluate(context);
 }
-
-/*
- * 투자 가능 금액 정책도 내려놓았습니다.
- *
- * 원장에서 해당 KPI가 사라졌고, 비슷한 지표를 Finance가 다시 만들지 않습니다.
- * 얼마를 투자할 수 있는지는 대표님의 결정이고, 그 판단에 필요한 상태 계산은
- * Asset Management의 일입니다.
- */
 
 export const ALL_POLICIES_PASS = "대표님께서 설정하신 운영 기준은 모두 정상입니다.";
 

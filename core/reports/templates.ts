@@ -134,11 +134,15 @@ export const finance: ReportTemplate = {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
     // Two purposes only: operating policy, and changes worth attention.
-    const policy = outcome.filter((o) => o.startsWith("[관찰]") || o.startsWith("[근거]"));
+    const use = outcome.filter((o) => /^\[관찰\] (고정비|수입)/.test(o));
+    const policy = outcome.filter(
+      (o) => (o.startsWith("[관찰]") || o.startsWith("[근거]")) && !use.includes(o),
+    );
     const changes = outcome.filter((o) => o.startsWith("[추론]"));
     const advice = outcome.filter((o) => o.startsWith("[제안]"));
 
     const sections = [
+      ...section("돈이 어디에 쓰였나", use),
       ...section("운영 기준 점검", policy),
       ...section("눈에 띄는 변화", changes),
       ...section("요청하신 의견", advice),
@@ -156,7 +160,7 @@ export const finance: ReportTemplate = {
 
     if (state === "done") {
       // Every rule kept: the policy section is not rendered at all.
-      if (policy.length === 0 && changes.length === 0) {
+      if (policy.length === 0 && changes.length === 0 && use.length === 0) {
         return {
           summary: "대표님께서 설정하신 운영 기준은 모두 정상입니다.",
           sections: [],
@@ -169,7 +173,9 @@ export const finance: ReportTemplate = {
         summary:
           policy.length > 0
             ? "운영 기준과 어긋난 항목이 있어 올립니다."
-            : "대표님께서 설정하신 운영 기준은 모두 정상입니다. 다만 평소와 다른 항목이 있어 올립니다.",
+            : changes.length > 0
+              ? "대표님께서 설정하신 운영 기준은 모두 정상입니다. 다만 평소와 다른 항목이 있어 올립니다."
+              : "대표님께서 설정하신 운영 기준은 모두 정상입니다. 이번 달 사용 내역만 정리해 올립니다.",
         sections,
         recommendation: `모든 숫자는 거래내역 행으로 확인하실 수 있습니다. ${NO_DECISION}`,
         decision: null,

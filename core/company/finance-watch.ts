@@ -15,7 +15,7 @@
 import { randomUUID } from "node:crypto";
 
 import { EventLog } from "../events/log.ts";
-import { violations } from "../capabilities/finance/policy.ts";
+import { financePolicies, violations } from "../capabilities/finance/policy.ts";
 import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
 import { advanceFinanceFromLedger } from "./finance-runner.ts";
 
@@ -24,8 +24,14 @@ function fingerprint(rows: { row: number; key: string; amount: number; month: st
   return `${String(rows.length)}:${rows.map((r) => `${r.key || String(r.row)}#${String(r.amount)}`).join(",").length.toString(36)}:${rows.at(-1)?.month ?? ""}`;
 }
 
-/** Violations already reported and not yet seen to clear. */
+/**
+ * Violations already reported and not yet seen to clear.
+ *
+ * Signatures belonging to policies that no longer exist are dropped: a retired
+ * rule leaves no residue that could suppress or resurrect a report.
+ */
 function openSignatures(log: EventLog): Set<string> {
+  const live = new Set(financePolicies.all().map((p) => p.id));
   const open = new Set<string>();
 
   for (const envelope of log.read()) {
@@ -33,7 +39,11 @@ function openSignatures(log: EventLog): Set<string> {
     if (event.type !== "HandedOver" || event.capability !== "finance") continue;
 
     const match = /^정책점검 (.+)$/.exec(event.handover.company);
-    if (match) for (const sig of match[1].split(" ")) open.add(sig);
+    if (match) {
+      for (const sig of match[1].split(" ")) {
+        if (live.has(sig.split("@")[0])) open.add(sig);
+      }
+    }
   }
 
   return open;

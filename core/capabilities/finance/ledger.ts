@@ -20,10 +20,57 @@ import { flowOf } from "./policy.ts";
  * category, it counts — the ledger's silence is not a licence to drop a row.
  */
 export function isSpending(tx: LedgerTransaction): boolean {
-  // 통계포함 (P) is the ledger's decision about whether this row counts at all,
-  // and 상태 (K) tells us whether it has happened yet — 예정 is a plan, not a
-  // payment, and counting it would overstate the month.
-  return tx.countsInStats && tx.status.trim() !== "예정" && flowOf(tx) === "spending";
+  // 상태 (K) tells us whether it has happened yet — 예정 is a plan, not a
+  // payment. Snapshots and asset movements are excluded by `flowOf`.
+  return tx.status.trim() !== "예정" && flowOf(tx) === "spending";
+}
+
+/**
+ * 고정비, as the household defines it by 분류 (J).
+ *
+ * 자동차할부 and 자동차보험 are fixed; 자동차 (충전·주차·일반) is not. The ledger
+ * keeps them as separate categories, and so does Finance.
+ */
+const FIXED_CATEGORIES = ["주거", "대출이자", "자동차할부", "자동차보험", "용돈"];
+
+export function isFixed(tx: LedgerTransaction): boolean {
+  return isSpending(tx) && FIXED_CATEGORIES.includes(tx.category.trim());
+}
+
+export type MonthlyUse = {
+  month: string;
+  income: number;
+  fixed: number;
+  variable: number;
+  assetMovement: number;
+  rows: { income: number[]; fixed: number[]; variable: number[]; assetMovement: number[] };
+};
+
+/**
+ * How money was used in a month. Nothing here is a balance, a reserve, or an
+ * amount left to spend — those are not Finance's to compute.
+ */
+export function monthlyUse(transactions: LedgerTransaction[], month: string): MonthlyUse {
+  const rows = { income: [] as number[], fixed: [] as number[], variable: [] as number[], assetMovement: [] as number[] };
+  const use = { income: 0, fixed: 0, variable: 0, assetMovement: 0 };
+
+  for (const tx of transactions) {
+    if (tx.month !== month) continue;
+
+    const value = Math.abs(tx.amount);
+    const flow = flowOf(tx);
+
+    if (flow === "snapshot") continue;
+
+    if (flow === "income") { use.income += value; rows.income.push(tx.row); continue; }
+    if (flow === "assetMovement") { use.assetMovement += value; rows.assetMovement.push(tx.row); continue; }
+    if (!isSpending(tx)) continue;
+
+    if (isFixed(tx)) { use.fixed += value; rows.fixed.push(tx.row); }
+    else { use.variable += value; rows.variable.push(tx.row); }
+  }
+
+  return { month, ...use, rows };
 }
 
 export function onlySpending(transactions: LedgerTransaction[]): LedgerTransaction[] {
