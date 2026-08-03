@@ -8,3 +8,6 @@ backups/
 lifeos_audit.txt
 *.log
 .vscode/
+
+# Runtime event streams and identity records — real household data.
+.life-os/
