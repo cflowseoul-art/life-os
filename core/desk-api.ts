@@ -16,6 +16,7 @@ import { CustodyEngine } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
+import { isStaffed, route } from "./company/routing.ts";
 import { templateFor } from "./reports/templates.ts";
 import type { ReportSection } from "./reports/templates.ts";
 
@@ -219,6 +220,22 @@ createServer((req, res) => {
         sent = JSON.parse(body || "{}") as typeof sent;
       } catch {
         json(res, 400, { ok: false, reasons: ["요청을 읽을 수 없습니다."] });
+        return;
+      }
+
+      // Operations reads the request and names one accountable department.
+      // The decision itself never leaves this process (§4).
+      const routed = route({
+        subject: sent.subject,
+        body: sent.request,
+        attachment: sent.attachment,
+      });
+
+      if (!isStaffed(routed)) {
+        json(res, 400, {
+          ok: false,
+          reasons: ["그 일을 맡을 팀이 아직 준비되지 않았습니다. 준비되는 대로 말씀드리겠습니다."],
+        });
         return;
       }
 
