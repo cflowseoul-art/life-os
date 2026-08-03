@@ -210,8 +210,10 @@ export const home: ReportTemplate = {
 
     if (state === "done") {
       const spend = outcome.find((o) => o.startsWith("지출 합계")) ?? "";
+      // Discounts are recorded facts but are not stocked items.
+      const stocked = facts.filter((f) => !f.includes(" · 할인 · ")).length;
       return {
-        summary: `영수증 정리했습니다. ${String(facts.length)}개 품목을 재고에 반영했습니다.`,
+        summary: `영수증 정리했습니다. ${String(stocked)}개 품목을 재고에 반영했습니다.`,
         sections,
         recommendation: `${spend ? `${spend}은 재무팀에 넘겼습니다. ` : ""}${NO_DECISION}`,
         decision: null,
