@@ -41,7 +41,7 @@ type Work = {
   contributor: string;
   status: string;
   report: string;
-  findings?: string[];
+  sections?: { heading: string; bullets: string[] }[];
   recommendation?: string;
   decision?: string | null;
   attachment?: { name: string; lines: number; preview: string[] } | null;
@@ -154,25 +154,14 @@ function Reading({
         <h2 className="rc__h">요약</h2>
         <p className="rc__lead">{work.report}</p>
 
-        {(work.findings ?? []).length > 0 && (
-          <>
-            <h2 className="rc__h">확인한 내용</h2>
+        {(work.sections ?? []).map((sec) => (
+          <div key={sec.heading}>
+            <h2 className="rc__h">{sec.heading}</h2>
             <ul className="rc__bullets">
-              {(work.findings ?? []).map((f) => <li key={f}>{f}</li>)}
+              {sec.bullets.map((b) => <li key={b}>{b}</li>)}
             </ul>
-          </>
-        )}
-
-        {work.artifact && (
-          <>
-            <h2 className="rc__h">정리한 순서</h2>
-            <ol className="rc__bullets">
-              {work.artifact.sections.map((sec) => (
-                <li key={sec.heading}>{sec.heading.replace(/^\d+\.\s*/, "")}</li>
-              ))}
-            </ol>
-          </>
-        )}
+          </div>
+        ))}
 
         {work.attachment && (
           <div className="rc__attachment">

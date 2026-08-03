@@ -16,6 +16,8 @@ import { CustodyEngine } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
 import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
+import { templateFor } from "./reports/templates.ts";
+import type { ReportSection } from "./reports/templates.ts";
 
 /**
  * Accountable contributors, by capability.
@@ -23,12 +25,8 @@ import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.t
  * Art. 16 (Naming): a name, so the user knows who to ask. Not a rank, not a
  * team, not a routing target. One capability, one responsible name.
  */
-const CONTRIBUTOR: Record<string, string> = {
-  career: "서junior",
-};
-
 function contributorFor(capability: string): string {
-  return CONTRIBUTOR[capability] ?? capability;
+  return templateFor(capability).contributor;
 }
 
 export type DeskWork = {
@@ -40,8 +38,8 @@ export type DeskWork = {
   status: string;
   /** 1. Summary — the conclusion, in one sentence. */
   report: string;
-  /** 2. Findings — what was actually found, as bullets. */
-  findings: string[];
+  /** 2. Findings, labelled the way the team labels them. */
+  sections: ReportSection[];
   /** 3. Recommendation. */
   recommendation: string;
   /** 4. Decision required, or null when nothing is asked of the representative. */
@@ -108,11 +106,6 @@ function attachmentFor(
   };
 }
 
-/** Findings are the observations themselves. Nothing is summarised into them. */
-function findingsFor(hold: Hold): string[] {
-  return hold.observations.map((o) => o.statement);
-}
-
 function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
   if (hold.state === "withdrawn") return null;
 
@@ -128,69 +121,38 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       what: describe(e.event),
     }));
 
-  const observed = hold.observations.length;
   const attachment = attachmentFor(hold, events);
-  const findings = findingsFor(hold);
+  const template = templateFor(hold.capability);
 
-  if (hold.state === "asking" && hold.outstandingAsk) {
-    return {
-      id: hold.id,
-      section: "awaiting",
-      title,
-      contributor,
-      status: "결정을 기다리고 있습니다",
-      report: "첫 문단에 무엇을 앞세울지 하나만 정해 주시면, 이력서 정리는 끝납니다.",
-      findings,
-      recommendation:
-        "두 가지로 좁혀 두었습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라 제가 정하지 않았습니다.",
-      decision: hold.outstandingAsk.question,
-      attachment,
-      ask: hold.outstandingAsk,
-      artifact: null,
-      observations: hold.observations,
-      history,
-      withdrawnReason: null,
-    };
-  }
+  const state = hold.state === "asking" ? "awaiting" : hold.state === "kept" ? "done" : "inProgress";
 
-  if (hold.state === "kept" && hold.artifact) {
-    return {
-      id: hold.id,
-      section: "done",
-      title,
-      contributor,
-      status: "마무리했습니다",
-      report: `이력서 정리본이 준비됐습니다. 정해 주신 순서 그대로 ${String(hold.artifact.sections.length)}개 항목을 배치했습니다.`,
-      findings,
-      recommendation:
-        "이대로 쓰셔도 됩니다. 제출은 대표님이 하실 때 따로 여쭙겠습니다. 현재 대표님께 결정을 요청드릴 사항은 없습니다.",
-      decision: null,
-      attachment,
-      ask: null,
-      artifact: hold.artifact,
-      observations: hold.observations,
-      history,
-      withdrawnReason: null,
-    };
-  }
+  const composed = template.compose({
+    state,
+    facts: hold.observations.map((o) => o.statement),
+    outcome: (hold.artifact?.sections ?? []).map((sec) => sec.heading.replace(/^\d+\.\s*/, "")),
+    question: hold.outstandingAsk?.question ?? null,
+  });
+
+  const status =
+    state === "awaiting"
+      ? "결정을 기다리고 있습니다"
+      : state === "done"
+        ? "마무리했습니다"
+        : "진행하고 있습니다";
 
   return {
     id: hold.id,
-    section: "inProgress",
+    section: state,
     title,
     contributor,
-    status: observed === 0 ? "보내주신 공고를 읽고 있습니다" : `공고에서 요건 ${String(observed)}개를 확인했습니다`,
-    report:
-      observed === 0
-        ? "보내주신 공고를 읽으며 요건을 뽑고 있습니다."
-        : `공고 요건을 정리하고 있습니다. 지금까지 ${String(observed)}개를 뽑았습니다.`,
-    findings,
-    recommendation:
-      "지금 대표님께서 하실 일은 없습니다. 첫 문단 순서를 정하실 시점이 오면 바로 올려드리겠습니다.",
-    decision: null,
+    status,
+    report: composed.summary,
+    sections: composed.sections,
+    recommendation: composed.recommendation,
+    decision: composed.decision,
     attachment,
-    ask: null,
-    artifact: null,
+    ask: hold.outstandingAsk,
+    artifact: hold.artifact,
     observations: hold.observations,
     history,
     withdrawnReason: null,
