@@ -139,10 +139,10 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       title,
       contributor,
       status: "결정을 기다리고 있습니다",
-      report: `공고 요건 ${String(observed)}개를 확인했습니다. 첫 문단에 무엇을 앞세울지만 정해 주시면 됩니다.`,
+      report: "첫 문단에 무엇을 앞세울지 하나만 정해 주시면, 이력서 정리는 끝납니다.",
       findings,
       recommendation:
-        "우열은 제가 정하지 않았습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라, 두 가지로 좁혀 두었습니다.",
+        "두 가지로 좁혀 두었습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라 제가 정하지 않았습니다.",
       decision: hold.outstandingAsk.question,
       attachment,
       ask: hold.outstandingAsk,
@@ -160,9 +160,10 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
       title,
       contributor,
       status: "마무리했습니다",
-      report: "정해 주신 순서대로 정리해서 올려드립니다.",
+      report: `이력서 정리본이 준비됐습니다. 정해 주신 순서 그대로 ${String(hold.artifact.sections.length)}개 항목을 배치했습니다.`,
       findings,
-      recommendation: "이대로 쓰셔도 됩니다. 제출은 대표님이 하실 때 따로 여쭙겠습니다.",
+      recommendation:
+        "이대로 쓰셔도 됩니다. 제출은 대표님이 하실 때 따로 여쭙겠습니다. 현재 대표님께 결정을 요청드릴 사항은 없습니다.",
       decision: null,
       attachment,
       ask: null,
@@ -179,9 +180,13 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
     title,
     contributor,
     status: observed === 0 ? "보내주신 공고를 읽고 있습니다" : `공고에서 요건 ${String(observed)}개를 확인했습니다`,
-    report: "맡아 두었습니다. 지금 대표님께서 하실 일은 없습니다.",
+    report:
+      observed === 0
+        ? "보내주신 공고를 읽는 중이라, 아직 말씀드릴 결과가 없습니다."
+        : "아직 대표님 판단이 필요한 지점은 나오지 않았습니다.",
     findings,
-    recommendation: "판단이 필요한 지점에 닿으면 그때 올려드리겠습니다.",
+    recommendation:
+      "판단이 필요한 지점이 나오면 그때 올려드리겠습니다. 현재 대표님께 결정을 요청드릴 사항은 없습니다.",
     decision: null,
     attachment,
     ask: null,
