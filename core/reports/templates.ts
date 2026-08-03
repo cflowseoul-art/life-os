@@ -196,7 +196,11 @@ export const home: ReportTemplate = {
 
     const sections = [
       ...section("구입 품목", facts),
-      ...section("재고 반영", outcome.filter((o) => !o.startsWith("지출 합계"))),
+      // Discounts belong to the receipt, not to what is now in the house.
+      ...section(
+        "재고 반영",
+        outcome.filter((o) => !o.startsWith("지출 합계") && !/-[\d,]+원$/.test(o)),
+      ),
     ];
 
     if (state === "awaiting") {

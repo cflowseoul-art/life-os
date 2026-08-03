@@ -48,8 +48,29 @@ export type Receipt = {
 const NOT_AN_ITEM =
   /^(합계|총액|소계|결제|카드|현금|받은|거스름|부가세|과세|면세|승인|포인트|적립|잔액|매출|주소|전화|사업자)/;
 
+/**
+ * The same, in English. `\b` is meaningless after a Korean character in
+ * JavaScript, so the two alphabets need two expressions rather than one.
+ */
+const NOT_AN_ITEM_EN =
+  /^(total|subtotal|sub-total|sum|cash|change|payment|balance|vat|tax|amount due|approval|card|due)\b/i;
+
 /** Discount lines. Real, but they take money off rather than adding an item. */
 const DISCOUNT = /^(할인|행사할인|쿠폰|에누리|즉시할인|멤버십할인|카드할인)/;
+
+/**
+ * A quantity line in the two-line layout convenience stores print:
+ *
+ *     삼각김밥 참치마요
+ *     1개 x 1,300      1,300
+ *
+ * The product is on the line above; this line carries only how many and how
+ * much. Read alone it would enter inventory as an item called "1개 x 1,300".
+ */
+const QUANTITY_LINE = /^(\d+)\s*(개|봉|팩|병|캔|입|박스|세트|줄|장|롤|포)?\s*[x×X*]\s*[\d,]*$/;
+
+/** A line that is nothing but an amount — a wrapped line total. */
+const BARE_AMOUNT = /^[\d,]+\s*원?$/;
 
 /** A date or a time ends in digits and buys nothing. */
 const DATE_OR_TIME = /^\d{2,4}[-./]\d{1,2}[-./]\d{1,2}|^\d{1,2}:\d{2}/;
@@ -118,30 +139,81 @@ function splitQuantity(head: string): { name: string; quantity: number; unit: st
 export function readReceipt(text: string): Receipt {
   const items: ReceiptItem[] = [];
   const discounts: { label: string; amount: number; line: number }[] = [];
+  const lines = text.split("\n").map((l) => l.trim());
 
-  text.split("\n").forEach((raw, index) => {
-    const line = raw.trim();
-    if (line === "" || NOT_AN_ITEM.test(line) || DATE_OR_TIME.test(line)) return;
+  /** The most recent line that looked like a product name and was not used. */
+  let pendingName: { name: string; line: number } | null = null;
+
+  lines.forEach((line, index) => {
+    if (
+      line === ""
+      || NOT_AN_ITEM.test(line)
+      || NOT_AN_ITEM_EN.test(line)
+      || DATE_OR_TIME.test(line)
+    ) {
+      pendingName = null;
+      return;
+    }
 
     const amountMatch = AMOUNT.exec(line);
-    if (!amountMatch) return;
+
+    if (!amountMatch) {
+      // No amount: this is a product name waiting for its quantity line.
+      pendingName = { name: line, line: index + 1 };
+      return;
+    }
 
     const amount = Number(amountMatch[1].replace(/,/g, ""));
-    if (Number.isNaN(amount)) return;
+    if (Number.isNaN(amount)) {
+      pendingName = null;
+      return;
+    }
 
     const head = line.slice(0, amountMatch.index).trim();
-    if (head === "") return;
 
     // A discount line, or any negative amount, takes money off.
     if (DISCOUNT.test(line) || amount < 0) {
-      discounts.push({ label: head, amount: Math.abs(amount), line: index + 1 });
+      discounts.push({ label: head === "" ? line : head, amount: Math.abs(amount), line: index + 1 });
+      pendingName = null;
+      return;
+    }
+
+    // Two-line layout: quantity and price under a product name.
+    if (pendingName && (head === "" || QUANTITY_LINE.test(head) || BARE_AMOUNT.test(line))) {
+      const counted = /^(\d+)\s*(개|봉|팩|병|캔|입|박스|세트|줄|장|롤|포)?/.exec(head);
+      const quantity = counted ? Number(counted[1]) : 1;
+
+      // The line total may wrap onto the next line: `2개 x 1,700` / `3,400`.
+      const next = lines[index + 1] ?? "";
+      const wrapped = BARE_AMOUNT.test(next) ? Number(next.replace(/[,원]/g, "")) : NaN;
+      const total = Number.isNaN(wrapped) ? amount : wrapped;
+
+      items.push({
+        name: pendingName.name,
+        quantity,
+        unit: counted?.[2] ?? null,
+        amount: total,
+        line: pendingName.line,
+      });
+
+      pendingName = null;
+      if (!Number.isNaN(wrapped)) lines[index + 1] = "";
+      return;
+    }
+
+    if (head === "") {
+      pendingName = null;
       return;
     }
 
     const { name, quantity, unit } = splitQuantity(head);
-    if (name === "" || /^[\d,.\s]+$/.test(name)) return;
+    if (name === "" || /^[\d,.\s]+$/.test(name)) {
+      pendingName = null;
+      return;
+    }
 
     items.push({ name, quantity, unit, amount, line: index + 1 });
+    pendingName = null;
   });
 
   const total =
