@@ -39,6 +39,7 @@ type Work = {
   section: "awaiting" | "inProgress" | "done";
   title: string;
   contributor: string;
+  contributorTitle?: string;
   status: string;
   report: string;
   sections?: { heading: string; bullets: string[] }[];
@@ -176,7 +177,9 @@ function Reading({
         <span className="rc__avatar">{work.contributor.slice(0, 1)}</span>
         <span>
           <span className="rc__name">{work.contributor}</span>
-          <span className="rc__from-sub">{work.status}</span>
+          <span className="rc__from-sub">
+            {work.contributorTitle ? `${work.contributorTitle} · ` : ""}{work.status}
+          </span>
         </span>
         <span className="rc__time">{lastMoved(work)}</span>
       </div>
@@ -548,7 +551,7 @@ export default function RepresentativeComputer() {
         <div className="rc__list">
           {accepted && (
             <div className="rc__notice">
-              <h2>김리서치</h2>
+              <h2>Seo Biseo · CEO Office Manager</h2>
               <p>맡았습니다.</p>
               <p>현재 적절한 팀에 배정하고 있습니다.</p>
               <p className="rc__fine">대표님 판단이 필요한 때에 다시 올려드리겠습니다.</p>

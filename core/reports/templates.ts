@@ -13,6 +13,8 @@
  * capability observed, and every count is the length of a real array.
  */
 
+import { employeeFor } from "../company/employees.ts";
+
 /** What a template is given. Buckets are generic; labels are the team's job. */
 export type ReportInput = {
   state: "awaiting" | "inProgress" | "done";
@@ -80,7 +82,7 @@ const NO_DECISION = "현재 대표님께 결정을 요청드릴 사항은 없습
 
 export const career: ReportTemplate = {
   capability: "career",
-  contributor: "서junior",
+  contributor: employeeFor("career").fullName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("이 건은", "준비되는 대로 바로 올려드리겠습니다.");
 
@@ -129,7 +131,7 @@ export const career: ReportTemplate = {
 
 export const finance: ReportTemplate = {
   capability: "finance",
-  contributor: "윤senior",
+  contributor: employeeFor("finance").fullName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -193,7 +195,7 @@ export const finance: ReportTemplate = {
 
 export const health: ReportTemplate = {
   capability: "health",
-  contributor: "민경",
+  contributor: employeeFor("health").fullName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("건강 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -222,7 +224,7 @@ export const health: ReportTemplate = {
 
 export const home: ReportTemplate = {
   capability: "home",
-  contributor: "한별",
+  contributor: employeeFor("home").fullName,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("살림 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -277,7 +279,7 @@ export const home: ReportTemplate = {
 /** Operations holds a request only until a domain department is accountable. */
 export const operations: ReportTemplate = {
   capability: "operations",
-  contributor: "운영",
+  contributor: employeeFor("operations").fullName,
   compose: () => notYetStaffed(
     "이 건은",
     "담당 부서가 정해지는 대로 그 팀이 이어받아 올려드리겠습니다.",
@@ -291,7 +293,7 @@ export function templateFor(capability: string): ReportTemplate {
   return (
     TEMPLATES.find((t) => t.capability === capability) ?? {
       capability,
-      contributor: capability,
+      contributor: employeeFor(capability).fullName,
       compose: ({ state, staffed, facts, question }) => (!staffed
         ? notYetStaffed("이 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.")
         : {

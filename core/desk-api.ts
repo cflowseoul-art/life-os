@@ -26,6 +26,7 @@ import { readReceipt } from "./capabilities/home/index.ts";
 import { detectProjects, projectFor } from "./company/projects.ts";
 import type { Project } from "./company/projects.ts";
 import { isStaffed, route } from "./company/routing.ts";
+import { signature } from "./company/employees.ts";
 import { templateFor } from "./reports/templates.ts";
 import type { ReportSection } from "./reports/templates.ts";
 
@@ -43,7 +44,10 @@ export type DeskWork = {
   id: string;
   section: "awaiting" | "inProgress" | "done";
   title: string;
+  /** The person who signs this report. */
   contributor: string;
+  /** Their title, e.g. "Finance Manager". The department is metadata only. */
+  contributorTitle: string;
   /** Plain-language state, derived from the hold. */
   status: string;
   /** 1. Summary — the conclusion, in one sentence. */
@@ -124,6 +128,7 @@ function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskW
   if (hold.state === "withdrawn") return null;
 
   const contributor = contributorFor(hold.capability);
+  const sign = signature(hold.capability);
   const title = `${hold.company} · ${hold.role}`;
 
   const history = events
@@ -159,7 +164,8 @@ function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskW
     id: hold.id,
     section: state,
     title,
-    contributor,
+    contributor: sign.name,
+    contributorTitle: sign.title,
     status,
     report: composed.summary,
     sections: composed.sections,
