@@ -141,7 +141,7 @@ function toWork(hold: Hold, events: EventEnvelope[], projects: Project[]): DeskW
 
   const composed = template.compose({
     state,
-    staffed: hold.capability === "career" || hold.capability === "home",
+    staffed: ["career", "home", "finance"].includes(hold.capability),
     facts: hold.observations.map((o) => o.statement),
     outcome: (hold.artifact?.sections ?? []).map((sec) => sec.heading.replace(/^\d+\.\s*/, "")),
     question: hold.outstandingAsk?.question ?? null,

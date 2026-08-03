@@ -133,13 +133,15 @@ export const finance: ReportTemplate = {
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
-    const recurring = outcome.filter((o) => !o.includes("1회성"));
-    const once = outcome.filter((o) => o.includes("1회성"));
+    // Two purposes only: operating policy, and changes worth attention.
+    const policy = outcome.filter((o) => o.startsWith("[관찰]") || o.startsWith("[근거]"));
+    const changes = outcome.filter((o) => o.startsWith("[추론]"));
+    const advice = outcome.filter((o) => o.startsWith("[제안]"));
 
     const sections = [
-      ...section("정기 결제", recurring),
-      ...section("1회성 지출", once),
-      ...section("명세에서 확인한 청구", facts),
+      ...section("운영 기준 점검", policy),
+      ...section("눈에 띄는 변화", changes),
+      ...section("요청하신 의견", advice),
     ];
 
     if (state === "awaiting") {
@@ -153,10 +155,22 @@ export const finance: ReportTemplate = {
     }
 
     if (state === "done") {
+      if (policy.length === 0 && changes.length === 0) {
+        return {
+          summary: "가계부 기준으로 특별히 보고드릴 사항이 없습니다.",
+          sections: [],
+          recommendation: NO_DECISION,
+          decision: null,
+        };
+      }
+
       return {
-        summary: `정기 결제 ${String(recurring.length)}건을 정리했습니다.`,
+        summary:
+          policy.length > 0
+            ? "운영 기준과 어긋난 항목이 있어 올립니다."
+            : "평소와 다른 항목이 있어 올립니다.",
         sections,
-        recommendation: `주기와 금액은 기억해 두겠습니다. ${NO_DECISION}`,
+        recommendation: `모든 숫자는 거래내역 행으로 확인하실 수 있습니다. ${NO_DECISION}`,
         decision: null,
       };
     }

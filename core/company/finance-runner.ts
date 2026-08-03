@@ -12,6 +12,7 @@ import { EventLog } from "../events/log.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
 import { anomalies, baselines, onlySpending } from "../capabilities/finance/ledger.ts";
+import { checkPolicies, recommendationRequested } from "../capabilities/finance/policy.ts";
 import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
 
 type FinanceHold = {
@@ -105,21 +106,33 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
 
     // The ledger's own rules decide what is spending (분류규칙 · 통계포함).
     const spending = onlySpending(read.transactions, rules);
+    const months = baselines(spending);
     // A month is only complete once the next one has begun.
     const monthComplete = months.some((m) => m.month > currentMonth);
     const found = anomalies(spending, currentMonth, 3, monthComplete);
-    const thisMonth = months.find((m) => m.month === currentMonth);
+    const violations = checkPolicies(read.transactions, rules, currentMonth);
+    const asked = recommendationRequested(hold.text);
 
+    // Statements are recorded with their kind. Nothing normal is recorded:
+    // a kept policy and an unremarkable month both produce silence (Art. 2).
     if (!hold.observed) {
-      for (const [index, anomaly] of found.entries()) {
+      const statements = [
+        ...violations.flatMap((v) => [
+          { kind: "관찰", text: `${v.policy} — ${v.state.text}`, rows: v.state.rows },
+          { kind: "관찰", text: `운영 기준: ${v.expected}`, rows: [] as number[] },
+        ]),
+        ...found.map((a) => ({ kind: "추론", text: a.sentence, rows: a.rows })),
+      ];
+
+      for (const [index, statement] of statements.entries()) {
         log.append(
           {
             type: "ObservationRecorded",
             holdId: hold.holdId,
             observation: {
-              id: `anomaly-${String(index + 1)}`,
-              statement: anomaly.sentence,
-              source: `거래내역 ${anomaly.rows.join(", ")}행`,
+              id: `statement-${String(index + 1)}`,
+              statement: `[${statement.kind}] ${statement.text}`,
+              source: statement.rows.length > 0 ? `거래내역 ${statement.rows.join(", ")}행` : "분류규칙",
               acquiredAt: now,
               confidence: 1,
             },
@@ -131,28 +144,43 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
       }
     }
 
+    const nothingToSay = violations.length === 0 && found.length === 0;
+
     log.append(
       {
         type: "ArtifactKept",
         holdId: hold.holdId,
         artifact: {
           id: `ledger-${currentMonth}`,
-          title: thisMonth
-            ? `${currentMonth} 지출 ${thisMonth.total.toLocaleString("ko-KR")}원`
-            : `${currentMonth} 지출 기록 없음`,
+          title: nothingToSay
+            ? `${currentMonth} · 보고드릴 사항 없음`
+            : `${currentMonth} · 운영 기준 ${String(violations.length)}건 · 변화 ${String(found.length)}건`,
           sections: [
-            ...found.map((a, i) => ({
-              heading: a.sentence,
-              body: `거래내역 ${a.rows.join(", ")}행 · 평균은 최근 ${String(a.months)}개월 기준입니다.`,
-              derivedFrom: [`anomaly-${String(i + 1)}`],
-            })),
-            ...Object.entries(thisMonth?.byCategory ?? {})
-              .sort((a, b) => b[1] - a[1])
-              .map(([category, amount]) => ({
-                heading: `${category} ${amount.toLocaleString("ko-KR")}원`,
-                body: `거래내역 ${(thisMonth?.rowsByCategory[category] ?? []).join(", ")}행`,
-                derivedFrom: [],
+            ...violations.flatMap((v) => [
+              {
+                heading: `[관찰] ${v.state.text}`,
+                body: `운영 기준: ${v.expected}`,
+                derivedFrom: v.state.rows.map((r) => `거래내역 ${String(r)}행`),
+              },
+              ...v.evidence.map((e) => ({
+                heading: `[근거] ${e.text}`,
+                body: `거래내역 ${e.rows.join(", ")}행`,
+                derivedFrom: e.rows.map((r) => `거래내역 ${String(r)}행`),
               })),
+            ]),
+            ...found.map((a) => ({
+              heading: `[추론] ${a.sentence}`,
+              body: `최근 ${String(a.months)}개월 평균과 비교했습니다 · 거래내역 ${a.rows.join(", ")}행`,
+              derivedFrom: a.rows.map((r) => `거래내역 ${String(r)}행`),
+            })),
+            // A recommendation exists only when it was asked for.
+            ...(asked && (violations.length > 0 || found.length > 0)
+              ? [{
+                  heading: "[제안] 요청하신 의견입니다",
+                  body: "판단에 필요한 사실만 위에 정리했습니다. 어떤 쪽을 보실지 말씀해 주시면 그 기준으로 다시 정리하겠습니다.",
+                  derivedFrom: [],
+                }]
+              : []),
           ],
         },
       },

@@ -9,6 +9,7 @@
  */
 
 import type { CategoryRule, LedgerTransaction } from "../../infrastructure/ledger/dugong.ts";
+import { flowOf } from "./policy.ts";
 
 /**
  * Spending, as the ledger itself defines it.
@@ -19,8 +20,7 @@ import type { CategoryRule, LedgerTransaction } from "../../infrastructure/ledge
  * category, it counts — the ledger's silence is not a licence to drop a row.
  */
 export function isSpending(tx: LedgerTransaction, rules: Map<string, CategoryRule>): boolean {
-  const rule = rules.get(tx.category.trim());
-  return rule ? rule.countsAsSpending : true;
+  return flowOf(tx, rules) === "spending";
 }
 
 export function onlySpending(
