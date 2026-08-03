@@ -52,6 +52,9 @@ export function readReceipt(text: string): ReceiptItem[] {
     // Totals are not purchases. They are the sum of purchases.
     if (/^(합계|총액|결제|카드|받은돈|거스름|부가세)/.test(line)) return;
 
+    // Dates and times end in digits but buy nothing.
+    if (/^\d{2,4}[-./]\d{1,2}[-./]\d{1,2}/.test(line) || /^\d{1,2}:\d{2}/.test(line)) return;
+
     const amountMatch = AMOUNT.exec(line);
     if (!amountMatch) return;
 
