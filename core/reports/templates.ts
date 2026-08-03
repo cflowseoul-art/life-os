@@ -212,6 +212,15 @@ export const home: ReportTemplate = {
       };
     }
 
+    if (state === "done" && outcome.some((o) => o.startsWith("장보기 목록"))) {
+      return {
+        summary: "장보기 목록에 올려두었습니다.",
+        sections: [...section("장보기 목록", outcome)],
+        recommendation: `다음에 장 보실 때 함께 챙기겠습니다. ${NO_DECISION}`,
+        decision: null,
+      };
+    }
+
     if (state === "done") {
       const spend = outcome.find((o) => o.startsWith("지출 합계")) ?? "";
       // Discounts are recorded facts but are not stocked items.

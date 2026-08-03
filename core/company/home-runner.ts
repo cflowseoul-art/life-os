@@ -13,6 +13,7 @@
 import { EventLog } from "../events/log.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as home from "../capabilities/home/index.ts";
+import { matchProduct, preferences, remember, statedPreference } from "../capabilities/home/memory.ts";
 
 type HomeHold = { holdId: string; store: string; text: string; observed: boolean; kept: boolean };
 
@@ -56,10 +57,79 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
 
     const text = ocr(hold.text);
     const receipt = home.readReceipt(text);
-
-    if (receipt.items.length === 0) continue;
-
     const actor = { kind: "capability" as const, id: home.CAPABILITY_ID };
+    const now = new Date().toISOString();
+
+    // Not a receipt. Did the representative say something ran out?
+    if (receipt.items.length === 0) {
+      const word = home.readDepletion(text);
+      if (word === null) continue;
+
+      const events = log.read();
+      const memory = remember(events);
+      const product = matchProduct(memory, word);
+      const stated = statedPreference(text, now, "대표님 말씀");
+      const known = preferences(events).find((p) => p.about.includes(word));
+
+      if (!hold.observed) {
+        log.append(
+          {
+            type: "ObservationRecorded",
+            holdId: hold.holdId,
+            observation: {
+              id: "depletion",
+              statement: `${word} · 소진`,
+              source: "대표님 말씀",
+              acquiredAt: now,
+              confidence: 1,
+            },
+          },
+          actor,
+          home.CAPABILITY_ID,
+          "home",
+        );
+
+        // A preference is recorded only when it was said out loud.
+        if (stated) {
+          log.append(
+            {
+              type: "ObservationRecorded",
+              holdId: hold.holdId,
+              observation: {
+                id: "preference",
+                statement: `선호 · ${stated.about}`,
+                source: "대표님 말씀",
+                acquiredAt: now,
+                confidence: 1,
+              },
+            },
+            actor,
+            home.CAPABILITY_ID,
+            "home",
+          );
+        }
+      }
+
+      log.append(
+        {
+          type: "ArtifactKept",
+          holdId: hold.holdId,
+          artifact: home.proposeShoppingEntry({
+            word,
+            product: product?.name ?? null,
+            quantity: product?.usualQuantity ?? null,
+            lastBought: product?.lastBought ?? null,
+            repeatDays: product?.repeatDays ?? null,
+            preference: stated?.about ?? known?.about ?? null,
+          }),
+        },
+        actor,
+        home.CAPABILITY_ID,
+        "home",
+      );
+
+      continue;
+    }
 
     if (!hold.observed) {
       for (const observation of home.observe(text, new Date().toISOString())) {

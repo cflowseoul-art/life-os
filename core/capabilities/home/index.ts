@@ -295,3 +295,69 @@ export function factualNumbers(receipt: Receipt): Set<number> {
 
   return allowed;
 }
+
+
+/**
+ * A statement that something ran out.
+ *
+ * Only an explicit statement changes household state — nothing is inferred from
+ * time passing, from a recipe, or from how much was bought. If the
+ * representative did not say it, it did not happen.
+ */
+const DEPLETION = /(.+?)\s*(?:다\s*썼|떨어졌|떨어짐|다\s*먹었|없어졌|다\s*쓴)/;
+
+export function readDepletion(text: string): string | null {
+  for (const raw of text.split(/[\n.,]/)) {
+    const match = DEPLETION.exec(raw.trim());
+    if (match) {
+      const name = match[1].replace(/^(이제|우리|집에|그|저)\s*/, "").trim();
+      if (name !== "") return name;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The shopping list entry a depletion produces.
+ *
+ * Quantity comes from what the household usually buys, and only when that is
+ * known from two or more purchases. Brand appears only if the representative
+ * stated one. Everything else is left out rather than assumed.
+ */
+export function proposeShoppingEntry(input: {
+  word: string;
+  product: string | null;
+  quantity: number | null;
+  lastBought: string | null;
+  repeatDays: number | null;
+  preference: string | null;
+}): Artifact {
+  const sections: Artifact["sections"] = [
+    {
+      heading: `장보기 목록 · ${input.product ?? input.word}${input.quantity ? ` ${String(input.quantity)}개` : ""}`,
+      body: "장보기 목록에 올렸습니다.",
+      derivedFrom: ["depletion"],
+    },
+  ];
+
+  if (input.lastBought) {
+    sections.push({
+      heading: `마지막 구매 ${input.lastBought.slice(0, 10)}`,
+      body: input.repeatDays === null
+        ? "구매 기록에서 확인했습니다."
+        : `보통 ${String(input.repeatDays)}일에 한 번 사셨습니다.`,
+      derivedFrom: ["history"],
+    });
+  }
+
+  if (input.preference) {
+    sections.push({
+      heading: `말씀하신 선호 · ${input.preference}`,
+      body: "직접 말씀하신 내용만 반영합니다.",
+      derivedFrom: ["preference"],
+    });
+  }
+
+  return { id: `shopping-${input.word}`, title: `장보기 · ${input.word}`, sections };
+}
