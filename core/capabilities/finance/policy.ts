@@ -1,5 +1,8 @@
 /**
- * Operating policy checks.
+ * Finance's operating policies.
+ *
+ * Definitions only. Evaluation, ordering, and suppression of passing rules
+ * belong to the company-wide policy engine — Finance is one consumer of it.
  *
  * Finance reports have exactly two purposes: whether the representative's own
  * operating rules are being followed, and changes that deserve their attention.
@@ -14,7 +17,11 @@
  * own and writes nothing.
  */
 
+import { defineRegistry } from "../../company/policy-engine.ts";
+import type { PolicyDefinition, Severity, Statement } from "../../company/policy-engine.ts";
 import type { CategoryRule, LedgerTransaction } from "../../infrastructure/ledger/dugong.ts";
+
+export type { Severity, Statement };
 
 /**
  * The ledger's own vocabulary.
@@ -40,59 +47,15 @@ export function flowOf(tx: LedgerTransaction, rules: Map<string, CategoryRule>):
   return "spending";
 }
 
-/** A statement, and what kind of statement it is. */
-export type Statement = {
-  kind: "관찰" | "추론" | "제안";
-  text: string;
-  /** 거래내역 rows behind it. */
-  rows: number[];
-};
-
-export type Severity = "low" | "medium" | "high";
-
-/** Everything a policy is evaluated against. Read-only. */
+/** Everything Finance evaluates policies against. Read-only. */
 export type PolicyContext = {
   transactions: LedgerTransaction[];
   rules: Map<string, CategoryRule>;
   month: string;
 };
 
-/**
- * A policy is data, not code.
- *
- * `condition` answers one question — does the rule hold? — and everything the
- * report says is built from `evidence` and `template`. Adding a policy means
- * adding an entry to the registry; no evaluation logic changes, and no
- * department gains a special case.
- *
- * A policy may never propose a fix or perform an action. There is nowhere in
- * this shape to put one (Art. 6).
- */
-export type PolicyDefinition = {
-  id: string;
-  title: string;
-  /** The department accountable for the rule. */
-  owner: string;
-  severity: Severity;
-  /** True when the representative's rule is being followed. */
-  condition(context: PolicyContext): boolean;
-  /** The rows that demonstrate the current state. */
-  evidence(context: PolicyContext): Statement[];
-  template: {
-    /** What the ledger currently shows. */
-    state(context: PolicyContext): string;
-    /** The rule, as the representative set it. */
-    expected: string;
-  };
-};
-
-export type PolicyResult = {
-  policy: PolicyDefinition;
-  passed: boolean;
-  state: Statement;
-  expected: string;
-  evidence: Statement[];
-};
+/** Finance's registry. The engine owns evaluation; Finance owns the rules. */
+export const financePolicies = defineRegistry<PolicyContext>("finance");
 
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
@@ -111,11 +74,8 @@ function asEvidence(transactions: LedgerTransaction[], limit = 5): Statement[] {
   }));
 }
 
-/**
- * The registry. Every operating rule the representative has set, as data.
- */
-export const POLICIES: PolicyDefinition[] = [
-  {
+/** Every operating rule the representative has set for money, as data. */
+financePolicies.register({
     id: "carryover-zero",
     title: "월초 이월금 0원",
     owner: "finance",
@@ -130,8 +90,9 @@ export const POLICIES: PolicyDefinition[] = [
       },
       expected: "월초 이월금은 0원이어야 합니다.",
     },
-  },
-  {
+});
+
+financePolicies.register({
     id: "transfers-excluded",
     title: "이동은 통계 제외",
     owner: "finance",
@@ -153,8 +114,9 @@ export const POLICIES: PolicyDefinition[] = [
       },
       expected: "저축·투자·카드대금 이동은 통계에서 제외돼야 합니다.",
     },
-  },
-  {
+});
+
+financePolicies.register({
     id: "rows-classified",
     title: "분류 누락 없음",
     owner: "finance",
@@ -174,35 +136,11 @@ export const POLICIES: PolicyDefinition[] = [
       },
       expected: "모든 거래에 분류가 있어야 합니다.",
     },
-  },
-];
+});
 
-/** Evaluates the registry. Order follows severity, worst first. */
-export function evaluatePolicies(context: PolicyContext, registry = POLICIES): PolicyResult[] {
-  const weight: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
-
-  return registry
-    .map((policy) => {
-      const passed = policy.condition(context);
-
-      return {
-        policy,
-        passed,
-        state: {
-          kind: "관찰" as const,
-          text: passed ? `${policy.title} — 정상입니다.` : policy.template.state(context),
-          rows: passed ? [] : policy.evidence(context).flatMap((e) => e.rows),
-        },
-        expected: policy.template.expected,
-        evidence: passed ? [] : policy.evidence(context),
-      };
-    })
-    .sort((a, b) => weight[a.policy.severity] - weight[b.policy.severity]);
-}
-
-/** Only the rules that are not being followed. A kept rule is not news. */
-export function violations(context: PolicyContext, registry = POLICIES): PolicyResult[] {
-  return evaluatePolicies(context, registry).filter((r) => !r.passed);
+/** Only the rules that are not being followed. Evaluation lives in the engine. */
+export function violations(context: PolicyContext) {
+  return financePolicies.evaluate(context);
 }
 
 export const ALL_POLICIES_PASS = "대표님께서 설정하신 운영 기준은 모두 정상입니다.";
