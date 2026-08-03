@@ -16,6 +16,11 @@
 /** What a template is given. Buckets are generic; labels are the team's job. */
 export type ReportInput = {
   state: "awaiting" | "inProgress" | "done";
+  /**
+   * False when the department owns the work but cannot execute it yet. The
+   * department still reports: what it has, and what is not yet supported.
+   */
+  staffed: boolean;
   /** What the capability observed, verbatim. */
   facts: string[];
   /** What the capability produced, in order. Empty until work completes. */
@@ -45,6 +50,27 @@ export type ReportTemplate = {
   compose(input: ReportInput): ComposedReport;
 };
 
+/**
+ * A department that owns work it cannot execute yet says so plainly: it keeps
+ * the work, states the limit, and names what happens next. Never a refusal.
+ */
+function notYetStaffed(what: string, next: string): ComposedReport {
+  return {
+    summary: `${what} 저희 팀이 맡고 있습니다.`,
+    sections: [
+      {
+        heading: "지금 상태",
+        bullets: [
+          "요청은 그대로 보관돼 있고, 사라지지 않습니다.",
+          "아직 저희 쪽에서 대신 처리해 드릴 수 있는 단계가 아닙니다.",
+        ],
+      },
+    ],
+    recommendation: `${next} 현재 대표님께 결정을 요청드릴 사항은 없습니다.`,
+    decision: null,
+  };
+}
+
 /** Sections with nothing in them are omitted, never rendered empty. */
 function section(heading: string, bullets: string[]): ReportSection[] {
   return bullets.length > 0 ? [{ heading, bullets }] : [];
@@ -55,7 +81,9 @@ const NO_DECISION = "현재 대표님께 결정을 요청드릴 사항은 없습
 export const career: ReportTemplate = {
   capability: "career",
   contributor: "서junior",
-  compose({ state, facts, outcome, question }) {
+  compose({ state, staffed, facts, outcome, question }) {
+    if (!staffed) return notYetStaffed("이 건은", "준비되는 대로 바로 올려드리겠습니다.");
+
     const sections = [
       ...section("공고 요건", facts),
       ...section("추천 포지셔닝", outcome),
@@ -102,7 +130,9 @@ export const career: ReportTemplate = {
 export const finance: ReportTemplate = {
   capability: "finance",
   contributor: "윤senior",
-  compose({ state, facts, outcome, question }) {
+  compose({ state, staffed, facts, outcome, question }) {
+    if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
+
     const sections = [
       ...section("핵심 수치", facts),
       ...section("분석", outcome),
@@ -132,7 +162,9 @@ export const finance: ReportTemplate = {
 export const health: ReportTemplate = {
   capability: "health",
   contributor: "민경",
-  compose({ state, facts, outcome, question }) {
+  compose({ state, staffed, facts, outcome, question }) {
+    if (!staffed) return notYetStaffed("건강 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
+
     const sections = [
       ...section("현재 상태", facts),
       ...section("살펴봐야 할 점", outcome),
@@ -156,10 +188,12 @@ export const health: ReportTemplate = {
   },
 };
 
-export const kitchen: ReportTemplate = {
-  capability: "kitchen",
+export const home: ReportTemplate = {
+  capability: "home",
   contributor: "한별",
-  compose({ state, facts, outcome, question }) {
+  compose({ state, staffed, facts, outcome, question }) {
+    if (!staffed) return notYetStaffed("살림 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
+
     const sections = [
       ...section("지금 있는 것", facts),
       ...section("떨어진 것", outcome),
@@ -183,7 +217,17 @@ export const kitchen: ReportTemplate = {
   },
 };
 
-const TEMPLATES: ReportTemplate[] = [career, finance, health, kitchen];
+/** Operations holds a request only until a domain department is accountable. */
+export const operations: ReportTemplate = {
+  capability: "operations",
+  contributor: "운영",
+  compose: () => notYetStaffed(
+    "이 건은",
+    "담당 부서가 정해지는 대로 그 팀이 이어받아 올려드리겠습니다.",
+  ),
+};
+
+const TEMPLATES: ReportTemplate[] = [career, finance, health, home, operations];
 
 /** A capability with no template gets the common envelope and its own name. */
 export function templateFor(capability: string): ReportTemplate {
@@ -191,7 +235,9 @@ export function templateFor(capability: string): ReportTemplate {
     TEMPLATES.find((t) => t.capability === capability) ?? {
       capability,
       contributor: capability,
-      compose: ({ state, facts, question }) => ({
+      compose: ({ state, staffed, facts, question }) => (!staffed
+        ? notYetStaffed("이 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.")
+        : {
         summary: state === "done" ? "요청하신 일을 마쳤습니다." : "맡은 일을 진행하고 있습니다.",
         sections: section("확인한 내용", facts),
         recommendation: question === null ? NO_DECISION : "",

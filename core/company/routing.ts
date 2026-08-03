@@ -23,7 +23,10 @@ export type DepartmentId =
   | "finance"
   | "home"
   | "health"
-  | "planning";
+  /** Coordinates multi-department work. Never owns. */
+  | "planning"
+  /** Coordinates provisionally until a domain department is accountable. */
+  | "operations";
 
 type Department = {
   id: DepartmentId;
@@ -33,15 +36,18 @@ type Department = {
   subjectSignals: string[];
   /**
    * The capability that executes this department's work today.
-   * `null` means the department is defined but not yet staffed.
+   * `null` means the department exists and owns work, but cannot yet execute
+   * it. It still takes custody and still reports (§3). Work is never refused
+   * because a capability is missing.
    */
   capability: string | null;
 };
 
 /**
- * Departments, as routing sees them. Function departments (Research,
- * Operations) never appear: they cannot own work, so they are never a routing
- * outcome. Planning appears only as the multi-domain fallback.
+ * Ownable departments. Function departments (Research, Planning, Operations)
+ * are absent by construction: they cannot own work, so they can never be a
+ * routing outcome. Operations appears only as a provisional holder, and
+ * Planning only as a contributor on multi-department work.
  */
 const DEPARTMENTS: Department[] = [
   {
@@ -68,17 +74,17 @@ const DEPARTMENTS: Department[] = [
     subjectSignals: ["병원", "건강", "약", "증상"],
     capability: null,
   },
-  {
-    id: "planning",
-    decisionSignals: [],
-    subjectSignals: [],
-    capability: null,
-  },
 ];
 
 export type RoutingDecision = {
   /** Exactly one. Never zero, never two (§3). */
   owner: DepartmentId;
+  /**
+   * True while Operations is holding the request because no domain department
+   * is yet accountable. Temporary by construction: ownership transfers as soon
+   * as a domain department can be named, silently (§3).
+   */
+  provisional: boolean;
   /** Departments the owner will ask. Internal; never surfaced (§4). */
   contributors: DepartmentId[];
   /** Why this owner, in one line. For inspection after the fact, not for display. */
@@ -105,7 +111,7 @@ function score(department: Department, text: string): { decision: number; subjec
 export function route(request: { subject?: string; body?: string; attachment?: string }): RoutingDecision {
   const text = [request.subject ?? "", request.body ?? "", request.attachment ?? ""].join("\n");
 
-  const scored = DEPARTMENTS.filter((d) => d.id !== "planning")
+  const scored = DEPARTMENTS.filter((d) => d.id !== "operations")
     .map((d) => ({ department: d, ...score(d, text) }))
     .filter((s) => s.decision > 0 || s.subject > 0)
     .sort((a, b) => b.decision - a.decision || b.subject - a.subject);
@@ -113,29 +119,34 @@ export function route(request: { subject?: string; body?: string; attachment?: s
   const top = scored[0];
 
   if (!top) {
-    // Nothing recognisable. Planning holds it rather than the request bouncing.
+    // Nothing recognisable yet. Operations coordinates until a domain
+    // department can be named. Never a refusal, never a question back.
     return {
-      owner: "planning",
+      owner: "operations",
+      provisional: true,
       contributors: [],
-      reason: "어느 영역인지 드러나는 신호가 없어 조율 부서가 맡습니다.",
+      reason: "아직 담당 부서가 정해지지 않아 운영이 임시로 맡습니다.",
       capability: null,
     };
   }
 
   const second = scored[1];
 
-  // Two departments with equal decision weight is genuinely multi-domain.
+  // Genuinely multi-domain. Planning coordinates but never owns, so the first
+  // department still carries accountability and still signs the report.
   if (second && second.decision === top.decision && top.decision > 0) {
     return {
-      owner: "planning",
-      contributors: [top.department.id, second.department.id],
-      reason: "결정이 두 영역에 걸쳐 있어 조율 부서가 맡고, 두 팀에 요청합니다.",
-      capability: null,
+      owner: top.department.id,
+      provisional: false,
+      contributors: ["planning", second.department.id],
+      reason: "결정이 두 영역에 걸쳐 있어, 한 부서가 맡고 조율을 함께 붙입니다.",
+      capability: top.department.capability,
     };
   }
 
   return {
     owner: top.department.id,
+    provisional: false,
     // The owner asks the rest; the router only notes who is implicated.
     contributors: scored.slice(1).map((s) => s.department.id),
     reason:
@@ -146,7 +157,12 @@ export function route(request: { subject?: string; body?: string; attachment?: s
   };
 }
 
-/** True when the owning department can actually execute today. */
+/**
+ * True when the owning department can execute today.
+ *
+ * False is not a refusal. The department still owns the work, still takes
+ * custody, and still reports what it can and cannot yet do.
+ */
 export function isStaffed(decision: RoutingDecision): boolean {
   return decision.capability !== null;
 }

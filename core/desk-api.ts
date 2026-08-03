@@ -10,6 +10,7 @@
  * omitted and the surface renders without it.
  */
 
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
 import { CustodyEngine } from "./custody/engine.ts";
@@ -129,6 +130,7 @@ function toWork(hold: Hold, events: EventEnvelope[]): DeskWork | null {
 
   const composed = template.compose({
     state,
+    staffed: hold.capability === "career",
     facts: hold.observations.map((o) => o.statement),
     outcome: (hold.artifact?.sections ?? []).map((sec) => sec.heading.replace(/^\d+\.\s*/, "")),
     question: hold.outstandingAsk?.question ?? null,
@@ -231,15 +233,30 @@ createServer((req, res) => {
         attachment: sent.attachment,
       });
 
+      const { company, role } = splitSubject(sent.subject ?? "");
+
+      // A department that cannot execute yet still owns the work and still
+      // takes custody. Work is never refused for a missing capability (§3).
       if (!isStaffed(routed)) {
-        json(res, 400, {
-          ok: false,
-          reasons: ["그 일을 맡을 팀이 아직 준비되지 않았습니다. 준비되는 대로 말씀드리겠습니다."],
-        });
+        log.append(
+          {
+            type: "HandedOver",
+            holdId: randomUUID(),
+            capability: routed.owner,
+            handover: {
+              company: company === "" ? (sent.subject ?? "").trim() || "요청" : company,
+              role,
+              jdText: [sent.attachment ?? "", sent.request ?? ""].join("\n").trim(),
+            },
+          },
+          { kind: "user" },
+          routed.owner,
+          "computer",
+        );
+
+        json(res, 200, { ok: true, desk: deskView(engine, log) });
         return;
       }
-
-      const { company, role } = splitSubject(sent.subject ?? "");
 
       // The engine validates and records. This bridge proposes nothing.
       const result = engine.handOver({
