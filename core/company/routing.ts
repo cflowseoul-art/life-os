@@ -19,6 +19,7 @@
  */
 
 export type DepartmentId =
+  | "asset"
   | "career"
   | "finance"
   | "home"
@@ -50,6 +51,17 @@ type Department = {
  * Planning only as a contributor on multi-department work.
  */
 const DEPARTMENTS: Department[] = [
+  {
+    // State: what is owned or owed right now. Ambiguous "얼마나 있어?" is a
+    // question about state, so it belongs here rather than to Finance.
+    id: "asset",
+    decisionSignals: [
+      "잔액", "얼마나 있", "얼마 있", "자산", "순자산", "부채", "빚",
+      "예금", "적금", "통장에", "남아 있", "보유", "받을 돈", "예정 자산",
+    ],
+    subjectSignals: ["계좌", "통장", "포인트", "대출 잔액"],
+    capability: "asset",
+  },
   {
     id: "career",
     decisionSignals: ["이력서", "지원", "공고", "채용", "포트폴리오", "면접", "오퍼", "이직"],

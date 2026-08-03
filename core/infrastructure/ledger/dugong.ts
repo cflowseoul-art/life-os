@@ -262,6 +262,28 @@ async function fetchRows(range: string): Promise<string[][]> {
   return ((await response.json()) as { values?: string[][] }).values ?? [];
 }
 
+/**
+ * 잔액기록 — account balance snapshots, as recorded by the household.
+ *
+ * State, not events. Asset reads this; nothing here is computed from 거래내역.
+ */
+export async function readBalanceRows(): Promise<string[][]> {
+  try {
+    return await fetchRows(process.env.DUGONG_LEDGER_BALANCE_SHEET ?? "잔액기록");
+  } catch {
+    return [];
+  }
+}
+
+/** PENDING_ASSET — expected or not-yet-received assets, as the household lists them. */
+export async function readPendingAssetRows(): Promise<string[][]> {
+  try {
+    return await fetchRows(process.env.DUGONG_LEDGER_PENDING_SHEET ?? "PENDING_ASSET");
+  } catch {
+    return [];
+  }
+}
+
 /** The ledger's classification rules. Empty map when the tab is absent. */
 export async function readCategoryRules(): Promise<Map<string, CategoryRule>> {
   try {

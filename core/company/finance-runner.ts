@@ -212,6 +212,23 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
   }
 }
 
+/**
+ * Structural guardrail (§9).
+ *
+ * Finance's conclusions may not carry Asset's. The compiler rejects a report
+ * type that grows a balance, net worth, liability balance, asset value, or
+ * investable amount — a comment would not.
+ */
+type ForbiddenForFinance = "balance" | "netWorth" | "liabilityBalance" | "assetValue" | "investableAmount";
+
+export type FinanceConclusion = {
+  month: string;
+  fixedSpending: number;
+  variableSpending: number;
+  income: number;
+  assetMovement: number;
+} & { [K in ForbiddenForFinance]?: never };
+
 export function advanceFinance(log: EventLog): void {
   for (const hold of financeHolds(log.read())) {
     if (hold.kept) continue;
