@@ -1,0 +1,34 @@
+# Render — one long-running Node process serving the API and the built app.
+services:
+  - type: web
+    name: life-os
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm run serve
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: LIFE_OS_STORAGE
+        value: postgres
+      - key: PGSSL
+        value: require
+      - key: DATABASE_URL
+        fromDatabase:
+          name: life-os-db
+          property: connectionString
+      # Set in the dashboard; VITE_ must exist at build time.
+      - key: SESSION_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+
+databases:
+  - name: life-os-db
+    plan: basic-256mb
