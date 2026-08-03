@@ -148,10 +148,20 @@ const PREFERENCE_PATTERNS = [
 ];
 
 export function statedPreference(text: string, at: string, source: string): Preference | null {
-  for (const pattern of PREFERENCE_PATTERNS) {
-    const match = pattern.exec(text.trim());
-    if (match && match[1].trim() !== "") {
-      return { about: match[1].trim(), statement: text.trim(), source, at };
+  // Clause by clause: "우유 다 썼어. 저지방으로 사줘" states one preference,
+  // and it is 저지방 — not the whole sentence.
+  const clauses = text.split(/[\n.,·]|그리고/).map((c) => c.trim()).filter((c) => c !== "");
+
+  for (const clause of clauses) {
+    if (/다\s*썼|떨어졌|다\s*먹었|없어졌/.test(clause)) continue;
+
+    for (const pattern of PREFERENCE_PATTERNS) {
+      const match = pattern.exec(clause);
+      const about = match?.[1].trim() ?? "";
+
+      if (about !== "" && about.length <= 20) {
+        return { about, statement: clause, source, at };
+      }
     }
   }
 

@@ -306,11 +306,46 @@ export function factualNumbers(receipt: Receipt): Set<number> {
  */
 const DEPLETION = /(.+?)\s*(?:다\s*썼|떨어졌|떨어짐|다\s*먹었|없어졌|다\s*쓴)/;
 
+/**
+ * "사줘" is a request for the shopping list, not an order.
+ *
+ * Home's MVP ends at the list: no product search, no cart, no payment, no
+ * ordering. Asking for something is treated exactly as saying it ran out —
+ * mark it gone, put it on the list, and stop. Buying is a future capability,
+ * and it will be gated by an Ask because it spends money (Art. 5).
+ */
+const WANTED = /(.+?)\s*(?:좀\s*)?(?:사\s*줘|사다\s*줘|사놔|사둬|주문해\s*줘|챙겨\s*줘)/;
+
+function cleanName(raw: string): string {
+  return raw
+    // Time and errand framing is not the product name.
+    .replace(/^(?:이제|우리|집에|그|저|다음에|이번에|담에)\s*/, "")
+    .replace(/^(?:장\s*볼\s*때|장\s*보러\s*갈\s*때|마트\s*가면|나갈\s*때)\s*/, "")
+    .replace(/(?:으로|로)(?:만)?$/, "")
+    .replace(/(?:도|은|는|이|가|을|를)$/, "")
+    .trim();
+}
+
+/**
+ * The item the representative means. A depletion is read first: when they say
+ * both ("우유 다 썼어. 저지방으로 사줘") the thing that ran out is the item and
+ * the rest is how they want it replaced.
+ */
 export function readDepletion(text: string): string | null {
-  for (const raw of text.split(/[\n.,]/)) {
-    const match = DEPLETION.exec(raw.trim());
+  const clauses = text.split(/[\n.,·]|그리고/).map((c) => c.trim()).filter((c) => c !== "");
+
+  for (const clause of clauses) {
+    const match = DEPLETION.exec(clause);
     if (match) {
-      const name = match[1].replace(/^(이제|우리|집에|그|저)\s*/, "").trim();
+      const name = cleanName(match[1]);
+      if (name !== "") return name;
+    }
+  }
+
+  for (const clause of clauses) {
+    const match = WANTED.exec(clause);
+    if (match) {
+      const name = cleanName(match[1]);
       if (name !== "") return name;
     }
   }
