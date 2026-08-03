@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Representative Computer — 검토용 프로토타입</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================================================================
+     Review prototype. Throwaway. All screens stacked; no routing.
+     Data below is invented for review and is not from the engine.
+     =================================================================== -->
+
+<p class="proto-note">화면 1 — <span>대표님의 컴퓨터 · 업무 보고</span></p>
+
+<section class="screen" id="screen-1">
+  <header class="topbar">
+    <span class="wordmark">Life OS</span>
+    <span class="today">8월 3일 월요일</span>
+    <input class="search" type="search" placeholder="보고 검색" aria-label="보고 검색">
+  </header>
+
+  <div class="body">
+    <nav class="rail">
+      <a class="here" href="#screen-1">업무 보고</a>
+      <a href="#screen-6">일정</a>
+      <a href="#screen-4">프로젝트</a>
+      <a href="#screen-5">보고서</a>
+      <p class="rail-foot">오늘 대표님 판단이 필요한 건은 하나입니다.</p>
+    </nav>
+
+    <main class="main">
+      <p class="greeting">대표님</p>
+      <p class="greeting-sub">결정하실 것 하나, 나머지는 맡아 두었습니다.</p>
+
+      <div class="section">
+        <p class="group">결재 대기</p>
+
+        <!-- The single report that needs judgement, expanded in place. -->
+        <article class="decision">
+          <p class="who">담당 <b>서준</b> · 커리어<span class="badge">판단 필요</span></p>
+          <h3>토스 · 프로덕트 디자이너 — 이력서 첫 문단</h3>
+          <p class="summary">
+            공고 원문에서 요건 세 개를 그대로 옮겨 적었습니다. 어느 것을 앞세울지는
+            대표님이 무엇으로 알려지고 싶은지의 문제라 제가 정하지 않았습니다.
+          </p>
+          <div class="options">
+            <button class="opt" onclick="approve()">모바일 금융 플로우 설계를 앞세운다</button>
+            <button class="opt secondary" onclick="approve()">사용자 조사 연결을 앞세운다</button>
+            <button class="quiet-link" onclick="openReport()">근거 보기</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="section">
+        <p class="group">진행 중</p>
+        <div class="rows">
+          <a class="row" href="#screen-2" onclick="openReport()">
+            <span class="who">한별</span>
+            <span class="line"><span class="subject">이번 주 장보기 목록</span> <span class="snippet">— 소진 알려주신 품목 정리, 주문 전 확인 예정</span></span>
+            <span class="when">2시간 전</span>
+          </a>
+          <a class="row" href="#screen-2" onclick="openReport()">
+            <span class="who">윤도</span>
+            <span class="line"><span class="subject">3분기 고정지출 대조</span> <span class="snippet">— 카드 명세와 구독 목록 대조 중</span></span>
+            <span class="when">어제</span>
+          </a>
+          <a class="row" href="#screen-2" onclick="openReport()">
+            <span class="who">서준</span>
+            <span class="line"><span class="subject">당근마켓 · 시니어 디자이너 공고</span> <span class="snippet">— 요건 확인함, 앞의 건 정리되면 올리겠습니다</span></span>
+            <span class="when">어제</span>
+          </a>
+          <a class="row" href="#screen-2" onclick="openReport()">
+            <span class="who">민경</span>
+            <span class="line"><span class="subject">건강검진 예약</span> <span class="snippet">— 가능한 날짜 세 개 확인, 일정과 대조 중</span></span>
+            <span class="when">7월 31일</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="group">완료</p>
+        <div class="rows">
+          <a class="row" href="#screen-5" onclick="openReport()">
+            <span class="who">윤도</span>
+            <span class="line"><span class="subject">7월 구독 정리</span> <span class="snippet">— 중복 결제 건 해지, 근거 첨부</span></span>
+            <span class="when">7월 30일</span>
+          </a>
+          <a class="row" href="#screen-5" onclick="openReport()">
+            <span class="who">한별</span>
+            <span class="line"><span class="subject">냉장고 재고 대조</span> <span class="snippet">— 말씀하신 품목 기준으로 갱신</span></span>
+            <span class="when">7월 28일</span>
+          </a>
+          <a class="row" href="#screen-5" onclick="openReport()">
+            <span class="who">서준</span>
+            <span class="line"><span class="subject">포트폴리오 문장 정리</span> <span class="snippet">— 대표님이 고르신 순서대로 재배열</span></span>
+            <span class="when">7월 24일</span>
+          </a>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+
+<p class="proto-note">화면 2 — <span>보고 열람</span></p>
+
+<section class="screen" id="screen-2">
+  <header class="topbar">
+    <span class="wordmark">Life OS</span>
+    <span class="today">8월 3일 월요일</span>
+    <input class="search" type="search" placeholder="보고 검색" aria-label="보고 검색">
+  </header>
+
+  <div class="reading">
+    <button class="back" onclick="closeReport()">← 업무 보고</button>
+
+    <p class="who">담당 <b>서준</b> · 커리어 · 8월 3일 오전 9시 12분</p>
+    <h2>토스 · 프로덕트 디자이너 — 이력서 첫 문단</h2>
+    <p class="lede">
+      공고에서 확인한 요건 세 개를 그대로 옮겨 적었습니다. 원문에 없는 내용은 채우지 않았습니다.
+      어느 것을 앞세울지는 대표님 판단으로 남겨 두었습니다.
+    </p>
+
+    <hr class="rule">
+
+    <div class="part">
+      <h4>보고</h4>
+      <p>
+        공고 본문을 줄 단위로 읽고, 요건으로 적힌 문장만 골라 기록했습니다. 세 개였습니다.
+        기존 이력서와 대조해 보니 세 요건 모두 대응되는 경험이 있었고, 대응되지 않는 항목은
+        없었습니다.
+      </p>
+      <p>
+        남은 것은 순서뿐입니다. 첫 문단에 무엇을 두느냐에 따라 읽는 사람이 대표님을 어떤
+        사람으로 기억할지가 달라집니다. 그건 제가 계산할 수 있는 문제가 아니라서 올립니다.
+      </p>
+    </div>
+
+    <hr class="rule">
+
+    <div class="part">
+      <h4>근거</h4>
+      <ul class="evidence">
+        <li>
+          모바일 금융 서비스의 핵심 플로우를 설계합니다
+          <span class="source">공고 원문 2행 · 8월 3일 09:11 확인 · 확신도 1.0</span>
+        </li>
+        <li>
+          사용자 조사 결과를 제품 결정으로 연결합니다
+          <span class="source">공고 원문 3행 · 8월 3일 09:11 확인 · 확신도 1.0</span>
+        </li>
+        <li>
+          디자인 시스템을 유지하고 확장합니다
+          <span class="source">공고 원문 4행 · 8월 3일 09:11 확인 · 확신도 1.0</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="part">
+      <h4>입력 · 가정</h4>
+      <p>입력: 대표님이 전달하신 공고 원문, 보관 중인 이력서 최신본(7월 24일 수정).</p>
+      <p>가정: 지원 직무는 공고에 적힌 그대로이며, 따로 강조하라고 하신 항목은 없습니다.</p>
+    </div>
+
+    <hr class="rule">
+
+    <div class="part">
+      <h4>결재 요청</h4>
+      <div class="ask-box">
+        <p>이력서 첫 문단에서 무엇을 앞세울까요?</p>
+        <div class="options">
+          <button class="opt" onclick="approve()">모바일 금융 플로우 설계</button>
+          <button class="opt secondary" onclick="approve()">사용자 조사 연결</button>
+        </div>
+        <p class="consequence">
+          정하시면 그 순서로 이력서를 정리해 보고서에 보관합니다. 제출은 하지 않습니다.
+          외부 제출은 따로 여쭙겠습니다.
+        </p>
+      </div>
+    </div>
+
+    <div class="part">
+      <h4>처리 이력</h4>
+      <ul class="evidence">
+        <li>8월 3일 09:11 · 대표님 — 위임<span class="source">공고 원문 전달</span></li>
+        <li>8월 3일 09:11 · 서준 — 요건 3건 기록<span class="source">공고 원문 2·3·4행</span></li>
+        <li>8월 3일 09:12 · 서준 — 결재 요청<span class="source">순서는 판단 사항</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+
+<p class="proto-note">화면 3 — <span>결정 이후</span></p>
+
+<section class="screen" id="screen-3">
+  <header class="topbar">
+    <span class="wordmark">Life OS</span>
+    <span class="today">8월 3일 월요일</span>
+    <input class="search" type="search" placeholder="보고 검색" aria-label="보고 검색">
+  </header>
+
+  <div class="settled">
+    <h3>정해 주셔서 감사합니다.</h3>
+    <p>서준이 이어서 정리합니다. 끝나면 보고서에 올려 두겠습니다.</p>
+    <p>지금 대표님이 하실 일은 없습니다.</p>
+    <p class="fine">닫으셔도 됩니다. 열어 두지 않아도 진행됩니다.</p>
+    <p style="margin-top:28px"><button class="opt secondary" onclick="closeReport()">업무 보고로</button></p>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+
+<p class="proto-note">화면 4 — <span>프로젝트 · 맡겨 둔 것들</span></p>
+
+<section class="screen" id="screen-4">
+  <header class="topbar">
+    <span class="wordmark">Life OS</span>
+    <span class="today">8월 3일 월요일</span>
+    <input class="search" type="search" placeholder="보고 검색" aria-label="보고 검색">
+  </header>
+
+  <div class="body">
+    <nav class="rail">
+      <a href="#screen-1">업무 보고</a>
+      <a href="#screen-6">일정</a>
+      <a class="here" href="#screen-4">프로젝트</a>
+      <a href="#screen-5">보고서</a>
+    </nav>
+
+    <main class="main">
+      <p class="greeting">맡겨 두신 것들</p>
+      <p class="greeting-sub">보고가 여러 번 오갈 일들입니다. 여기서 하실 일은 없습니다.</p>
+
+      <ul class="entrusted">
+        <li>
+          <h4>이직 준비</h4>
+          <p class="meta">서준 · 4월 12일부터</p>
+          <p class="state">공고 두 건 검토 중. 한 건은 대표님 판단을 기다리고 있습니다.</p>
+        </li>
+        <li>
+          <h4>집안 살림</h4>
+          <p class="meta">한별 · 3월 2일부터</p>
+          <p class="state">장보기와 재고를 이어서 맡고 있습니다. 주문 전에는 항상 여쭙습니다.</p>
+        </li>
+        <li>
+          <h4>돈 나가는 것들 정리</h4>
+          <p class="meta">윤도 · 6월 20일부터</p>
+          <p class="state">3분기 고정지출 대조 중. 해지 판단이 필요한 건이 나오면 올립니다.</p>
+        </li>
+        <li>
+          <h4>건강 챙기기</h4>
+          <p class="meta">민경 · 7월 30일부터</p>
+          <p class="state">검진 예약 가능한 날짜를 일정과 맞춰 보고 있습니다.</p>
+        </li>
+      </ul>
+    </main>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+
+<p class="proto-note">화면 5 — <span>보고서 · 끝난 일</span></p>
+
+<section class="screen" id="screen-5">
+  <header class="topbar">
+    <span class="wordmark">Life OS</span>
+    <span class="today">8월 3일 월요일</span>
+    <input class="search" type="search" placeholder="보고 검색" aria-label="보고 검색">
+  </header>
+
+  <div class="body">
+    <nav class="rail">
+      <a href="#screen-1">업무 보고</a>
+      <a href="#screen-6">일정</a>
+      <a href="#screen-4">프로젝트</a>
+      <a class="here" href="#screen-5">보고서</a>
+    </nav>
+
+    <main class="main">
+      <p class="greeting">보고서</p>
+      <p class="greeting-sub">끝난 일은 여기 그대로 남습니다. 언제든 되짚어 보실 수 있습니다.</p>
+
+      <div class="rows">
+        <a class="row" href="#screen-2" onclick="openReport()">
+          <span class="who">윤도</span>
+          <span class="line"><span class="subject">7월 구독 정리</span> <span class="snippet">— 중복 결제 2건 해지, 명세 근거 첨부</span></span>
+          <span class="when">7월 30일</span>
+        </a>
+        <a class="row" href="#screen-2" onclick="openReport()">
+          <span class="who">한별</span>
+          <span class="line"><span class="subject">냉장고 재고 대조</span> <span class="snippet">— 말씀하신 품목 기준으로 갱신</span></span>
+          <span class="when">7월 28일</span>
+        </a>
+        <a class="row" href="#screen-2" onclick="openReport()">
+          <span class="who">서준</span>
+          <span class="line"><span class="subject">포트폴리오 문장 정리</span> <span class="snippet">— 고르신 순서대로 재배열</span></span>
+          <span class="when">7월 24일</span>
+        </a>
+        <a class="row" href="#screen-2" onclick="openReport()">
+          <span class="who">민경</span>
+          <span class="line"><span class="subject">6월 수면 기록 정리</span> <span class="snippet">— 직접 적어 주신 기록만 정리</span></span>
+          <span class="when">7월 2일</span>
+        </a>
+        <a class="row" href="#screen-2" onclick="openReport()">
+          <span class="who">윤도</span>
+          <span class="line"><span class="subject">상반기 지출 요약</span> <span class="snippet">— 카드사 명세 기준</span></span>
+          <span class="when">6월 30일</span>
+        </a>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+
+<p class="proto-note">화면 6 — <span>일정</span></p>
+
+<section class="screen" id="screen-6">
+  <header class="topbar">
+    <span class="wordmark">Life OS</span>
+    <span class="today">8월 3일 월요일</span>
+    <input class="search" type="search" placeholder="보고 검색" aria-label="보고 검색">
+  </header>
+
+  <div class="body">
+    <nav class="rail">
+      <a href="#screen-1">업무 보고</a>
+      <a class="here" href="#screen-6">일정</a>
+      <a href="#screen-4">프로젝트</a>
+      <a href="#screen-5">보고서</a>
+    </nav>
+
+    <main class="main">
+      <p class="greeting">일정</p>
+      <p class="greeting-sub">시간이 정해진 것만 둡니다.</p>
+
+      <ul class="commitments">
+        <li>
+          <span class="day">8월 5일 수요일</span>
+          <span class="what">토스 지원 마감<span>서준이 그 전에 정리해 둡니다</span></span>
+        </li>
+        <li>
+          <span class="day">8월 12일 수요일</span>
+          <span class="what">건강검진 예약 가능일<span>민경이 확인 중 · 아직 정해지지 않았습니다</span></span>
+        </li>
+        <li>
+          <span class="day">8월 25일 화요일</span>
+          <span class="what">구독 자동결제일<span>윤도가 그 전에 해지 판단을 올립니다</span></span>
+        </li>
+      </ul>
+    </main>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+
+<p class="proto-note">화면 7 — <span>사무실 입구 (선택)</span></p>
+
+<section class="office-card">
+  <p class="glyph">🏢</p>
+  <h3>사무실</h3>
+  <p>직원들이 일하고 있습니다.</p>
+  <p class="fine">대표님이 가셔야 할 이유는 없습니다.</p>
+  <button class="walk">사무실로 걸어가기</button>
+</section>
+
+<script>
+  // The only script: move between the list and the reading surface.
+  function openReport() { document.getElementById('screen-2').scrollIntoView(); }
+  function closeReport() { document.getElementById('screen-1').scrollIntoView(); }
+  function approve() { document.getElementById('screen-3').scrollIntoView(); }
+</script>
+
+</body>
+</html>
