@@ -64,7 +64,11 @@ const DEPARTMENTS: Department[] = [
   },
   {
     id: "home",
-    decisionSignals: ["장보기", "주문", "구매", "재고", "떨어졌", "다 썼", "영수증", "마트", "장 봤"],
+    decisionSignals: [
+      "장보기", "주문", "구매", "재고", "떨어졌", "다 썼", "영수증", "마트", "장 봤",
+      // A request to buy something for the house is Home's, and stops at the list.
+      "사줘", "사 줘", "사다 줘", "사놔", "사둬", "챙겨 줘", "떨어짐", "다 먹었",
+    ],
     subjectSignals: ["냉장고", "집", "살림", "택배", "생필품"],
     capability: "home",
   },
