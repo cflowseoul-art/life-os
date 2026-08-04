@@ -203,6 +203,7 @@ describe("Dispatch is by responsibility", () => {
     const runnable = runnableResponsibilities().map((r) => r.id).sort();
 
     expect(runnable).toEqual([
+      "career.application_operator",
       "career.job_fit",
       "finance.ledger-review",
       "home.provisioning",
@@ -245,7 +246,11 @@ describe("The manifest binds responsibilities", () => {
     const career = CAPABILITIES.find((c) => c.id === "career")!;
 
     expect(career.responsibilities).toHaveLength(7);
-    expect(Object.keys(career.runners ?? {})).toEqual(["career.job_fit"]);
+    // Two of seven can execute; the rest are declared and unstaffed.
+    expect(Object.keys(career.runners ?? {}).sort()).toEqual([
+      "career.application_operator",
+      "career.job_fit",
+    ]);
   });
 
   it("seats the same people at the same desks as before the split", () => {

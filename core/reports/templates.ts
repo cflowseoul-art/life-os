@@ -137,6 +137,8 @@ export const career: ReportTemplate = {
     const decided = outcome.filter(
       (o) => o.startsWith("지원 결정") || o.startsWith("보류로") || o.startsWith("지원하지"),
     );
+    // The Application Operator reports status groups, not fit findings.
+    const statuses = outcome.filter((o) => /(건$|내역이 없습니다|없습니다$)/.test(o));
 
     const sections = [
       ...section("적합도", fit),
@@ -145,6 +147,7 @@ export const career: ReportTemplate = {
       ...section("빈 곳", gaps),
       ...section("위험", risks),
       ...section("결정", decided),
+      ...section("지원 현황", fit.length === 0 ? statuses : []),
     ];
 
     if (state === "awaiting") {

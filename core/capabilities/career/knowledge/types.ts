@@ -129,6 +129,52 @@ export type InterviewStoryFact = KnowledgeFact<"interview_story", {
   narrative: string;
 }>;
 
+/** Where an application stands. Ordered as a real process runs. */
+export type ApplicationStatus =
+  | "planned"
+  | "applied"
+  | "screening"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "withdrawn";
+
+export const APPLICATION_STATUSES: ApplicationStatus[] = [
+  "planned", "applied", "screening", "interview", "offer", "rejected", "withdrawn",
+];
+
+/** How each status is said to the representative. */
+export const STATUS_LABEL: Record<ApplicationStatus, string> = {
+  planned: "지원 예정",
+  applied: "지원함",
+  screening: "서류 통과",
+  interview: "면접 예정",
+  offer: "오퍼",
+  rejected: "탈락",
+  withdrawn: "지원 철회",
+};
+
+/**
+ * One application, and where it stands.
+ *
+ * Knowledge about the representative's search, not about the posting: the
+ * posting is gone once applied to, and what remains is what happened. Nothing
+ * here is a capability or a tool, so ADR-025 leaves this shape untouched.
+ */
+export type ApplicationFact = KnowledgeFact<"application", {
+  company: string;
+  position: string;
+  status: ApplicationStatus;
+  /** When the application was sent. Absent while still planned. */
+  appliedAt: string | null;
+  /** What happens next, in the representative's own terms. */
+  nextStep: string | null;
+  /** When an interview is scheduled, if one is. */
+  interviewAt: string | null;
+  memo: string | null;
+  updatedAt: string;
+}>;
+
 export type CareerKnowledgeFact =
   | ProfileFact
   | EmploymentFact
@@ -141,7 +187,8 @@ export type CareerKnowledgeFact =
   | WeaknessFact
   | PreferredRoleFact
   | InterviewQuestionFact
-  | InterviewStoryFact;
+  | InterviewStoryFact
+  | ApplicationFact;
 
 export type CareerKnowledgeType = CareerKnowledgeFact["type"];
 
@@ -159,6 +206,7 @@ export const CATEGORY_OF: Record<CareerKnowledgeType, KnowledgeCategory> = {
   preferred_role: "preferred_roles",
   interview_question: "interview_preparation",
   interview_story: "interview_preparation",
+  application: "application_history",
 };
 
 /**

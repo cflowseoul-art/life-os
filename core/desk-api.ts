@@ -27,11 +27,11 @@ import { PostgresEventStore, markReportRead, readReports } from "./infrastructur
 import { ensureSchema } from "./infrastructure/db/init.ts";
 import {
   accountableForWork,
-  accountableResponsibility,
   companyRoster,
   isEnabled,
   producesReports,
   runnableResponsibilities,
+  responsibilityForRequest,
   runnerModuleFor,
   validateRunners,
   scopeOf,
@@ -607,7 +607,11 @@ function handle(
       // The manifest names the runner; the desk never learns which capability
       // answered. Adding a capability changes nothing here.
       if (routed.capability) {
-        const intake = accountableResponsibility(routed.capability);
+        // Routing named the department; this names who in it takes the work.
+        const intake = responsibilityForRequest(
+          routed.capability,
+          [sent.subject ?? "", sent.request ?? ""].join("\n"),
+        );
 
         void loadRunner(intake, runnerModuleFor(intake))
           .then((runner) =>
@@ -714,7 +718,7 @@ function handle(
         return;
       }
 
-      const intake = accountableResponsibility(owner);
+      const intake = responsibilityForRequest(owner, "영수증 정리");
 
       void loadRunner(intake, runnerModuleFor(intake))
         .then((runner) =>

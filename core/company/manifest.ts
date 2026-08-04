@@ -13,6 +13,7 @@
 import { employeeForResponsibility } from "./employees.ts";
 import { knownResponsibility, responsibility } from "./responsibilities.ts";
 import type { ResponsibilityId } from "./responsibilities.ts";
+import { APPLICATION_QUERY_SIGNALS } from "../capabilities/career/applications.ts";
 import type { Scope } from "../identity/types.ts";
 
 export type CapabilityId =
@@ -66,6 +67,17 @@ export type CapabilityManifest = {
    * a responsibility that nobody can execute yet simply has no entry here.
    */
   runners?: Partial<Record<ResponsibilityId, string>>;
+  /**
+   * Which responsibility inside this capability takes a request.
+   *
+   * Routing names the department; this names the person in it. Without it every
+   * request reaches whoever is accountable for the capability, which is right
+   * until a department has two people who answer different questions.
+   *
+   * Checked in order, and only against the request the representative wrote.
+   * Anything unmatched goes to `accountableFor`.
+   */
+  routes?: { responsibility: ResponsibilityId; signals: string[] }[];
   /** Whether it can accept work today. A department may exist unstaffed. */
   enabled: boolean;
 };
@@ -103,7 +115,19 @@ export const CAPABILITIES: CapabilityManifest[] = [
       subjectSignals: ["회사", "직무", "경력", "연봉 협상"],
     },
     scheduler: "none",
-    runners: { "career.job_fit": "../capabilities/career/runner.ts" },
+    runners: {
+      "career.job_fit": "../capabilities/career/runner.ts",
+      "career.application_operator": "../capabilities/career/application-operator.ts",
+    },
+    // A question about the search goes to the operator; a posting goes to the
+    // analyst. The operator's phrases are ones only somebody asking about their
+    // own applications would write, so a posting cannot land there by accident.
+    routes: [
+      {
+        responsibility: "career.application_operator",
+        signals: APPLICATION_QUERY_SIGNALS,
+      },
+    ],
     enabled: true,
   },
   {
@@ -228,6 +252,23 @@ export function appearsInOffice(id: string): boolean {
  */
 export function accountableResponsibility(capability: string): ResponsibilityId {
   return manifestFor(capability).accountableFor;
+}
+
+/**
+ * Which responsibility inside a capability should take this request.
+ *
+ * Falls back to whoever is accountable for the capability, which is the common
+ * case: most departments have one person answering everything.
+ */
+export function responsibilityForRequest(capability: string, text: string): ResponsibilityId {
+  const manifest = manifestFor(capability);
+  const asked = text.replace(/\s+/g, " ");
+
+  for (const route of manifest.routes ?? []) {
+    if (route.signals.some((signal) => asked.includes(signal))) return route.responsibility;
+  }
+
+  return manifest.accountableFor;
 }
 
 /**

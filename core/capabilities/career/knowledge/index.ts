@@ -17,7 +17,7 @@
  *   they report instead of asking or inventing.
  */
 
-import { CATEGORY_OF, KNOWLEDGE_CATEGORIES } from "./types.ts";
+import { CATEGORY_OF, KNOWLEDGE_CATEGORIES, STATUS_LABEL } from "./types.ts";
 import type {
   CareerKnowledgeFact,
   CareerKnowledgeType,
@@ -29,8 +29,14 @@ import { assertRepresentative } from "./representative.ts";
 import type { RepresentativeKey } from "./representative.ts";
 import type { KnowledgeFact } from "../../../events/types.ts";
 
-export type { CareerKnowledgeFact, Gap, KnowledgeCategory } from "./types.ts";
-export { KNOWLEDGE_CATEGORIES, CATEGORY_OF } from "./types.ts";
+export type {
+  ApplicationFact,
+  ApplicationStatus,
+  CareerKnowledgeFact,
+  Gap,
+  KnowledgeCategory,
+} from "./types.ts";
+export { APPLICATION_STATUSES, CATEGORY_OF, KNOWLEDGE_CATEGORIES, STATUS_LABEL } from "./types.ts";
 export { BootstrapRepository, InMemoryRepository } from "./repository.ts";
 export type { CareerKnowledgeRepository } from "./repository.ts";
 export {
@@ -164,6 +170,8 @@ export function display(fact: KnowledgeFact): string {
       return subject.value.question;
     case "interview_story":
       return `${subject.value.title} · ${subject.value.narrative}`;
+    case "application":
+      return `${subject.value.company} · ${subject.value.position} · ${STATUS_LABEL[subject.value.status]}`;
   }
 }
 
