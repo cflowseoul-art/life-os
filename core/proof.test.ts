@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { CustodyEngine, unbackedNumbers } from "./custody/engine.ts";
 import { EventLog, EventLogCorrupt } from "./events/log.ts";
+import { SCHEMA_VERSION } from "./events/types.ts";
 import type { Artifact } from "./events/types.ts";
 
 const JD = `Data Analyst
@@ -51,7 +52,7 @@ describe("Article 3 — Custody", () => {
     const revived = new CustodyEngine(new EventLog(path));
 
     expect(revived.outstandingAsk()).not.toBeNull();
-    expect(revived.ledger()[0].observations).toHaveLength(3);
+    expect(revived.ledger()[0].facts).toHaveLength(3);
   });
 });
 
@@ -119,14 +120,39 @@ describe("Article 9 — Trust", () => {
 });
 
 describe("Article 10 — Provenance", () => {
-  it("gives every fact a source and an acquisition time", () => {
+  it("gives every fact a source, an author, and an acquisition time", () => {
     const engine = new CustodyEngine(new EventLog(freshLog()));
     engine.handOver({ company: "OpenAI", role: "Data Analyst", jdText: JD });
 
-    for (const observation of engine.ledger()[0].observations) {
-      expect(observation.source).toMatch(/^handover\.jdText:\d+$/);
-      expect(observation.acquiredAt).not.toBe("");
-      expect(observation.confidence).toBe(1);
+    for (const fact of engine.ledger()[0].facts) {
+      expect(fact.source).toMatch(/^handover\.jdText:\d+$/);
+      expect(fact.acquiredAt).not.toBe("");
+      expect(fact.confidence).toBe(1);
+      // Author is required, and is never the anonymous fallback for a fact the
+      // company wrote itself. Only pre-migration facts may be unattributed.
+      expect(fact.author.kind).toBeTruthy();
+      expect(fact.author.kind).not.toBe("unattributed");
+    }
+  });
+
+  it("keeps author separate from the actor that wrote the event", () => {
+    const path = freshLog();
+    new CustodyEngine(new EventLog(path)).handOver({
+      company: "OpenAI", role: "Data Analyst", jdText: JD,
+    });
+
+    const recorded = new EventLog(path)
+      .read()
+      .filter((e) => e.event.type === "KnowledgeFactRecorded");
+
+    expect(recorded.length).toBeGreaterThan(0);
+
+    for (const envelope of recorded) {
+      if (envelope.event.type !== "KnowledgeFactRecorded") continue;
+
+      // The capability wrote the event; the posting asserts the requirement.
+      expect(envelope.actor).toEqual({ kind: "capability", id: "career" });
+      expect(envelope.event.fact.author).toEqual({ kind: "external", name: "채용공고" });
     }
   });
 });
@@ -138,7 +164,7 @@ describe("Article 8 — Transparency", () => {
     engine.answer(engine.outstandingAsk()!.options[1].id);
 
     const hold = engine.ledger()[0];
-    const known = new Set(hold.observations.map((o) => o.id));
+    const known = new Set(hold.facts.map((f) => f.id));
 
     expect(hold.artifact).not.toBeNull();
     for (const section of hold.artifact!.sections) {
@@ -192,7 +218,8 @@ describe("Stability guarantees", () => {
 
     for (const e of new EventLog(path).read()) {
       expect(e.id).toMatch(/^[0-9a-f-]{36}$/);
-      expect(e.schemaVersion).toBe(1);
+      // The constant, not a literal: a bumped schema must not need a test edit.
+      expect(e.schemaVersion).toBe(SCHEMA_VERSION);
       expect(Number.isNaN(Date.parse(e.at))).toBe(false);
       expect(e.actor.kind).toBeTruthy();
       expect(typeof e.source).toBe("string");
@@ -240,7 +267,7 @@ describe("Stability guarantees", () => {
     const counts = (t: string) =>
       log.read().filter((e) => e.event.type === t).length;
 
-    expect(counts("ObservationRecorded")).toBe(3);
+    expect(counts("KnowledgeFactRecorded")).toBe(3);
     expect(counts("AskRaised")).toBe(1);
     expect(counts("AskAnswered")).toBe(1);
     expect(counts("ArtifactKept")).toBe(1);

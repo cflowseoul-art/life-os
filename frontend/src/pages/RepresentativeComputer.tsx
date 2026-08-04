@@ -14,12 +14,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./RepresentativeComputer.css";
 
-type Observation = {
+/**
+ * A fact, as the company hands it over.
+ *
+ * `text` arrives already written by the department that owns the fact. There is
+ * deliberately no `type` and no `value` here: this screen must never learn how
+ * to phrase a purchase, a requirement, or a ledger reading, because that is the
+ * department's knowledge and it changes when the department changes.
+ */
+type Fact = {
   id: string;
-  statement: string;
+  text: string;
   source: string;
+  author: { kind: string; name?: string; employeeId?: string; userId?: string };
   acquiredAt: string;
   confidence: number;
+  derivedFrom?: string[];
 };
 
 type AskOption = { id: string; label: string; derivedFrom: string[] };
@@ -55,7 +65,7 @@ type Work = {
   workOrder?: { id: string; state: string; assignee: string; acceptedAt: string } | null;
   ask: Ask | null;
   artifact: Artifact | null;
-  observations: Observation[];
+  facts: Fact[];
   history: { at: string; actor: string; capability: string | null; what: string }[];
   withdrawnReason: string | null;
 };
@@ -302,16 +312,16 @@ function Reader({
         </div>
       )}
 
-      {work.observations.length > 0 && (
+      {work.facts.length > 0 && (
         <details className="more">
-          <summary>근거 · 출처 {work.observations.length}건</summary>
+          <summary>근거 · 출처 {work.facts.length}건</summary>
           <ul className="facts">
-            {work.observations.map((o) => (
-              <li key={o.id}>
-                {o.statement}
+            {work.facts.map((f) => (
+              <li key={f.id}>
+                {f.text}
                 <span className="src">
-                  {naturalSource(o.source)} · {when(o.acquiredAt)}에 확인
-                  {o.confidence < 1 && " · 미루어 본 것"}
+                  {naturalSource(f.source)} · {when(f.acquiredAt)}에 확인
+                  {f.confidence < 1 && " · 미루어 본 것"}
                 </span>
               </li>
             ))}

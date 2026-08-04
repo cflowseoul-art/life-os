@@ -10,7 +10,9 @@
  * refuses to trust this module.
  */
 
-import type { Artifact, Ask, CareerHandover, Observation } from "../../events/types.ts";
+import { POSTING_AUTHOR, statementOf } from "./facts.ts";
+import type { JdRequirementFact } from "./facts.ts";
+import type { Artifact, Ask, CareerHandover, KnowledgeFact } from "../../events/types.ts";
 
 export const CAPABILITY_ID = "career";
 
@@ -57,8 +59,8 @@ function shorten(statement: string): string {
  * enough to scan. The full posting stays attached as the source; nothing here
  * re-renders it.
  */
-export function observe(handover: CareerHandover, acquiredAt: string): Observation[] {
-  const observations: Observation[] = [];
+export function observe(handover: CareerHandover, acquiredAt: string): JdRequirementFact[] {
+  const observations: JdRequirementFact[] = [];
   const seen = new Set<string>();
 
   handover.jdText.split("\n").forEach((raw, index) => {
@@ -77,9 +79,12 @@ export function observe(handover: CareerHandover, acquiredAt: string): Observati
 
     observations.push({
       id: `req-${String(observations.length + 1)}`,
-      statement,
+      type: "jd_requirement",
+      value: { statement },
       source: `handover.jdText:${String(index + 1)}`,
+      author: POSTING_AUTHOR,
       acquiredAt,
+      // The line is quoted, so the source supports the stored value exactly.
       confidence: 1,
     });
   });
@@ -100,7 +105,7 @@ export function observe(handover: CareerHandover, acquiredAt: string): Observati
 export function judgmentNeeded(
   holdId: string,
   handover: CareerHandover,
-  observations: Observation[],
+  observations: KnowledgeFact[],
   raisedAt: string,
 ): Omit<Ask, "id"> | null {
   if (observations.length < 2) {
@@ -115,11 +120,11 @@ export function judgmentNeeded(
     facts: [
       `${handover.company} · ${handover.role}`,
       `공고에서 확인한 요건 ${String(observations.length)}개`,
-      ...observations.map((o) => `· ${o.statement}`),
+      ...observations.map((o) => `· ${statementOf(o)}`),
     ],
     options: [
-      { id: first.id, label: first.statement, derivedFrom: [first.id] },
-      { id: second.id, label: second.statement, derivedFrom: [second.id] },
+      { id: first.id, label: statementOf(first), derivedFrom: [first.id] },
+      { id: second.id, label: statementOf(second), derivedFrom: [second.id] },
     ],
     raisedAt,
   };
@@ -144,7 +149,7 @@ export function judgmentNeeded(
  */
 export function proposeArtifact(
   handover: CareerHandover,
-  observations: Observation[],
+  observations: KnowledgeFact[],
   leadObservationId: string,
 ): Artifact {
   const lead = observations.find((o) => o.id === leadObservationId) ?? observations[0];
@@ -152,7 +157,7 @@ export function proposeArtifact(
 
   const draft = lead
     ? `${handover.company} ${handover.role} 지원자 〈이름〉입니다. `
-      + `${lead.statement}에 해당하는 일을 〈어디서·언제〉 맡아 〈무엇을 바꿨는지〉 중심으로 말씀드리겠습니다.`
+      + `${statementOf(lead)}에 해당하는 일을 〈어디서·언제〉 맡아 〈무엇을 바꿨는지〉 중심으로 말씀드리겠습니다.`
     : `${handover.company} ${handover.role} 지원자 〈이름〉입니다.`;
 
   return {
@@ -165,7 +170,7 @@ export function proposeArtifact(
         derivedFrom: lead ? [lead.id] : [],
       },
       {
-        heading: `앞세운 요건 · ${lead?.statement ?? "없음"}`,
+        heading: `앞세운 요건 · ${lead ? statementOf(lead) : "없음"}`,
         body: "대표님이 고르신 순서입니다.",
         derivedFrom: lead ? [lead.id] : [],
       },
@@ -181,7 +186,7 @@ export function proposeArtifact(
 }
 
 /** Art. 9 enforcement input: the only numbers this capability may state. */
-export function factualNumbers(observations: Observation[]): Set<number> {
+export function factualNumbers(observations: KnowledgeFact[]): Set<number> {
   const allowed = new Set<number>([observations.length]);
 
   observations.forEach((_, index) => {

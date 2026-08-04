@@ -57,7 +57,7 @@ import {
 import { CustodyEngine, project } from "./custody/engine.ts";
 import type { Hold } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
-import type { Ask, Artifact, EventEnvelope, Observation } from "./events/types.ts";
+import type { Ask, Artifact, Author, EventEnvelope, KnowledgeFact } from "./events/types.ts";
 import { continueProjects } from "./company/continuation.ts";
 import { OcrFailed, OcrUnavailable, readImage } from "./infrastructure/ocr/index.ts";
 import { readReceipt } from "./capabilities/home/index.ts";
@@ -78,6 +78,35 @@ import type { ReportSection } from "./reports/templates.ts";
  */
 function contributorFor(capability: string): string {
   return templateFor(capability).contributor;
+}
+
+/**
+ * A fact, as the surface receives it.
+ *
+ * `text` is already written by the department that owns the fact. The desk does
+ * not format it and React cannot: no consumer of this type ever sees `type` or
+ * `value`, so no surface can grow a switch over a department's vocabulary.
+ */
+export type DeskFact = {
+  id: string;
+  text: string;
+  source: string;
+  author: Author;
+  confidence: number;
+  acquiredAt: string;
+  derivedFrom?: string[];
+};
+
+function toDeskFact(capability: string, fact: KnowledgeFact): DeskFact {
+  return {
+    id: fact.id,
+    text: templateFor(capability).displayFact(fact),
+    source: fact.source,
+    author: fact.author,
+    confidence: fact.confidence,
+    acquiredAt: fact.acquiredAt,
+    ...(fact.derivedFrom ? { derivedFrom: fact.derivedFrom } : {}),
+  };
 }
 
 export type DeskWork = {
@@ -108,7 +137,8 @@ export type DeskWork = {
   workOrder: { id: string; state: string; assignee: string; acceptedAt: string } | null;
   ask: Ask | null;
   artifact: Artifact | null;
-  observations: Observation[];
+  /** Evidence, already written by the owning department. */
+  facts: DeskFact[];
   history: { at: string; actor: string; capability: string | null; what: string }[];
   withdrawnReason: string | null;
 };
@@ -125,12 +155,12 @@ export type DeskView = {
   done: DeskWork[];
 };
 
-function describe(event: EventEnvelope["event"]): string {
+function describe(event: EventEnvelope["event"], capability: string | null): string {
   switch (event.type) {
     case "HandedOver":
       return "맡았습니다";
-    case "ObservationRecorded":
-      return `확인했습니다 — ${event.observation.statement}`;
+    case "KnowledgeFactRecorded":
+      return `확인했습니다 — ${templateFor(capability ?? "").displayFact(event.fact)}`;
     case "AskRaised":
       return `여쭤봤습니다 — ${event.ask.question}`;
     case "AskAnswered":
@@ -189,15 +219,15 @@ function toWork(
   // One entry per thing that happened. Reading a posting is one act, however
   // many lines it had — a progress log per line is noise, not history.
   const own = events.filter((e) => e.event.holdId === hold.id);
-  const observed = own.filter((e) => e.event.type === "ObservationRecorded");
+  const observed = own.filter((e) => e.event.type === "KnowledgeFactRecorded");
 
   const history = own
-    .filter((e) => e.event.type !== "ObservationRecorded")
+    .filter((e) => e.event.type !== "KnowledgeFactRecorded")
     .map((e) => ({
       at: e.at,
       actor: actorLabel(e.actor),
       capability: e.capability,
-      what: describe(e.event),
+      what: describe(e.event, e.capability),
     }));
 
   if (observed.length > 0) {
@@ -218,7 +248,7 @@ function toWork(
   const composed = template.compose({
     state,
     staffed: isEnabled(hold.capability) && producesReports(hold.capability),
-    facts: hold.observations.map((o) => o.statement),
+    facts: hold.facts.map((f) => template.displayFact(f)),
     outcome: (hold.artifact?.sections ?? []).map((sec) => sec.heading.replace(/^\d+\.\s*/, "")),
     question: hold.outstandingAsk?.question ?? null,
   });
@@ -256,7 +286,7 @@ function toWork(
     ask: hold.outstandingAsk,
     artifact: hold.artifact,
     // The few that carry the result, not every line that was read.
-    observations: hold.observations.slice(0, 5),
+    facts: hold.facts.slice(0, 5).map((f) => toDeskFact(hold.capability, f)),
     history,
     withdrawnReason: null,
   };

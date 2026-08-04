@@ -9,7 +9,9 @@
  * A line that cannot be read is skipped, never guessed.
  */
 
-import type { Artifact, Observation } from "../../events/types.ts";
+import { RECEIPT_AUTHOR } from "./facts.ts";
+import type { DiscountFact, PurchaseFact } from "./facts.ts";
+import type { Artifact } from "../../events/types.ts";
 
 export const CAPABILITY_ID = "home";
 
@@ -223,23 +225,32 @@ export function readReceipt(text: string): Receipt {
   return { items, discounts, total };
 }
 
-/** One observation per item, each pointing at the line it came from (Art. 10). */
-export function observe(text: string, acquiredAt: string): Observation[] {
+/**
+ * One fact per item, each pointing at the line it came from (Art. 10).
+ *
+ * Quantity and amount are fields, not words in a sentence. Inventory reads them
+ * directly — there is no longer a printed shape for anything to parse back.
+ */
+export function observe(text: string, acquiredAt: string): (PurchaseFact | DiscountFact)[] {
   const { items, discounts } = readReceipt(text);
 
   return [
-    ...items.map((item, index) => ({
+    ...items.map((item, index): PurchaseFact => ({
       id: `item-${String(index + 1)}`,
-      // Stable shape: name · quantity · amount. Read back by inventory.
-      statement: `${item.name} · ${String(item.quantity)}${item.unit ?? "개"} · ${item.amount.toLocaleString("ko-KR")}원`,
+      type: "purchase",
+      value: { name: item.name, quantity: item.quantity, unit: item.unit, amount: item.amount },
       source: `receipt:${String(item.line)}`,
+      author: RECEIPT_AUTHOR,
       acquiredAt,
+      // Read straight off the line; the receipt supports the value exactly.
       confidence: 1,
     })),
-    ...discounts.map((d, index) => ({
+    ...discounts.map((d, index): DiscountFact => ({
       id: `discount-${String(index + 1)}`,
-      statement: `${d.label} · 할인 · -${d.amount.toLocaleString("ko-KR")}원`,
+      type: "discount",
+      value: { label: d.label, amount: d.amount },
       source: `receipt:${String(d.line)}`,
+      author: RECEIPT_AUTHOR,
       acquiredAt,
       confidence: 1,
     })),

@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "./pool.ts";
 import { SCHEMA_VERSION } from "../../events/types.ts";
+import { upcast } from "../../events/migrate.ts";
 import type { Actor, EventEnvelope, LifeEvent } from "../../events/types.ts";
 import type { EventStore, EventStream, PreparedStreams } from "../../storage/event-store.ts";
 import type { ActorContext, Scope } from "../../identity/types.ts";
@@ -26,7 +27,9 @@ type Row = {
 };
 
 function toEnvelope(row: Row): EventEnvelope {
-  return {
+  // Same upcast as the file adapter, so a stored shape means the same thing
+  // whichever adapter loaded it. The row itself is never updated.
+  return upcast({
     id: row.id,
     schemaVersion: row.schema_version,
     at: row.at.toISOString(),
@@ -36,7 +39,7 @@ function toEnvelope(row: Row): EventEnvelope {
     event: row.payload,
     householdId: row.household_id,
     scope: row.scope,
-  };
+  });
 }
 
 /**

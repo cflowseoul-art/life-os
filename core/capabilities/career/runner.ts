@@ -8,6 +8,7 @@
 import { CustodyEngine, project } from "../../custody/engine.ts";
 import { employeeForDuty } from "../../company/employees.ts";
 import { analyse, readProfile } from "./fit.ts";
+import { statementOf } from "./facts.ts";
 import { observe } from "./index.ts";
 import { randomUUID } from "node:crypto";
 
@@ -78,10 +79,10 @@ export const runner: CapabilityRunner = {
     // The posting's requirements, and the profile the representative supplied.
     const requirements = observe({ company, role, jdText: postingSection(text) }, now);
     const profile = readProfile(profileSection(text));
-    const fit = analyse(requirements.map((r) => r.statement), profile);
+    const fit = analyse(requirements.map((r) => r.value.statement), profile);
 
-    for (const observation of requirements) {
-      log.append({ type: "ObservationRecorded", holdId, observation }, actor, "career", "career");
+    for (const fact of requirements) {
+      log.append({ type: "KnowledgeFactRecorded", holdId, fact }, actor, "career", "career");
     }
 
     log.append(
@@ -171,7 +172,7 @@ export const runner: CapabilityRunner = {
     const now = new Date().toISOString();
     const actor = { kind: "capability" as const, id: "career" };
     const hold = project(log.read()).get(ask.holdId);
-    const requirements = hold?.observations ?? [];
+    const requirements = hold?.facts ?? [];
     const company = hold?.company ?? "";
     const role = hold?.role ?? "";
 
@@ -222,7 +223,7 @@ export const runner: CapabilityRunner = {
             ],
             options: top.map((o) => ({
               id: `strategy-${o.id}`,
-              label: `${o.statement}을(를) 앞세운다`,
+              label: `${statementOf(o)}을(를) 앞세운다`,
               derivedFrom: [o.id],
             })),
             raisedAt: now,
@@ -249,7 +250,7 @@ export const runner: CapabilityRunner = {
           sections: [
             {
               heading: `초안 · ${company} ${role} 지원자 〈이름〉입니다. `
-                + `${chosen?.statement ?? "핵심 경험"}에 해당하는 일을 〈어디서·언제〉 맡아 〈무엇을 바꿨는지〉 중심으로 말씀드리겠습니다.`,
+                + `${chosen ? statementOf(chosen) : "핵심 경험"}에 해당하는 일을 〈어디서·언제〉 맡아 〈무엇을 바꿨는지〉 중심으로 말씀드리겠습니다.`,
               body: `${editor.displayName} ${editor.displayTitle} 작성 · 확정 전 초안입니다.`,
               derivedFrom: chosen ? [chosen.id] : [],
             },
@@ -278,7 +279,7 @@ export const runner: CapabilityRunner = {
     );
 
     const hold = project(log.read()).get(ask.holdId);
-    const observations = hold?.observations ?? [];
+    const observations = hold?.facts ?? [];
 
     log.append(
       {
@@ -291,11 +292,11 @@ export const runner: CapabilityRunner = {
           facts: [
             `대표님 말씀: ${feedback}`,
             "말씀 주신 내용을 우선으로 두고 다시 여쭙습니다.",
-            ...observations.map((o) => `· ${o.statement}`),
+            ...observations.map((o) => `· ${statementOf(o)}`),
           ],
           options: observations.map((o) => ({
             id: o.id,
-            label: o.statement,
+            label: statementOf(o),
             derivedFrom: [o.id],
           })),
           raisedAt: new Date().toISOString(),

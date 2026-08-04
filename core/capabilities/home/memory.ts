@@ -14,9 +14,23 @@
  * representative saying so does.
  */
 
-import type { EventEnvelope } from "../../events/types.ts";
+import { factsOfType } from "./facts.ts";
+import type { EventEnvelope, KnowledgeFact } from "../../events/types.ts";
 
 export const CAPABILITY_ID = "home";
+
+/** Home's own facts, in order. Another department's are not Home's to read (§5). */
+function ownFacts(events: EventEnvelope[]): KnowledgeFact[] {
+  const facts: KnowledgeFact[] = [];
+
+  for (const envelope of events) {
+    if (envelope.event.type !== "KnowledgeFactRecorded") continue;
+    if (envelope.capability !== CAPABILITY_ID) continue;
+    facts.push(envelope.event.fact);
+  }
+
+  return facts;
+}
 
 export type ProductMemory = {
   /** The product as printed on receipts. Size included. */
@@ -44,40 +58,21 @@ export type Preference = {
 
 type Purchase = { name: string; quantity: number; at: string };
 
-/** Reads purchases out of Home's own observations. */
+/** Reads purchases out of Home's own facts. */
 function purchases(events: EventEnvelope[]): Purchase[] {
-  const out: Purchase[] = [];
-
-  for (const envelope of events) {
-    const { event } = envelope;
-    if (event.type !== "ObservationRecorded" || envelope.capability !== CAPABILITY_ID) continue;
-
-    // name · quantity+unit · amount   (discounts and notes have other shapes)
-    const parts = event.observation.statement.split(" · ");
-    if (parts.length !== 3 || parts[1] === "할인") continue;
-
-    const quantity = Number(/^(\d+)/.exec(parts[1])?.[1] ?? NaN);
-    if (Number.isNaN(quantity)) continue;
-
-    out.push({ name: parts[0], quantity, at: event.observation.acquiredAt });
-  }
-
-  return out;
+  return factsOfType(ownFacts(events), "purchase").map((fact) => ({
+    name: fact.value.name,
+    quantity: fact.value.quantity,
+    at: fact.acquiredAt,
+  }));
 }
 
 /** Explicit depletions: the representative said something ran out. */
 function depletions(events: EventEnvelope[]): { name: string; at: string }[] {
-  const out: { name: string; at: string }[] = [];
-
-  for (const envelope of events) {
-    const { event } = envelope;
-    if (event.type !== "ObservationRecorded" || envelope.capability !== CAPABILITY_ID) continue;
-
-    const match = /^(.+) · 소진$/.exec(event.observation.statement);
-    if (match) out.push({ name: match[1], at: event.observation.acquiredAt });
-  }
-
-  return out;
+  return factsOfType(ownFacts(events), "depletion").map((fact) => ({
+    name: fact.value.name,
+    at: fact.acquiredAt,
+  }));
 }
 
 function mode(values: number[]): number {
@@ -170,24 +165,14 @@ export function statedPreference(text: string, at: string, source: string): Pref
 
 /** Preferences the representative has actually stated, newest first. */
 export function preferences(events: EventEnvelope[]): Preference[] {
-  const out: Preference[] = [];
-
-  for (const envelope of events) {
-    const { event } = envelope;
-    if (event.type !== "ObservationRecorded" || envelope.capability !== CAPABILITY_ID) continue;
-
-    const match = /^선호 · (.+)$/.exec(event.observation.statement);
-    if (match) {
-      out.push({
-        about: match[1],
-        statement: match[1],
-        source: event.observation.source,
-        at: event.observation.acquiredAt,
-      });
-    }
-  }
-
-  return out.reverse();
+  return factsOfType(ownFacts(events), "preference")
+    .map((fact) => ({
+      about: fact.value.about,
+      statement: fact.value.about,
+      source: fact.source,
+      at: fact.acquiredAt,
+    }))
+    .reverse();
 }
 
 /** Finds what the representative meant by a loose word like 우유. */

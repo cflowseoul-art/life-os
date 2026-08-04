@@ -12,6 +12,11 @@ import { EventLog } from "../events/log.ts";
 import type { Forbidden, ForbiddenForFinance } from "./boundaries.ts";
 import type { EventEnvelope } from "../events/types.ts";
 import * as finance from "../capabilities/finance/index.ts";
+import {
+  INFERENCE_CONFIDENCE,
+  LEDGER_AUTHOR,
+  SYSTEM_AUTHOR,
+} from "../capabilities/finance/facts.ts";
 import { anomalies, baselines, monthlyUse, onlySpending } from "../capabilities/finance/ledger.ts";
 import { ALL_POLICIES_PASS, recommendationRequested, violations } from "../capabilities/finance/policy.ts";
 import { readCategoryRules, readLedger } from "../infrastructure/ledger/dugong.ts";
@@ -44,7 +49,7 @@ function financeHolds(events: EventEnvelope[]): FinanceHold[] {
     const hold = holds.get(event.holdId);
     if (!hold) continue;
 
-    if (event.type === "ObservationRecorded") hold.observed = true;
+    if (event.type === "KnowledgeFactRecorded") hold.observed = true;
     if (event.type === "AskRaised") hold.asked = true;
     if (event.type === "AskAnswered") hold.answeredWith = event.optionId;
     if (event.type === "ArtifactKept") hold.kept = true;
@@ -88,12 +93,15 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
       // No access is not "no spending". Say so, record nothing else.
       log.append(
         {
-          type: "ObservationRecorded",
+          type: "KnowledgeFactRecorded",
           holdId: hold.holdId,
-          observation: {
+          fact: {
             id: "ledger-unavailable",
-            statement: read.reason,
+            type: "unavailable",
+            value: { reason: read.reason },
             source: "가계부",
+            // The company reporting on its own reach, not the ledger speaking.
+            author: SYSTEM_AUTHOR,
             acquiredAt: now,
             confidence: 1,
           },
@@ -124,23 +132,30 @@ export async function advanceFinanceFromLedger(log: EventLog, today = new Date()
     if (!hold.observed) {
       const statements = [
         ...failed.flatMap((v) => [
-          { kind: "관찰", text: `${v.policy.title} — ${v.state.text}`, rows: v.state.rows },
-          { kind: "관찰", text: `운영 기준: ${v.expected}`, rows: [] as number[] },
+          { kind: "observation" as const, text: `${v.policy.title} — ${v.state.text}`, rows: v.state.rows },
+          { kind: "observation" as const, text: `운영 기준: ${v.expected}`, rows: [] as number[] },
         ]),
-        ...found.map((a) => ({ kind: "추론", text: a.sentence, rows: a.rows })),
+        ...found.map((a) => ({ kind: "inference" as const, text: a.sentence, rows: a.rows })),
       ];
 
       for (const [index, statement] of statements.entries()) {
+        const inferred = statement.kind === "inference";
+
         log.append(
           {
-            type: "ObservationRecorded",
+            type: "KnowledgeFactRecorded",
             holdId: hold.holdId,
-            observation: {
+            fact: {
               id: `statement-${String(index + 1)}`,
-              statement: `[${statement.kind}] ${statement.text}`,
+              // The kind is a field now, so nothing has to read the sentence
+              // to find out whether Finance observed this or concluded it.
+              type: statement.kind,
+              value: { text: statement.text },
               source: statement.rows.length > 0 ? `거래내역 ${statement.rows.join(", ")}행` : "분류규칙",
+              // An observation is the ledger's; an inference is Finance's own.
+              author: inferred ? SYSTEM_AUTHOR : LEDGER_AUTHOR,
               acquiredAt: now,
-              confidence: 1,
+              confidence: inferred ? INFERENCE_CONFIDENCE : 1,
             },
           },
           actor,

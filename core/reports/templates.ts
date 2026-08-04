@@ -15,6 +15,10 @@
 
 import { employeeFor } from "../company/employees.ts";
 import { producesReports } from "../company/manifest.ts";
+import { display as displayCareerFact } from "../capabilities/career/facts.ts";
+import { display as displayFinanceFact } from "../capabilities/finance/facts.ts";
+import { display as displayHomeFact } from "../capabilities/home/facts.ts";
+import type { KnowledgeFact } from "../events/types.ts";
 
 /** What a template is given. Buckets are generic; labels are the team's job. */
 export type ReportInput = {
@@ -51,7 +55,27 @@ export type ReportTemplate = {
   /** The accountable name that signs this team's reports. */
   contributor: string;
   compose(input: ReportInput): ComposedReport;
+  /**
+   * One line of readable text for one of this department's facts.
+   *
+   * The department owns the phrasing, because it owns the vocabulary. No
+   * surface may switch on a fact type: a new type changes the department's own
+   * `facts.ts` and nothing downstream (§4, Art. 15).
+   */
+  displayFact(fact: KnowledgeFact): string;
 };
+
+/**
+ * The last resort, for a department with no template.
+ *
+ * Prints a legacy prose fact as written and nothing else. It deliberately
+ * cannot read a typed value: a department that writes typed facts and supplies
+ * no formatter should show blank, not a guessed rendering of someone else's
+ * vocabulary.
+ */
+function displayUnknownFact(fact: KnowledgeFact): string {
+  return typeof fact.value === "string" ? fact.value : "";
+}
 
 /**
  * A department that owns work it cannot execute yet says so plainly: it keeps
@@ -84,6 +108,7 @@ const NO_DECISION = "현재 대표님께 결정을 요청드릴 사항은 없습
 export const career: ReportTemplate = {
   capability: "career",
   contributor: employeeFor("career").displayName,
+  displayFact: displayCareerFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("이 건은", "준비되는 대로 바로 올려드리겠습니다.");
 
@@ -158,6 +183,7 @@ export const career: ReportTemplate = {
 export const finance: ReportTemplate = {
   capability: "finance",
   contributor: employeeFor("finance").displayName,
+  displayFact: displayFinanceFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -222,6 +248,8 @@ export const finance: ReportTemplate = {
 export const health: ReportTemplate = {
   capability: "health",
   contributor: employeeFor("health").displayName,
+  // Health writes no facts yet; legacy prose is all it could have.
+  displayFact: displayUnknownFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("건강 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -251,6 +279,7 @@ export const health: ReportTemplate = {
 export const home: ReportTemplate = {
   capability: "home",
   contributor: employeeFor("home").displayName,
+  displayFact: displayHomeFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("살림 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
 
@@ -306,6 +335,8 @@ export const home: ReportTemplate = {
 export const operations: ReportTemplate = {
   capability: "operations",
   contributor: employeeFor("operations").displayName,
+  // Operations owns no content memory (§2). It has no facts to format.
+  displayFact: displayUnknownFact,
   compose: () => notYetStaffed(
     "이 건은",
     "담당 부서가 정해지는 대로 그 팀이 이어받아 올려드리겠습니다.",
@@ -325,6 +356,7 @@ export function templateFor(capability: string): ReportTemplate {
     return {
       capability,
       contributor: employeeFor(capability).displayName,
+      displayFact: displayUnknownFact,
       compose: () => ({
         summary: "이 일은 보고 대상이 아닙니다.",
         sections: [],
@@ -338,6 +370,7 @@ export function templateFor(capability: string): ReportTemplate {
     TEMPLATES.find((t) => t.capability === capability) ?? {
       capability,
       contributor: employeeFor(capability).displayName,
+      displayFact: displayUnknownFact,
       compose: ({ state, staffed, facts, question }) => (!staffed
         ? notYetStaffed("이 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.")
         : {

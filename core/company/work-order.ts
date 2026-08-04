@@ -13,10 +13,16 @@
  * Lifecycle, in order:
  *   accepted   대표실이 접수했습니다        (HandedOver recorded)
  *   assigned   담당 부서와 담당자가 정해졌습니다  (capability on the event)
- *   working    담당자가 진행 중입니다        (first observation recorded)
+ *   working    담당자가 진행 중입니다        (representative answered an Ask)
  *   awaiting   대표님 결정을 기다립니다       (ask raised)
  *   completed  보고가 올라왔습니다          (artifact kept)
  *   withdrawn  거두어들였습니다            (hold withdrawn)
+ *
+ * `working` is deliberately **not** entered by recording a fact. Knowing
+ * something is not the same as having started the work: a department may record
+ * what it read and get no further, and reporting that as progress would tell the
+ * representative something the record does not support. Until a real work-start
+ * event exists, an order stays `assigned` until something actually moves it.
  */
 
 import type { EventEnvelope } from "../events/types.ts";
@@ -95,11 +101,6 @@ export function projectWorkOrders(events: EventEnvelope[]): WorkOrder[] {
       order.state = state;
       order.history.push({ state, at: envelope.at, by, note });
     };
-
-    if (event.type === "ObservationRecorded" && order.state === "assigned") {
-      move("working", order.assignee.name, "확인을 시작했습니다.");
-      continue;
-    }
 
     if (event.type === "AskRaised") {
       move("awaiting", order.assignee.name, "대표님 결정을 여쭈었습니다.");

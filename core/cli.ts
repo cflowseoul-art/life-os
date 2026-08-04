@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 
 import { CustodyEngine } from "./custody/engine.ts";
 import { EventLog } from "./events/log.ts";
+import { templateFor } from "./reports/templates.ts";
 
 function arg(name: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);
@@ -77,8 +78,9 @@ switch (command) {
     for (const hold of engine.ledger()) {
       console.log(`${hold.company} · ${hold.role} — ${hold.state}`);
 
-      for (const observation of hold.observations) {
-        console.log(`    · ${observation.statement}  (${observation.source})`);
+      // Formatted by the department that owns the fact, never by this surface.
+      for (const fact of hold.facts) {
+        console.log(`    · ${templateFor(hold.capability).displayFact(fact)}  (${fact.source})`);
       }
 
       if (hold.artifact) {

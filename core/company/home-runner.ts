@@ -11,8 +11,9 @@
  */
 
 import { EventLog } from "../events/log.ts";
-import type { EventEnvelope } from "../events/types.ts";
+import type { EventEnvelope, KnowledgeFact } from "../events/types.ts";
 import * as home from "../capabilities/home/index.ts";
+import { factsOfType, REPRESENTATIVE_AUTHOR } from "../capabilities/home/facts.ts";
 import { matchProduct, preferences, remember, statedPreference } from "../capabilities/home/memory.ts";
 
 type HomeHold = { holdId: string; store: string; text: string; observed: boolean; kept: boolean };
@@ -35,7 +36,7 @@ function homeHolds(events: EventEnvelope[]): HomeHold[] {
     const hold = holds.get(event.holdId);
     if (!hold) continue;
 
-    if (event.type === "ObservationRecorded") hold.observed = true;
+    if (event.type === "KnowledgeFactRecorded") hold.observed = true;
     if (event.type === "ArtifactKept") hold.kept = true;
     if (event.type === "HoldWithdrawn") holds.delete(event.holdId);
   }
@@ -74,12 +75,15 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
       if (!hold.observed) {
         log.append(
           {
-            type: "ObservationRecorded",
+            type: "KnowledgeFactRecorded",
             holdId: hold.holdId,
-            observation: {
+            fact: {
               id: "depletion",
-              statement: `${word} · 소진`,
+              type: "depletion",
+              value: { name: word },
               source: "대표님 말씀",
+              // The representative said it; the runner only wrote it down.
+              author: REPRESENTATIVE_AUTHOR,
               acquiredAt: now,
               confidence: 1,
             },
@@ -93,12 +97,14 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
         if (stated) {
           log.append(
             {
-              type: "ObservationRecorded",
+              type: "KnowledgeFactRecorded",
               holdId: hold.holdId,
-              observation: {
+              fact: {
                 id: "preference",
-                statement: `선호 · ${stated.about}`,
+                type: "preference",
+                value: { about: stated.about },
                 source: "대표님 말씀",
+                author: REPRESENTATIVE_AUTHOR,
                 acquiredAt: now,
                 confidence: 1,
               },
@@ -132,9 +138,9 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
     }
 
     if (!hold.observed) {
-      for (const observation of home.observe(text, new Date().toISOString())) {
+      for (const fact of home.observe(text, new Date().toISOString())) {
         log.append(
-          { type: "ObservationRecorded", holdId: hold.holdId, observation },
+          { type: "KnowledgeFactRecorded", holdId: hold.holdId, fact },
           actor,
           home.CAPABILITY_ID,
           "home",
@@ -155,22 +161,23 @@ export function advanceHome(log: EventLog, ocr: home.Ocr = home.passthroughOcr):
 export function inventory(events: EventEnvelope[]): { name: string; quantity: number; lastBought: string }[] {
   const byName = new Map<string, { name: string; quantity: number; lastBought: string }>();
 
+  // Purchases only. A discount is a separate fact type, so it can no longer be
+  // mistaken for stock by a parser that misread a sentence.
+  const facts: KnowledgeFact[] = [];
   for (const envelope of events) {
-    const { event } = envelope;
-    if (event.type !== "ObservationRecorded" || envelope.capability !== home.CAPABILITY_ID) continue;
+    if (envelope.event.type !== "KnowledgeFactRecorded") continue;
+    if (envelope.capability !== home.CAPABILITY_ID) continue;
+    facts.push(envelope.event.fact);
+  }
 
-    // name · quantity+unit · amount. Discounts are not inventory.
-    const [name, count] = event.observation.statement.split(" · ");
-    if (name === undefined || count === undefined || count === "할인") continue;
-
-    const quantity = Number(/^(\d+)/.exec(count)?.[1] ?? 1);
-    const existing = byName.get(name);
+  for (const fact of factsOfType(facts, "purchase")) {
+    const existing = byName.get(fact.value.name);
 
     // Merged on the full printed name, so 1L and 900ml stay apart.
-    byName.set(name, {
-      name,
-      quantity: (existing?.quantity ?? 0) + quantity,
-      lastBought: event.observation.acquiredAt,
+    byName.set(fact.value.name, {
+      name: fact.value.name,
+      quantity: (existing?.quantity ?? 0) + fact.value.quantity,
+      lastBought: fact.acquiredAt,
     });
   }
 

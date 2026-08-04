@@ -16,6 +16,7 @@ import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { SCHEMA_VERSION } from "./types.ts";
+import { upcast } from "./migrate.ts";
 import type { Actor, EventEnvelope, LifeEvent } from "./types.ts";
 
 export const DEFAULT_LOG_PATH = ".life-os/events.jsonl";
@@ -116,7 +117,8 @@ export class EventLog {
         );
       }
 
-      events.push(envelope as EventEnvelope);
+      // Older shapes are upcast in memory. The line on disk is never rewritten.
+      events.push(upcast(envelope as EventEnvelope));
     });
 
     return events;

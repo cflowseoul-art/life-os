@@ -14,21 +14,58 @@ export type Actor =
   | { kind: "system" };
 
 /**
+ * Who asserts a fact.
+ *
+ * Distinct from `Actor`, and never substituted for it. `Actor` answers "who
+ * caused this event to be written"; `Author` answers "who says this is true".
+ * A runner importing something the representative said last month has
+ * actor = the runner and author = the representative.
+ *
+ * `unattributed` exists for facts recorded before authorship was carried. It is
+ * never inferred and never back-filled — inventing an author would fabricate
+ * exactly the provenance this type exists to guarantee.
+ */
+export type Author =
+  | { kind: "representative"; userId?: string }
+  | { kind: "employee"; employeeId: string }
+  | { kind: "system" }
+  /** A source of record outside the company: a posting, a receipt, a ledger. */
+  | { kind: "external"; name: string }
+  | { kind: "unattributed" };
+
+/**
  * A fact the system holds.
  *
- * Art. 10 (Memory and Provenance): source, acquisition time, and confidence are
- * required fields, not optional metadata. A fact without them cannot be
- * constructed, so it cannot reach an Ask or an artifact.
+ * Art. 10 (Memory and Provenance): source, acquisition time, author, and
+ * confidence are required fields, not optional metadata. A fact without them
+ * cannot be constructed, so it cannot reach an Ask or an artifact.
+ *
+ * `type` and `value` are **owned by the department that wrote them**. The kernel
+ * stores and transports them and never inspects either — there is no global
+ * domain vocabulary here, and adding one would put Career (or Home, or Finance)
+ * back inside the kernel. Departments declare their own discriminated union over
+ * this type and narrow on read.
+ *
+ * `confidence` means: how strongly does the cited source support this exact
+ * stored value? Not importance, not usefulness, not general truth. A direct
+ * statement from a source of record is 1; a system or employee inference is
+ * always below 1. For an externally reported claim, 1 means "the source did
+ * report this", not "this is objectively true".
  */
-export type Observation = {
+export type KnowledgeFact<TType extends string = string, TValue = unknown> = {
   id: string;
-  /** What is known, in plain language. */
-  statement: string;
-  /** Where it came from, precisely enough to re-check by hand. */
+  /** Department-owned vocabulary. Opaque to the kernel. */
+  type: TType;
+  /** Department-owned shape. Opaque to the kernel. */
+  value: TValue;
+  /** Where the evidence came from, precisely enough to re-check by hand. */
   source: string;
+  /** Who asserts it. Never the envelope's actor. */
+  author: Author;
   acquiredAt: string;
-  /** 1 = quoted directly from what the user handed over. */
   confidence: number;
+  /** Fact ids this was derived or inferred from. Absent for direct facts. */
+  derivedFrom?: string[];
 };
 
 /**
@@ -50,7 +87,7 @@ export type Ask = {
 export type AskOption = {
   id: string;
   label: string;
-  /** Observation ids this option is derived from. Art. 8. */
+  /** KnowledgeFact ids this option is derived from. Art. 8. */
   derivedFrom: string[];
 };
 
@@ -76,7 +113,7 @@ export type CareerHandover = {
 
 export type LifeEvent =
   | { type: "HandedOver"; holdId: string; capability: string; handover: CareerHandover }
-  | { type: "ObservationRecorded"; holdId: string; observation: Observation }
+  | { type: "KnowledgeFactRecorded"; holdId: string; fact: KnowledgeFact }
   | { type: "AskRaised"; holdId: string; ask: Ask }
   | { type: "AskAnswered"; holdId: string; askId: string; optionId: string }
   /** The representative wrote their own instruction instead of choosing. */
@@ -91,8 +128,12 @@ export type LifeEvent =
  *
  * Art. 14 (Durability): a reader years from now must know which shape it is
  * looking at without asking us. Bumped only when the envelope changes.
+ *
+ * 3 — Observation became KnowledgeFact: typed `type`/`value` replacing a prose
+ *     `statement`, and a required `author` separate from the envelope's actor.
+ *     Version 1 and 2 events are upcast on read; see `migrate.ts`.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type EventEnvelope = {
   /** Which household this belongs to. Absent in pre-identity events. */

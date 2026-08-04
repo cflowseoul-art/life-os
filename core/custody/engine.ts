@@ -11,7 +11,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { EventLog } from "../events/log.ts";
-import type { Artifact, Ask, EventEnvelope, Observation } from "../events/types.ts";
+import type { Artifact, Ask, EventEnvelope, KnowledgeFact } from "../events/types.ts";
 import * as career from "../capabilities/career/index.ts";
 
 /**
@@ -60,7 +60,7 @@ export type Hold = {
   state: HoldState;
   company: string;
   role: string;
-  observations: Observation[];
+  facts: KnowledgeFact[];
   outstandingAsk: Ask | null;
   answeredAsks: { askId: string; optionId: string }[];
   artifact: Artifact | null;
@@ -85,7 +85,7 @@ export function project(events: EventEnvelope[]): Map<string, Hold> {
         state: "held",
         company: event.handover.company,
         role: event.handover.role,
-        observations: [],
+        facts: [],
         outstandingAsk: null,
         answeredAsks: [],
         artifact: null,
@@ -98,8 +98,8 @@ export function project(events: EventEnvelope[]): Map<string, Hold> {
     if (!hold) continue;
 
     switch (event.type) {
-      case "ObservationRecorded":
-        hold.observations.push(event.observation);
+      case "KnowledgeFactRecorded":
+        hold.facts.push(event.fact);
         break;
       case "AskRaised":
         hold.outstandingAsk = event.ask;
@@ -236,10 +236,10 @@ export class CustodyEngine {
     const handover = handedOver.event.handover;
 
     // 1. Observe. Only once — replay makes this idempotent by inspection.
-    if (hold.observations.length === 0) {
-      for (const observation of career.observe(handover, now)) {
+    if (hold.facts.length === 0) {
+      for (const fact of career.observe(handover, now)) {
         this.log.append(
-          { type: "ObservationRecorded", holdId, observation },
+          { type: "KnowledgeFactRecorded", holdId, fact },
           actor,
           career.CAPABILITY_ID,
         );
@@ -251,7 +251,7 @@ export class CustodyEngine {
 
     // 2. Ask, if judgment is genuinely required and none is outstanding.
     if (!current.outstandingAsk && current.answeredAsks.length === 0) {
-      const needed = career.judgmentNeeded(holdId, handover, current.observations, now);
+      const needed = career.judgmentNeeded(holdId, handover, current.facts, now);
 
       if (needed) {
         // Art. 4: system-wide, not per-hold. A second Ask waits.
@@ -270,12 +270,12 @@ export class CustodyEngine {
 
     // 3. Propose the artifact. The engine validates before it becomes real.
     const answer = current.answeredAsks[0];
-    const leadId = answer?.optionId ?? current.observations[0]?.id;
+    const leadId = answer?.optionId ?? current.facts[0]?.id;
 
     if (!leadId) return;
 
-    const proposal = career.proposeArtifact(handover, current.observations, leadId);
-    const allowed = career.factualNumbers(current.observations);
+    const proposal = career.proposeArtifact(handover, current.facts, leadId);
+    const allowed = career.factualNumbers(current.facts);
     const unbacked = unbackedNumbers(proposal, allowed);
 
     if (unbacked.length > 0) {
