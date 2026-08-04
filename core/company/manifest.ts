@@ -81,18 +81,19 @@ export const CAPABILITIES: CapabilityManifest[] = [
   {
     id: "career",
     displayName: "커리어",
-    // Six stages of an application, six people. Only fit analysis can execute
+    // Seven stages of an application, seven people. Only job fit can execute
     // today; the rest are declared and unstaffed, which is a fact about the
     // company rather than something to discover at runtime.
     responsibilities: [
-      "career.fit-analysis",
-      "career.application-strategy",
-      "career.resume-editing",
-      "career.cover-letter",
-      "career.interview-prep",
-      "career.application-operations",
+      "career.job_fit",
+      "career.application_strategy",
+      "career.resume_editor",
+      "career.portfolio_editor",
+      "career.cover_letter",
+      "career.interview_coach",
+      "career.application_operator",
     ],
-    accountableFor: "career.fit-analysis",
+    accountableFor: "career.job_fit",
     scope: "personal",
     officeFloor: 1,
     producesReports: true,
@@ -102,7 +103,7 @@ export const CAPABILITIES: CapabilityManifest[] = [
       subjectSignals: ["회사", "직무", "경력", "연봉 협상"],
     },
     scheduler: "none",
-    runners: { "career.fit-analysis": "../capabilities/career/runner.ts" },
+    runners: { "career.job_fit": "../capabilities/career/runner.ts" },
     enabled: true,
   },
   {

@@ -18,7 +18,7 @@
  * `Lee Jaemu (Staff)` differ by title alone.
  */
 
-import { responsibility } from "./responsibilities.ts";
+import { RESPONSIBILITIES, responsibility, responsibilityOf } from "./responsibilities.ts";
 import type { ResponsibilityId } from "./responsibilities.ts";
 
 export type EmployeeTitle =
@@ -153,6 +153,7 @@ const ROSTER: { id: string; department: Department; surname: string; title: Titl
   { id: "emp-career-004", department: "career", surname: "Shin", title: "Associate" },
   { id: "emp-career-005", department: "career", surname: "Bae", title: "Associate" },
   { id: "emp-career-006", department: "career", surname: "Song", title: "Staff" },
+  { id: "emp-career-007", department: "career", surname: "Cho", title: "Associate" },
   { id: "emp-home-001", department: "home", surname: "Han", title: "Senior" },
   { id: "emp-health-001", department: "health", surname: "Jung", title: "Associate" },
   { id: "emp-ceo-001", department: "ceo", surname: "Seo", title: "Manager" },
@@ -192,6 +193,46 @@ function build(entry: (typeof ROSTER)[number]): Employee {
 
 export const EMPLOYEES: Employee[] = ROSTER.map(build);
 
+/**
+ * Problems in the roster's relationship to the assignment table.
+ *
+ * Pure, so the rule can be tested against synthetic input. The rule is a
+ * bijection: every employee owns exactly one responsibility, and every
+ * responsibility is owned by somebody on the roster.
+ *
+ * An employee with no responsibility is the failure this exists to catch. They
+ * used to be reachable anyway — a department lookup would return them if they
+ * happened to be listed first — so an unassigned person could do work nobody
+ * had made them accountable for.
+ */
+export function rosterProblems(
+  employees: { id: string }[],
+  assignments: { id: string; employeeId: string }[],
+): string[] {
+  const problems: string[] = [];
+  const onRoster = new Set(employees.map((e) => e.id));
+  const owned = new Map(assignments.map((a) => [a.employeeId, a.id]));
+
+  for (const employee of employees) {
+    if (!owned.has(employee.id)) problems.push(`${employee.id}: 맡은 책임이 없습니다`);
+  }
+
+  for (const assignment of assignments) {
+    if (!onRoster.has(assignment.employeeId)) {
+      problems.push(`${assignment.id}: 명부에 없는 담당자입니다 (${assignment.employeeId})`);
+    }
+  }
+
+  return problems;
+}
+
+// Checked when the module loads: an unassigned employee must never reach a
+// lookup, because a lookup is already somebody asking who is accountable.
+const problems = rosterProblems(ROSTER, RESPONSIBILITIES);
+if (problems.length > 0) {
+  throw new Error(`명부와 책임 배정이 어긋납니다:\n  - ${problems.join("\n  - ")}`);
+}
+
 const BY_ID = new Map(EMPLOYEES.map((e) => [e.id, e]));
 
 /**
@@ -219,6 +260,13 @@ export function employeeById(id: string): Employee {
  */
 export function employeeForResponsibility(id: ResponsibilityId): Employee {
   return employeeById(responsibility(id).employeeId);
+}
+
+/** What an employee is accountable for. Throws rather than reporting nothing. */
+export function responsibilityOwnedBy(employeeId: string): ResponsibilityId {
+  const found = responsibilityOf(employeeId);
+  if (!found) throw new Error(`맡은 책임이 없는 담당자입니다: ${employeeId}`);
+  return found.id;
 }
 
 /**

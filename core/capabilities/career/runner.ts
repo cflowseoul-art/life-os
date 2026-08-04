@@ -53,7 +53,7 @@ function splitSubject(subject: string): { company: string; role: string } {
  * is settled. Each runs only when its turn comes.
  */
 export const runner: ResponsibilityRunner = {
-  responsibility: "career.fit-analysis",
+  responsibility: "career.job_fit",
 
   accept({ log, subject, request, attachment }: AcceptInput): AcceptResult {
     const { company, role } = splitSubject(subject);
@@ -66,7 +66,7 @@ export const runner: ResponsibilityRunner = {
 
     const holdId = randomUUID();
     const now = new Date().toISOString();
-    const analyst = employeeForResponsibility("career.fit-analysis");
+    const analyst = employeeForResponsibility("career.job_fit");
     const actor = { kind: "capability" as const, id: "career" };
 
     log.append(
@@ -206,7 +206,7 @@ export const runner: ResponsibilityRunner = {
     }
 
     if (optionId === "apply") {
-      const strategist = employeeForResponsibility("career.application-strategy");
+      const strategist = employeeForResponsibility("career.application_strategy");
       const top = requirements.slice(0, 3);
 
       log.append(
@@ -238,7 +238,7 @@ export const runner: ResponsibilityRunner = {
 
     // A positioning choice: the résumé editor's turn.
     const chosen = requirements.find((o) => `strategy-${o.id}` === optionId);
-    const editor = employeeForResponsibility("career.resume-editing");
+    const editor = employeeForResponsibility("career.resume_editor");
 
     log.append(
       {

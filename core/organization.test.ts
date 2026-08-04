@@ -116,14 +116,14 @@ describe("Assignment is explicit", () => {
 
 describe("Signatures come from the responsible employee", () => {
   it("gives two responsibilities in one department two different signatures", () => {
-    const analyst = signature("career.fit-analysis");
-    const editor = signature("career.resume-editing");
+    const analyst = signature("career.job_fit");
+    const editor = signature("career.resume_editor");
 
     expect(analyst.name).not.toBe(editor.name);
     // Same department, different people — the case the old model could not hold.
     expect(analyst.department).toBe(editor.department);
-    expect(analyst.responsibility).toBe("career.fit-analysis");
-    expect(editor.responsibility).toBe("career.resume-editing");
+    expect(analyst.responsibility).toBe("career.job_fit");
+    expect(editor.responsibility).toBe("career.resume_editor");
   });
 
   it("names the responsibility it signed for", () => {
@@ -134,18 +134,18 @@ describe("Signatures come from the responsible employee", () => {
 
 describe("Employee replacement", () => {
   it("changes signatures and nothing else", () => {
-    const target = RESPONSIBILITIES.find((r) => r.id === "career.fit-analysis")!;
+    const target = RESPONSIBILITIES.find((r) => r.id === "career.job_fit")!;
     const original = target.employeeId;
 
     const before = runCareer(freshLog());
-    const beforeName = signature("career.fit-analysis").name;
+    const beforeName = signature("career.job_fit").name;
 
     try {
       // A different person takes over the same responsibility.
       target.employeeId = "emp-career-004";
 
       const after = runCareer(freshLog());
-      const afterName = signature("career.fit-analysis").name;
+      const afterName = signature("career.job_fit").name;
 
       expect(afterName).not.toBe(beforeName);
 
@@ -191,7 +191,7 @@ describe("Dispatch is by responsibility", () => {
     const runnable = runnableResponsibilities().map((r) => r.id).sort();
 
     expect(runnable).toEqual([
-      "career.fit-analysis",
+      "career.job_fit",
       "finance.ledger-review",
       "home.provisioning",
     ]);
@@ -199,18 +199,18 @@ describe("Dispatch is by responsibility", () => {
 
   it("errors on a responsibility that cannot execute — never substitutes another", () => {
     // Declared, assigned, and deliberately unstaffed.
-    expect(() => runnerModuleFor("career.resume-editing")).toThrow(/러너가 선언되지 않았습니다/);
-    expect(() => runnerModuleFor("career.interview-prep")).toThrow(/러너가 선언되지 않았습니다/);
+    expect(() => runnerModuleFor("career.resume_editor")).toThrow(/러너가 선언되지 않았습니다/);
+    expect(() => runnerModuleFor("career.interview_coach")).toThrow(/러너가 선언되지 않았습니다/);
   });
 
   it("refuses a runner that claims a different responsibility", async () => {
     await expect(
-      loadRunner("career.cover-letter", "../capabilities/career/runner.ts"),
+      loadRunner("career.cover_letter", "../capabilities/career/runner.ts"),
     ).rejects.toThrow(/맡은 책임이 다릅니다/);
   });
 
   it("has every runner declare the responsibility it executes", () => {
-    expect(careerRunner.responsibility).toBe("career.fit-analysis");
+    expect(careerRunner.responsibility).toBe("career.job_fit");
   });
 });
 
@@ -232,8 +232,8 @@ describe("The manifest binds responsibilities", () => {
   it("lets a capability hold more responsibilities than it can execute", () => {
     const career = CAPABILITIES.find((c) => c.id === "career")!;
 
-    expect(career.responsibilities).toHaveLength(6);
-    expect(Object.keys(career.runners ?? {})).toEqual(["career.fit-analysis"]);
+    expect(career.responsibilities).toHaveLength(7);
+    expect(Object.keys(career.runners ?? {})).toEqual(["career.job_fit"]);
   });
 
   it("seats the same people at the same desks as before the split", () => {
