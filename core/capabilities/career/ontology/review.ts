@@ -8,9 +8,13 @@
  *
  * Nothing here decides anything on the representative's behalf. It presents
  * what was seen, offers the shapes a term can take, and writes only what was
- * approved. There is no search, no suggestion drawn from outside the record,
- * and no path from free text to the vocabulary that does not pass through an
- * explicit confirmation.
+ * approved. There is no path from free text to the vocabulary that does not
+ * pass through an explicit confirmation.
+ *
+ * An item may carry what Research found, ranked and with its evidence. That is
+ * a proposal and never an action: the same seven options are offered whatever
+ * the suggestion says, nothing is pre-selected, and an approval writes exactly
+ * what the representative chose rather than what was suggested.
  */
 
 import { randomUUID } from "node:crypto";
@@ -19,6 +23,8 @@ import { normaliseLabel } from "./types.ts";
 import { CANDIDATE_TYPE } from "./candidates.ts";
 import { recordChange } from "./changes.ts";
 import { candidateQueue } from "./queue.ts";
+import { cachedResearch, researchCandidate } from "./research.ts";
+import type { SearchFinding, Suggestion, TermSearch } from "./research.ts";
 import type { Candidate } from "./candidates.ts";
 import type { CareerOntology } from "./index.ts";
 import type { Label, Term, TermId, TermKind } from "./types.ts";
@@ -44,6 +50,30 @@ export const REVIEW_OPTIONS: { kind: ReviewOptionKind; label: string }[] = [
   { kind: "direct", label: "기타 · 직접 입력" },
 ];
 
+/**
+ * What Research found for a candidate, as the review shows it.
+ *
+ * Four states, and the difference between them matters. "Nobody has looked" and
+ * "we looked and could not tell" are different things to put in front of the
+ * representative, and "we could not look at all" is a third — reporting a
+ * missing adapter as an empty result would be the review claiming to have
+ * checked.
+ */
+export type ReviewResearch =
+  | { state: "not_searched"; note: string }
+  | { state: "unavailable"; note: string }
+  | { state: "unknown"; searchedAt: string; findings: SearchFinding[]; sources: string[]; note: string }
+  | {
+      state: "suggested";
+      searchedAt: string;
+      /** Ranked, highest confidence first. */
+      suggestions: Suggestion[];
+      /** The confidence of the strongest reading. */
+      confidence: number;
+      findings: SearchFinding[];
+      sources: string[];
+    };
+
 /** One candidate as the review presents it. */
 export type ReviewItem = {
   candidate: Candidate;
@@ -56,6 +86,14 @@ export type ReviewItem = {
    * the one mistake this vocabulary cannot recover from cheaply.
    */
   nearMatches: { termId: TermId; name: string }[];
+  /**
+   * What was found, if anything was.
+   *
+   * A suggestion is a proposal and never an action. The representative still
+   * chooses from the same seven options; nothing here narrows them, pre-selects
+   * one, or changes what an approval writes.
+   */
+  research: ReviewResearch;
 };
 
 export type Review = {
@@ -84,19 +122,101 @@ function nearMatches(term: string, ontology: CareerOntology): ReviewItem["nearMa
     });
 }
 
+/** Distinct places a set of findings came from, in the order they were found. */
+function sourcesOf(findings: SearchFinding[]): string[] {
+  return [...new Set(findings.map((f) => f.source))];
+}
+
+/**
+ * What Research has already found for a candidate.
+ *
+ * Reads the cache and never searches. Opening a review is looking at a list;
+ * it must not reach outward, and it must not cost a lookup per candidate every
+ * time somebody glances at the queue.
+ */
+export function researchFor(log: EventStream, candidate: Candidate): ReviewResearch {
+  if (candidate.status !== "pending") {
+    return { state: "not_searched", note: "나중에 보기로 두신 표현입니다." };
+  }
+
+  const found = cachedResearch(log, candidate.term);
+  if (!found) return { state: "not_searched", note: "아직 찾아보지 않았습니다." };
+
+  const usable = found.suggestions.filter((s) => s.kind !== "unknown");
+
+  if (usable.length === 0) {
+    return {
+      state: "unknown",
+      searchedAt: found.searchedAt,
+      findings: found.evidence,
+      sources: sourcesOf(found.evidence),
+      note: found.suggestions[0]?.rationale ?? "무엇인지 판단하기 어렵습니다.",
+    };
+  }
+
+  return {
+    state: "suggested",
+    searchedAt: found.searchedAt,
+    suggestions: usable,
+    confidence: usable[0].confidence,
+    findings: found.evidence,
+    sources: sourcesOf(found.evidence),
+  };
+}
+
 /**
  * Everything waiting, in one review.
  *
  * Deferred candidates are included: deferring means "not now", not "never", and
  * a queue that hid them would make deferral indistinguishable from ignoring.
+ *
+ * Research is read from the cache only. Nothing is searched by opening a list.
  */
 export function openReview(log: EventStream, ontology: CareerOntology): Review {
   const items = candidateQueue(log)
     .filter((c) => c.status === "pending" || c.status === "deferred")
     .sort((a, b) => b.occurrenceCount - a.occurrenceCount || a.normalised.localeCompare(b.normalised))
-    .map((candidate) => ({ candidate, nearMatches: nearMatches(candidate.term, ontology) }));
+    .map((candidate) => ({
+      candidate,
+      nearMatches: nearMatches(candidate.term, ontology),
+      research: researchFor(log, candidate),
+    }));
 
   return { items, version: ontology.version() };
+}
+
+/**
+ * The same review, having looked up whatever had not been looked up.
+ *
+ * Explicit and separate, because searching is an act and opening a list is not.
+ * Only pending candidates are searched, only once — a cached result is reused
+ * — and a search that could not happen leaves the item saying so rather than
+ * looking like one that found nothing.
+ */
+export async function openReviewWithResearch(
+  input: { log: EventStream; holdId: string; ontology: CareerOntology; search?: TermSearch },
+): Promise<Review> {
+  const { log, holdId, ontology, search } = input;
+
+  for (const candidate of candidateQueue(log)) {
+    if (candidate.status !== "pending") continue;
+    if (cachedResearch(log, candidate.term)) continue;
+
+    // Failures are not cached, so an unavailable adapter is retried later
+    // rather than becoming a settled answer.
+    await researchCandidate({ log, holdId, ontology, search }, candidate.term);
+  }
+
+  const review = openReview(log, ontology);
+
+  return {
+    ...review,
+    items: review.items.map((item) =>
+      item.research.state === "not_searched" && item.candidate.status === "pending"
+        ? { ...item, research: { state: "unavailable", note: "지금은 찾아볼 수 없습니다." } }
+        : item,
+    ),
+  };
 }
 
 /* ── Direct input ───────────────────────────────────────────────────────── */

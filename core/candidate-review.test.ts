@@ -17,8 +17,14 @@ import {
   REVIEW_OPTIONS,
   applyReview,
   openReview,
+  openReviewWithResearch,
   proposeFromText,
 } from "./capabilities/career/ontology/review.ts";
+import {
+  researchCandidate,
+  researchFacts,
+} from "./capabilities/career/ontology/research.ts";
+import type { SearchFinding, TermSearch } from "./capabilities/career/ontology/research.ts";
 import { candidateQueue } from "./capabilities/career/ontology/queue.ts";
 import { changeFacts } from "./capabilities/career/ontology/changes.ts";
 import { careerOntologyFor } from "./capabilities/career/ontology/provider.ts";
@@ -359,5 +365,200 @@ describe("Nothing is searched", () => {
         expect(held.has(near.termId)).toBe(true);
       }
     }
+  });
+});
+
+describe("Research reaches the review", () => {
+  const TOOL_FINDINGS: SearchFinding[] = [
+    {
+      title: "BigQuery",
+      snippet: "BigQuery is a serverless data warehouse platform.",
+      source: "https://example.test/bigquery",
+      retrievedAt: "2026-08-04T00:00:00.000Z",
+    },
+    {
+      title: "What is BigQuery?",
+      snippet: "A fully managed analytics service from Google Cloud.",
+      source: "https://example.test/what",
+      retrievedAt: "2026-08-04T00:00:00.000Z",
+    },
+  ];
+
+  const search: TermSearch = () => Promise.resolve(TOOL_FINDINGS);
+  const noise: TermSearch = () => Promise.resolve([
+    { title: "Zzz", snippet: "그냥 어떤 문장입니다.", source: "https://example.test/a", retrievedAt: "2026-08-04T00:00:00.000Z" },
+    { title: "Zzz 후기", snippet: "블로그 글입니다.", source: "https://example.test/b", retrievedAt: "2026-08-04T00:00:00.000Z" },
+  ]);
+
+  async function looked(log: EventLog, term: string, adapter: TermSearch) {
+    await researchCandidate(
+      { log, holdId: "r", ontology: careerOntologyFor(ACTOR, log), search: adapter },
+      term,
+    );
+    return review(log);
+  }
+
+  it("says nothing has been looked up yet", () => {
+    const item = review(queued()).items.find((i) => i.candidate.term === "BigQuery")!;
+
+    expect(item.research).toEqual({ state: "not_searched", note: "아직 찾아보지 않았습니다." });
+  });
+
+  it("carries ranked suggestions, confidence, findings and sources", async () => {
+    const found = await looked(queued(), "BigQuery", search);
+    const item = found.items.find((i) => i.candidate.term === "BigQuery")!;
+
+    expect(item.research.state).toBe("suggested");
+    if (item.research.state !== "suggested") throw new Error("shape");
+
+    expect(item.research.suggestions[0].kind).toBe("tool");
+    expect(item.research.confidence).toBe(1);
+    expect(item.research.findings).toHaveLength(2);
+    expect(item.research.sources).toEqual([
+      "https://example.test/bigquery",
+      "https://example.test/what",
+    ]);
+
+    // Ranked, highest first.
+    const confidences = item.research.suggestions.map((s) => s.confidence);
+    expect([...confidences].sort((a, b) => b - a)).toEqual(confidences);
+  });
+
+  it("shows an unreadable result as unknown, with what was found", async () => {
+    const log = freshLog();
+    analyst.accept({
+      actor: ACTOR, log, subject: "A · Data Analyst", request: "- Zzzqqq 운영", attachment: "",
+    });
+
+    const term = review(log).items[0].candidate.term;
+    const found = await looked(log, term, noise);
+    const item = found.items.find((i) => i.candidate.term === term)!;
+
+    expect(item.research.state).toBe("unknown");
+    if (item.research.state !== "unknown") throw new Error("shape");
+
+    // Honest: it looked, it could not tell, and the evidence is still there.
+    expect(item.research.findings).toHaveLength(2);
+    expect(item.research.sources).toHaveLength(2);
+    expect(item.research.note).toContain("판단하기 어렵습니다");
+  });
+
+  it("keeps the near matches it already had", async () => {
+    const log = freshLog();
+    analyst.accept({
+      actor: ACTOR, log, subject: "A · Data Analyst", request: "- Data Modeling Tools", attachment: "",
+    });
+
+    const found = await looked(log, "Data Modeling Tools", search);
+    const item = found.items[0];
+
+    expect(item.nearMatches.map((n) => n.name)).toContain("Data Modeling");
+    expect(item.research.state).toBe("suggested");
+  });
+
+  it("marks a deferred candidate as not searched", () => {
+    const log = queued();
+    decide(log, [{ kind: "defer", term: "BigQuery" }]);
+
+    const item = review(log).items.find((i) => i.candidate.term === "BigQuery")!;
+
+    expect(item.research).toEqual({ state: "not_searched", note: "나중에 보기로 두신 표현입니다." });
+  });
+
+  it("does not search by opening a review", () => {
+    const log = queued();
+    let calls = 0;
+
+    const counting: TermSearch = () => {
+      calls += 1;
+      return Promise.resolve(TOOL_FINDINGS);
+    };
+    void counting;
+
+    review(log);
+    review(log);
+
+    // Opening a list is looking, not acting.
+    expect(calls).toBe(0);
+    expect(researchFacts(log)).toEqual([]);
+  });
+
+  it("reuses the cache when the review is opened again", async () => {
+    const log = queued();
+    let calls = 0;
+
+    const counting: TermSearch = () => {
+      calls += 1;
+      return Promise.resolve(TOOL_FINDINGS);
+    };
+
+    await openReviewWithResearch({ log, holdId: "r", ontology: careerOntologyFor(ACTOR, log), search: counting });
+    const before = calls;
+
+    await openReviewWithResearch({ log, holdId: "r", ontology: careerOntologyFor(ACTOR, log), search: counting });
+
+    expect(calls).toBe(before);
+  });
+
+  it("says plainly when it could not look at all", async () => {
+    const log = queued();
+
+    // No adapter configured.
+    const found = await openReviewWithResearch({
+      log, holdId: "r", ontology: careerOntologyFor(ACTOR, log),
+    });
+
+    for (const item of found.items.filter((i) => i.candidate.status === "pending")) {
+      expect(item.research).toEqual({ state: "unavailable", note: "지금은 찾아볼 수 없습니다." });
+    }
+
+    // A search that never happened is not cached, so it will be retried.
+    expect(researchFacts(log)).toEqual([]);
+  });
+
+  it("writes nothing to the vocabulary", async () => {
+    const log = queued();
+    const before = careerOntologyFor(ACTOR, log);
+
+    await openReviewWithResearch({ log, holdId: "r", ontology: before, search });
+
+    const after = careerOntologyFor(ACTOR, log);
+
+    expect(after.version()).toBe(before.version());
+    expect(after.terms()).toHaveLength(before.terms().length);
+    expect(after.resolve("BigQuery")).toBeNull();
+    expect(changeFacts(log)).toEqual([]);
+  });
+
+  it("leaves the representative every option, whatever it suggested", async () => {
+    const log = queued();
+    const found = await looked(log, "BigQuery", search);
+    const item = found.items.find((i) => i.candidate.term === "BigQuery")!;
+
+    expect(item.research.state).toBe("suggested");
+    // Nothing is narrowed or pre-selected.
+    expect(REVIEW_OPTIONS).toHaveLength(7);
+    expect(item.candidate.status).toBe("pending");
+  });
+
+  it("writes what was chosen, not what was suggested", async () => {
+    const log = queued();
+    await looked(log, "BigQuery", search);
+
+    // Research read it as a tool; the representative says vocabulary.
+    decide(log, [{ kind: "vocabulary", term: "BigQuery" }]);
+
+    expect(careerOntologyFor(ACTOR, log).resolve("BigQuery")?.kind).toBe("vocabulary");
+  });
+
+  it("leaves the queue alone", async () => {
+    const log = queued();
+    const before = candidateQueue(log).map((c) => `${c.normalised}:${c.status}:${String(c.occurrenceCount)}`);
+
+    await openReviewWithResearch({ log, holdId: "r", ontology: careerOntologyFor(ACTOR, log), search });
+
+    const after = candidateQueue(log).map((c) => `${c.normalised}:${c.status}:${String(c.occurrenceCount)}`);
+
+    expect(after).toEqual(before);
   });
 });
