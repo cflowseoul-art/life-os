@@ -179,14 +179,18 @@ function Reader({
   work,
   onBack,
   onDecide,
+  onRevise,
   busy,
 }: {
   work: Work;
   onBack: () => void;
   onDecide: (optionId: string) => void;
+  onRevise: (feedback: string) => void;
   busy: boolean;
 }) {
   const [choice, setChoice] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const own = choice === "own";
   const person = (
     <>
       {work.contributor}
@@ -254,18 +258,46 @@ function Reader({
                 {option.label}
               </button>
             ))}
+
+            {/* The options are what the company could think of. This is where
+                the representative says something it did not offer. */}
+            <button
+              type="button"
+              className="choice"
+              aria-pressed={own}
+              onClick={() => { setChoice("own"); }}
+            >
+              직접 의견 입력
+            </button>
+
+            {own && (
+              <textarea
+                className="attach-box"
+                rows={3}
+                autoFocus
+                placeholder="어떻게 고칠지 말씀해 주십시오. (예: 3번이 있었어야지)"
+                value={feedback}
+                onChange={(e) => { setFeedback(e.target.value); }}
+              />
+            )}
           </div>
           <div className="actions">
             <button
               type="button"
               className="btn"
-              disabled={choice === null || busy}
-              onClick={() => { if (choice) onDecide(choice); }}
+              disabled={choice === null || own || busy}
+              onClick={() => { if (choice && !own) onDecide(choice); }}
             >
               승인
             </button>
-            {/* No revision event exists in the engine. Inert, not pretending. */}
-            <button type="button" className="btn btn--ghost" disabled>수정 요청</button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={feedback.trim() === "" || busy}
+              onClick={() => { onRevise(feedback.trim()); }}
+            >
+              수정 요청
+            </button>
           </div>
         </div>
       )}
@@ -571,6 +603,23 @@ export default function RepresentativeComputer() {
       .finally(() => { setBusy(false); });
   }, []);
 
+  /** The representative's own words, sent as written. */
+  const revise = useCallback((feedback: string) => {
+    setBusy(true);
+    fetch("/api/desk/revise", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ feedback }),
+    })
+      .then((r) => r.json() as Promise<{ ok: boolean; desk?: Desk; reason?: string }>)
+      .then((result) => {
+        if (result.ok && result.desk) { setDesk(result.desk); setOpenId(null); }
+        else setError(result.reason ?? "말씀을 전하지 못했습니다.");
+      })
+      .catch(() => { setError("말씀을 전하지 못했습니다."); })
+      .finally(() => { setBusy(false); });
+  }, []);
+
   const all = useMemo(
     () => (desk ? [...desk.awaiting, ...desk.inProgress, ...desk.done] : []),
     [desk],
@@ -691,7 +740,13 @@ export default function RepresentativeComputer() {
 
         <div className="panel">
           {open ? (
-            <Reader work={open} busy={busy} onBack={() => { setOpenId(null); }} onDecide={decide} />
+            <Reader
+              work={open}
+              busy={busy}
+              onBack={() => { setOpenId(null); }}
+              onDecide={decide}
+              onRevise={revise}
+            />
           ) : lens === "office" ? (
             <section>
               <div className="screen-head">

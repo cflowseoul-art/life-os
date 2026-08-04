@@ -135,6 +135,8 @@ function describe(event: EventEnvelope["event"]): string {
       return `여쭤봤습니다 — ${event.ask.question}`;
     case "AskAnswered":
       return "대표님께서 정해 주셨습니다";
+    case "RevisionRequested":
+      return `대표님 말씀 — ${event.feedback}`;
     case "ArtifactKept":
       return `정리해서 올렸습니다 — ${event.artifact.title}`;
     case "ProposalRejected":
@@ -647,6 +649,43 @@ function handle(
         )
         .then(() => { void ctx.flush().then(() => { json(res, 200, { ok: true, desk: ctx.view() }); }); })
         .catch(() => { json(res, 500, { ok: false, reasons: ["영수증을 정리하지 못했습니다."] }); });
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/desk/revise") {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+    req.on("end", () => {
+      const feedback = String((JSON.parse(body || "{}") as { feedback?: unknown }).feedback ?? "").trim();
+
+      if (feedback === "") {
+        json(res, 400, { ok: false, reason: "어떤 점을 고칠지 적어 주십시오." });
+        return;
+      }
+
+      const outstanding = ctx.outstandingAsk();
+
+      if (!outstanding) {
+        json(res, 400, { ok: false, reason: "지금은 여쭌 것이 없습니다." });
+        return;
+      }
+
+      const owner = outstanding.capability;
+
+      void loadRunner(owner, runnerModuleFor(owner))
+        .then((runner) => {
+          if (!runner.revise) throw new Error("이 건은 아직 수정 요청을 받지 못합니다.");
+          return runner.revise({ actor, log: ctx.logFor(owner), ask: outstanding.ask, feedback });
+        })
+        .then(() => ctx.flush())
+        .then(() => { json(res, 200, { ok: true, desk: ctx.view() }); })
+        .catch((error: unknown) => {
+          json(res, 400, {
+            ok: false,
+            reason: error instanceof Error ? error.message : "말씀을 전하지 못했습니다.",
+          });
+        });
     });
     return;
   }

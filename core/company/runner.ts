@@ -32,6 +32,15 @@ export type AnswerInput = {
   optionId: string;
 };
 
+/** What a capability is given when the representative asks for a revision. */
+export type ReviseInput = {
+  actor: ActorContext;
+  log: EventStream;
+  ask: Ask;
+  /** The representative's own words. Authoritative over the options offered. */
+  feedback: string;
+};
+
 /** What a capability is given when the schedule wakes it. */
 export type TickInput = {
   actor: ActorContext;
@@ -52,6 +61,11 @@ export type CapabilityRunner = {
    * the custody engine implement it; the rest leave it undefined.
    */
   answer?(input: AnswerInput): Promise<void> | void;
+  /**
+   * Take the representative's written instruction. The proposal that prompted
+   * it is already in the record; this adds what they said, and asks again.
+   */
+  revise?(input: ReviseInput): Promise<void> | void;
   /** Woken by the schedule, when the manifest says this capability is scheduled. */
   tick?(input: TickInput): Promise<void> | void;
 };

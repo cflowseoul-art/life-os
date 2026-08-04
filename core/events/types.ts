@@ -79,6 +79,8 @@ export type LifeEvent =
   | { type: "ObservationRecorded"; holdId: string; observation: Observation }
   | { type: "AskRaised"; holdId: string; ask: Ask }
   | { type: "AskAnswered"; holdId: string; askId: string; optionId: string }
+  /** The representative wrote their own instruction instead of choosing. */
+  | { type: "RevisionRequested"; holdId: string; askId: string; feedback: string }
   | { type: "ProposalRejected"; holdId: string; proposal: string; reasons: string[] }
   | { type: "ArtifactKept"; holdId: string; artifact: Artifact }
   /** Art. 18 (Deletion): corrections append, never destroy. */
