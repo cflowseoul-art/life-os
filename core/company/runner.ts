@@ -74,7 +74,38 @@ export type ResponsibilityRunner = {
   tick?(input: TickInput): Promise<void> | void;
 };
 
-const loaded = new Map<ResponsibilityId, ResponsibilityRunner>();
+/** What was registered, and where it came from. The path is kept to detect conflicts. */
+type Registration = { runner: ResponsibilityRunner; modulePath: string };
+
+const registry = new Map<ResponsibilityId, Registration>();
+
+/**
+ * Registers a runner against the responsibility it declares.
+ *
+ * The runner names its own responsibility, so registration cannot file it under
+ * somebody else's — there is no id parameter to disagree with.
+ *
+ * Registering the same module twice is the normal case: the registry is warmed
+ * at boot and consulted again on every request. Registering a *different*
+ * module for a responsibility that already has one is a contradiction, and it
+ * throws. Quietly keeping the first would mean the company runs one runner
+ * while its declaration names another, and nothing would ever say so.
+ */
+export function register(runner: ResponsibilityRunner, modulePath: string): ResponsibilityRunner {
+  const id = runner.responsibility;
+  const existing = registry.get(id);
+
+  if (existing) {
+    if (existing.modulePath === modulePath) return existing.runner;
+
+    throw new Error(
+      `${id}: 러너가 두 번 등록되었습니다 (${existing.modulePath}, ${modulePath})`,
+    );
+  }
+
+  registry.set(id, { runner, modulePath });
+  return runner;
+}
 
 /**
  * Loads a responsibility's runner from the module the manifest names.
@@ -87,8 +118,8 @@ export async function loadRunner(
   id: ResponsibilityId,
   modulePath: string,
 ): Promise<ResponsibilityRunner> {
-  const cached = loaded.get(id);
-  if (cached) return cached;
+  const cached = registry.get(id);
+  if (cached?.modulePath === modulePath) return cached.runner;
 
   const module = (await import(modulePath)) as { runner?: ResponsibilityRunner };
   const runner = module.runner;
@@ -98,10 +129,29 @@ export async function loadRunner(
     throw new Error(`${id}: 러너가 맡은 책임이 다릅니다 (${runner.responsibility})`);
   }
 
-  loaded.set(id, runner);
-  return runner;
+  return register(runner, modulePath);
 }
 
-export function loadedRunner(id: ResponsibilityId): ResponsibilityRunner | null {
-  return loaded.get(id) ?? null;
+/**
+ * The runner for a responsibility.
+ *
+ * Throws when nothing is registered. A responsibility with no runner is a
+ * responsibility nobody can execute, and the caller asking for it has already
+ * decided the work should happen — returning nothing would turn that into a
+ * silent no-op somewhere further down.
+ */
+export function runnerFor(id: ResponsibilityId): ResponsibilityRunner {
+  const found = registry.get(id);
+  if (!found) throw new Error(`${id}: 등록된 러너가 없습니다.`);
+  return found.runner;
+}
+
+/** Whether a responsibility can be executed right now. */
+export function hasRunner(id: ResponsibilityId): boolean {
+  return registry.has(id);
+}
+
+/** Everything registered, for inspection. Never used to pick a runner. */
+export function registeredResponsibilities(): ResponsibilityId[] {
+  return [...registry.keys()];
 }
