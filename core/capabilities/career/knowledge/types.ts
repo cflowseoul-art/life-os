@@ -171,6 +171,8 @@ export type ApplicationFact = KnowledgeFact<"application", {
   nextStep: string | null;
   /** When an interview is scheduled, if one is. */
   interviewAt: string | null;
+  /** 1 for a first interview, 2 for a second. Null outside the interview stage. */
+  interviewStage: number | null;
   memo: string | null;
   updatedAt: string;
 }>;

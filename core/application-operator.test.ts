@@ -7,7 +7,7 @@
  * posting still reaches the Job Fit Analyst.
  */
 
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { EventLog } from "./events/log.ts";
 import {
   APPLICATION_QUERY_SIGNALS,
+  applicationFor,
   readQuery,
   reportApplications,
 } from "./capabilities/career/applications.ts";
@@ -298,5 +299,214 @@ describe("The operator only reports", () => {
     // Operations only: it takes work and reports, and answers no question.
     expect(operator.answer).toBeUndefined();
     expect(operator.revise).toBeUndefined();
+  });
+});
+
+describe("Natural language writes", () => {
+  function fresh() {
+    const log = freshLog();
+    const say = (text: string) =>
+      operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
+    const knowledge = () => careerKnowledgeFor(ACTOR, log);
+    return { log, say, knowledge };
+  }
+
+  it("creates an application from 지원 완료", () => {
+    const { say, knowledge } = fresh();
+
+    expect(say("채널톡 지원 완료")).toEqual({ ok: true });
+
+    const record = applicationFor(knowledge(), "채널톡")!;
+    expect(record.company).toBe("채널톡");
+    expect(record.status).toBe("applied");
+    expect(record.appliedAt).not.toBeNull();
+    expect(record.history).toHaveLength(1);
+  });
+
+  it("updates an existing application and keeps what came before", () => {
+    const { say, knowledge } = fresh();
+
+    say("원프레딕트 지원 완료");
+    say("원프레딕트 서류 합격");
+    say("원프레딕트 1차 면접");
+    say("원프레딕트 2차 면접");
+    say("원프레딕트 최종 합격");
+
+    const record = applicationFor(knowledge(), "원프레딕트")!;
+
+    expect(record.status).toBe("offer");
+    expect(record.history.map((h) => h.status)).toEqual([
+      "applied", "screening", "interview", "interview", "offer",
+    ]);
+    // Nothing was overwritten: each movement is still exactly as recorded.
+    expect(record.history.map((h) => h.interviewStage)).toEqual([null, null, 1, 2, null]);
+  });
+
+  it("reads the interview stage the representative named", () => {
+    const { say, knowledge } = fresh();
+
+    say("에이블리 지원 완료");
+    say("에이블리 1차 면접");
+
+    const record = applicationFor(knowledge(), "에이블리")!;
+    expect(record.status).toBe("interview");
+    expect(record.interviewStage).toBe(1);
+  });
+
+  it("records a rejection", () => {
+    const { say, knowledge } = fresh();
+
+    say("미리디 지원 완료");
+    say("미리디 최종 탈락");
+
+    expect(applicationFor(knowledge(), "미리디")!.status).toBe("rejected");
+  });
+
+  it("adds a memo without changing status", () => {
+    const { say, knowledge } = fresh();
+
+    say("채널톡 지원 완료");
+    say("채널톡 메모 추가\n라이브 SQL 테스트 있음");
+
+    const record = applicationFor(knowledge(), "채널톡")!;
+    expect(record.memo).toBe("라이브 SQL 테스트 있음");
+    expect(record.status).toBe("applied");
+    expect(record.history).toHaveLength(2);
+  });
+
+  it("rejects a duplicate application", () => {
+    const { say, knowledge } = fresh();
+
+    say("채널톡 지원 완료");
+    const again = say("채널톡 지원 완료");
+
+    expect(again.ok).toBe(false);
+    expect(again).toMatchObject({ reasons: [expect.stringContaining("이미")] });
+    // The duplicate wrote nothing.
+    expect(applicationFor(knowledge(), "채널톡")!.history).toHaveLength(1);
+  });
+
+  it("refuses to move an application nobody applied to", () => {
+    const { say } = fresh();
+    const result = say("몰라요 서류 합격");
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ reasons: [expect.stringContaining("지원한 기록이 없습니다")] });
+  });
+
+  it("refuses a command that names no company", () => {
+    const { say } = fresh();
+    const result = say("지원 취소");
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ reasons: [expect.stringContaining("어느 회사인지")] });
+  });
+
+  it("reports only what moved", () => {
+    const { log, say } = fresh();
+
+    say("채널톡 지원 완료");
+    say("채널톡 서류 합격");
+
+    const kept = log.read().filter((e) => e.event.type === "ArtifactKept");
+    const last = kept[kept.length - 1];
+    if (last?.event.type !== "ArtifactKept") throw new Error("no artifact");
+
+    expect(last.event.artifact.sections.map((s) => s.heading)).toEqual([
+      "회사 · 채널톡",
+      "직무 · 미기재",
+      "이전 상태 · 지원함",
+      "현재 상태 · 서류 통과",
+      "기록 2건",
+    ]);
+  });
+});
+
+describe("Queries reflect writes immediately", () => {
+  it("shows a new application in the very next query", () => {
+    const log = freshLog();
+    const say = (text: string) =>
+      operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
+
+    expect(reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log)).empty).toBe(true);
+
+    say("채널톡 지원 완료");
+    say("당근 지원 완료");
+    say("당근 서류 합격");
+
+    const all = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log));
+    expect(all.total).toBe(2);
+
+    const passed = reportApplications(readQuery("서류합격한 곳")!, careerKnowledgeFor(ACTOR, log));
+    expect(passed.groups.flatMap((g) => g.applications.map((a) => a.company))).toEqual(["당근"]);
+  });
+
+  it("counts an application once however many movements it has", () => {
+    const log = freshLog();
+    const say = (text: string) =>
+      operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
+
+    say("토스 지원 완료");
+    say("토스 서류 합격");
+    say("토스 1차 면접");
+
+    const all = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log));
+
+    expect(all.total).toBe(1);
+    expect(all.groups.map((g) => g.status)).toEqual(["interview"]);
+  });
+});
+
+describe("Only the operator writes application history", () => {
+  it("routes an instruction to the operator", () => {
+    for (const said of [
+      "채널톡 지원 완료",
+      "원프레딕트 서류 합격",
+      "에이블리 1차 면접",
+      "미리디 최종 탈락",
+      "채널톡 메모 추가\n라이브 SQL 테스트 있음",
+    ]) {
+      expect(responsibilityForRequest("career", said)).toBe("career.application_operator");
+    }
+  });
+
+  it("still sends a posting listing 1차 면접 to the Job Fit Analyst", () => {
+    const posting = `Data Analyst
+
+주요 업무
+- SQL 을 사용해 사용자 행동 데이터를 분석합니다.
+- Tableau 로 대시보드를 운영합니다.
+
+전형 절차
+- 서류 전형 → 1차 면접 → 2차 면접 → 최종 합격
+- 지원 자격: 학력 무관
+`;
+
+    expect(responsibilityForRequest("career", posting)).toBe("career.job_fit");
+  });
+
+  it("is the only runner that writes an application fact", () => {
+    for (const file of ["capabilities/career/runner.ts", "capabilities/career/job-fit.ts"]) {
+      const source = readFileSync(join(import.meta.dirname, file), "utf8");
+      expect(source, `${file} writes applications`).not.toContain('"application"');
+    }
+  });
+
+  it("writes the movement as an event, so nothing is overwritten", () => {
+    const log = freshLog();
+    const say = (text: string) =>
+      operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
+
+    say("토스 지원 완료");
+    say("토스 최종 탈락");
+
+    const facts = log.read().flatMap((e) =>
+      e.event.type === "KnowledgeFactRecorded" && e.event.fact.type === "application"
+        ? [e.event.fact.value as { status: string }]
+        : [],
+    );
+
+    // Two facts, both intact. The first still says 지원함.
+    expect(facts.map((f) => f.status)).toEqual(["applied", "rejected"]);
   });
 });

@@ -14,6 +14,7 @@ import { employeeForResponsibility } from "./employees.ts";
 import { knownResponsibility, responsibility } from "./responsibilities.ts";
 import type { ResponsibilityId } from "./responsibilities.ts";
 import { APPLICATION_QUERY_SIGNALS } from "../capabilities/career/applications.ts";
+import { APPLICATION_COMMAND_SIGNALS } from "../capabilities/career/application-commands.ts";
 import type { Scope } from "../identity/types.ts";
 
 export type CapabilityId =
@@ -77,7 +78,16 @@ export type CapabilityManifest = {
    * Checked in order, and only against the request the representative wrote.
    * Anything unmatched goes to `accountableFor`.
    */
-  routes?: { responsibility: ResponsibilityId; signals: string[] }[];
+  routes?: {
+    responsibility: ResponsibilityId;
+    signals: string[];
+    /**
+     * Longest request this route accepts, when the signals are words a document
+     * might also contain. A spoken instruction is a sentence; a posting is a
+     * document, and length is the honest difference between them.
+     */
+    maxLength?: number;
+  }[];
   /** Whether it can accept work today. A department may exist unstaffed. */
   enabled: boolean;
 };
@@ -126,6 +136,14 @@ export const CAPABILITIES: CapabilityManifest[] = [
       {
         responsibility: "career.application_operator",
         signals: APPLICATION_QUERY_SIGNALS,
+        maxLength: 120,
+      },
+      {
+        responsibility: "career.application_operator",
+        signals: APPLICATION_COMMAND_SIGNALS,
+        // "1차 면접" appears in a posting's 전형 절차 as readily as in "에이블리
+        // 1차 면접". Only the second is something a person says.
+        maxLength: 120,
       },
     ],
     enabled: true,
@@ -265,6 +283,7 @@ export function responsibilityForRequest(capability: string, text: string): Resp
   const asked = text.replace(/\s+/g, " ");
 
   for (const route of manifest.routes ?? []) {
+    if (route.maxLength !== undefined && asked.length > route.maxLength) continue;
     if (route.signals.some((signal) => asked.includes(signal))) return route.responsibility;
   }
 

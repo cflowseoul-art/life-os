@@ -50,7 +50,7 @@ const QUERIES: { signals: string[]; label: string; statuses: ApplicationStatus[]
     statuses: ["rejected"],
   },
   {
-    signals: ["오퍼", "합격한 곳", "최종 합격"],
+    signals: ["오퍼 받은", "오퍼 온", "합격한 곳", "합격한 데"],
     label: "오퍼",
     statuses: ["offer"],
   },
@@ -108,9 +108,7 @@ function applicationsIn(
   knowledge: CareerKnowledge,
   statuses: ApplicationStatus[] | null,
 ): ApplicationFact["value"][] {
-  return knowledge
-    .factsOfType("application")
-    .map((f) => f.value)
+  return projectApplications(knowledge)
     .filter((a) => statuses === null || statuses.includes(a.status))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.company.localeCompare(b.company));
 }
@@ -126,7 +124,7 @@ export function reportApplications(
   query: ApplicationQuery,
   knowledge: CareerKnowledge,
 ): ApplicationReport {
-  const held = knowledge.factsOfType("application").length;
+  const held = projectApplications(knowledge).length;
   const wanted = query.kind === "all" ? null : query.statuses;
   const matching = applicationsIn(knowledge, wanted);
 
@@ -158,4 +156,59 @@ function summarise(query: ApplicationQuery, held: number, matched: number): stri
   return matched === 0
     ? `${query.label}인 곳은 없습니다.`
     : `${query.label} ${String(matched)}건입니다.`;
+}
+
+/**
+ * One application as it stands, with everything that happened to it.
+ *
+ * `history` is not stored. It is what the record *is*: every fact recorded
+ * against this company, in order, with the last one being where things stand.
+ * Nothing is overwritten because nothing is written twice — a movement is a new
+ * fact, and the previous one stays exactly as it was recorded.
+ */
+export type ApplicationRecord = ApplicationFact["value"] & {
+  history: { status: ApplicationStatus; label: string; at: string; interviewStage: number | null }[];
+};
+
+/** Applications are keyed by company: it is what the representative names. */
+export function applicationKey(company: string): string {
+  return company.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+/**
+ * Assembles current state and history from the facts recorded so far.
+ *
+ * Facts arrive in the order they were recorded, so the last one for a company
+ * is where it stands and the rest are how it got there.
+ */
+export function projectApplications(knowledge: CareerKnowledge): ApplicationRecord[] {
+  const byCompany = new Map<string, ApplicationFact["value"][]>();
+
+  for (const fact of knowledge.factsOfType("application")) {
+    const key = applicationKey(fact.value.company);
+    byCompany.set(key, [...(byCompany.get(key) ?? []), fact.value]);
+  }
+
+  return [...byCompany.values()].map((entries) => {
+    const current = entries[entries.length - 1];
+
+    return {
+      ...current,
+      history: entries.map((e) => ({
+        status: e.status,
+        label: STATUS_LABEL[e.status],
+        at: e.updatedAt,
+        interviewStage: e.interviewStage,
+      })),
+    };
+  });
+}
+
+/** The application recorded for a company, or null when there is none. */
+export function applicationFor(
+  knowledge: CareerKnowledge,
+  company: string,
+): ApplicationRecord | null {
+  const key = applicationKey(company);
+  return projectApplications(knowledge).find((a) => applicationKey(a.company) === key) ?? null;
 }

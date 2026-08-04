@@ -11,15 +11,22 @@
  * Analyst's input, and requesting one here would make the representative do the
  * operator's job to get an answer about their own search.
  *
- * Adding and editing applications is not implemented. The operator reports what
- * knowledge holds; nothing yet puts anything there.
+ * It is the only employee that writes application history. Movements are
+ * appended, never overwritten: the previous fact stays exactly as recorded and
+ * the sequence is the history.
  */
 
 import { randomUUID } from "node:crypto";
 
-import { readQuery, reportApplications } from "./applications.ts";
+import { applicationFor, readQuery, reportApplications } from "./applications.ts";
+import { readCommand } from "./application-commands.ts";
 import { careerKnowledgeFor } from "./knowledge/provider.ts";
-import type { ApplicationReport } from "./applications.ts";
+import { STATUS_LABEL } from "./knowledge/types.ts";
+import type { ApplicationRecord, ApplicationReport } from "./applications.ts";
+import type { ApplicationCommand } from "./application-commands.ts";
+import type { ApplicationFact } from "./knowledge/types.ts";
+import type { CareerKnowledge } from "./knowledge/index.ts";
+import type { EventStream } from "../../storage/event-store.ts";
 import type { ArtifactSection } from "../../events/types.ts";
 
 import type {
@@ -67,6 +74,149 @@ function sections(report: ApplicationReport): ArtifactSection[] {
   });
 }
 
+/**
+ * The state a command moves an application to.
+ *
+ * The whole record is written each time, not a delta: a fact has to be readable
+ * on its own years later (Art. 14), and a diff is not. Nothing is overwritten —
+ * the previous fact stays exactly as recorded, and the sequence is the history.
+ */
+function nextState(
+  command: ApplicationCommand,
+  existing: ApplicationRecord | null,
+  now: string,
+): ApplicationFact["value"] {
+  const base = existing ?? {
+    company: command.company,
+    position: "",
+    status: "planned" as const,
+    appliedAt: null,
+    nextStep: null,
+    interviewAt: null,
+    interviewStage: null,
+    memo: null,
+    updatedAt: now,
+  };
+
+  if (command.kind === "memo") {
+    return { ...base, company: base.company, memo: command.memo, updatedAt: now };
+  }
+
+  return {
+    ...base,
+    company: existing?.company ?? command.company,
+    position: command.position ?? base.position,
+    status: command.status,
+    interviewStage: command.status === "interview" ? command.interviewStage : null,
+    appliedAt: command.creates ? now.slice(0, 10) : base.appliedAt,
+    updatedAt: now,
+  };
+}
+
+/** After an update, only what moved. Never the whole record back. */
+function movementSections(
+  record: ApplicationRecord,
+  previous: ApplicationRecord | null,
+): ArtifactSection[] {
+  return [
+    { heading: `회사 · ${record.company}`, body: "", derivedFrom: [] },
+    {
+      heading: `직무 · ${record.position === "" ? "미기재" : record.position}`,
+      body: "",
+      derivedFrom: [],
+    },
+    {
+      heading: `이전 상태 · ${previous ? STATUS_LABEL[previous.status] : "없음"}`,
+      body: "",
+      derivedFrom: [],
+    },
+    { heading: `현재 상태 · ${STATUS_LABEL[record.status]}`, body: "", derivedFrom: [] },
+    { heading: `기록 ${String(record.history.length)}건`, body: "", derivedFrom: [] },
+  ];
+}
+
+/** Writes the movement and reports it. The only place application facts are written. */
+function record(
+  input: { actor: AcceptInput["actor"]; log: EventStream; knowledge: CareerKnowledge },
+  command: ApplicationCommand,
+): AcceptResult {
+  const { actor, log, knowledge } = input;
+  const existing = applicationFor(knowledge, command.company);
+
+  if (command.kind === "status" && command.creates && existing) {
+    return {
+      ok: false,
+      reasons: [
+        `${existing.company}은(는) 이미 ${STATUS_LABEL[existing.status]} 상태로 기록돼 있습니다.`,
+      ],
+    };
+  }
+
+  if ((command.kind === "memo" || !command.creates) && !existing) {
+    return {
+      ok: false,
+      reasons: [`${command.company}에 지원한 기록이 없습니다. 먼저 지원 완료를 남겨 주십시오.`],
+    };
+  }
+
+  const now = new Date().toISOString();
+  const holdId = randomUUID();
+  const state = nextState(command, existing, now);
+
+  log.append(
+    {
+      type: "HandedOver",
+      holdId,
+      capability: "career",
+      handover: { company: state.company, role: "지원 기록", jdText: "" },
+    },
+    { kind: "user" },
+    "career",
+    "ceo-office:accepted",
+  );
+
+  log.append(
+    {
+      type: "KnowledgeFactRecorded",
+      holdId,
+      fact: {
+        id: `application-${holdId}`,
+        type: "application",
+        value: state,
+        source: "대표님 말씀",
+        // The representative reported the movement; the operator filed it.
+        author: { kind: "representative" },
+        acquiredAt: now,
+        confidence: 1,
+      },
+    },
+    { kind: "capability", id: "career" },
+    "career",
+    "career:applications",
+  );
+
+  // Read back through the same view, so the report reflects what was written.
+  const updated = applicationFor(knowledge, state.company);
+  if (!updated) return { ok: false, reasons: ["기록하지 못했습니다."] };
+
+  log.append(
+    {
+      type: "ArtifactKept",
+      holdId,
+      artifact: {
+        id: `application-${holdId}`,
+        title: `${updated.company} · ${STATUS_LABEL[updated.status]}`,
+        sections: movementSections(updated, existing),
+      },
+    },
+    { kind: "capability", id: "career" },
+    "career",
+    "career:applications",
+  );
+
+  return { ok: true };
+}
+
 export const runner: ResponsibilityRunner = {
   responsibility: "career.application_operator",
 
@@ -78,7 +228,22 @@ export const runner: ResponsibilityRunner = {
     const asked = [subject, request, attachment].join("\n").trim();
     if (asked === "") return { ok: false, reasons: ["무엇을 확인해 드릴지 알 수 없습니다."] };
 
-    const query = readQuery(asked) ?? { kind: "all" as const };
+    const knowledge = careerKnowledgeFor(actor, log);
+
+    // An instruction names a company; a question does not. "미리디 최종 탈락"
+    // and "탈락한 곳 보여줘" share a word, and only the first says whose.
+    const command = readCommand(asked);
+
+    if (command && command.kind !== "refused") {
+      return record({ actor, log, knowledge }, command);
+    }
+
+    const query = readQuery(asked);
+
+    // Neither a question nor a command that named anybody: "지원 취소" alone
+    // says what to do and not to which application, and there is no safe guess.
+    if (!query && command) return { ok: false, reasons: [command.reason] };
+
     const holdId = randomUUID();
 
     log.append(
@@ -95,7 +260,7 @@ export const runner: ResponsibilityRunner = {
       "ceo-office:accepted",
     );
 
-    const report = reportApplications(query, careerKnowledgeFor(actor));
+    const report = reportApplications(query ?? { kind: "all" }, knowledge);
 
     log.append(
       {
