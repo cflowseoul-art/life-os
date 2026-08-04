@@ -51,6 +51,8 @@ export type Employee = {
   displayTitle: string;
 
   status: EmployeeStatus;
+  /** What this person does inside the department. Not seniority. */
+  duty?: string;
   /** Hold id currently carried, when the department runner sets one. */
   currentWork?: string;
 };
@@ -139,11 +141,17 @@ export const SURNAMES = [
  * One accountable employee per department today. A second employee in a
  * department takes the next unused surname and keeps the given name.
  */
-const ROSTER: { id: string; department: string; surname: string; title: Title }[] = [
+const ROSTER: { id: string; department: string; surname: string; title: Title; duty?: string }[] = [
   { id: "emp-finance-001", department: "finance", surname: "Kim", title: "Manager" },
   { id: "emp-asset-001", department: "asset", surname: "Choi", title: "Manager" },
   { id: "emp-treasury-001", department: "treasury", surname: "Oh", title: "Manager" },
-  { id: "emp-career-001", department: "career", surname: "Park", title: "Senior" },
+  // Career is a team: one person per stage of an application.
+  { id: "emp-career-001", department: "career", surname: "Park", title: "Senior", duty: "적합성 분석" },
+  { id: "emp-career-002", department: "career", surname: "Lee", title: "Senior", duty: "지원 전략" },
+  { id: "emp-career-003", department: "career", surname: "Yoon", title: "Associate", duty: "이력서 편집" },
+  { id: "emp-career-004", department: "career", surname: "Shin", title: "Associate", duty: "자기소개서" },
+  { id: "emp-career-005", department: "career", surname: "Bae", title: "Associate", duty: "면접 준비" },
+  { id: "emp-career-006", department: "career", surname: "Song", title: "Staff", duty: "지원 관리" },
   { id: "emp-home-001", department: "home", surname: "Han", title: "Senior" },
   { id: "emp-health-001", department: "health", surname: "Jung", title: "Associate" },
   { id: "emp-ceo-001", department: "ceo", surname: "Seo", title: "Manager" },
@@ -155,6 +163,7 @@ function compose(
   department: string,
   surname: string,
   title: EmployeeTitle,
+  duty?: string,
 ): Employee {
   const givenName = GIVEN_NAME_BY_DEPARTMENT[department] ?? department;
   const displaySurname = DISPLAY_SURNAME[surname] ?? surname;
@@ -173,15 +182,24 @@ function compose(
     title,
     displayDepartment: DEPARTMENT_LABEL[department] ?? department,
     displayTitle: TITLE_OVERRIDE[department]?.[title] ?? DISPLAY_TITLE[title],
+    duty,
     status: "active",
   };
 }
 
 function build(entry: (typeof ROSTER)[number]): Employee {
-  return compose(entry.id, entry.department, entry.surname, entry.title);
+  return compose(entry.id, entry.department, entry.surname, entry.title, entry.duty);
 }
 
 export const EMPLOYEES: Employee[] = ROSTER.map(build);
+
+/** The person in a department who does a particular duty. */
+export function employeeForDuty(department: string, duty: string): Employee {
+  const found = EMPLOYEES.find(
+    (e) => e.department === department && e.duty === duty && e.status === "active",
+  );
+  return found ?? employeeFor(department);
+}
 
 /** The employee accountable for a department's work. */
 export function employeeFor(department: string): Employee {

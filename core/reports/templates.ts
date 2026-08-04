@@ -89,28 +89,47 @@ export const career: ReportTemplate = {
 
     // The posting's requirements appear once, as what the draft answers. The
     // draft itself is the deliverable and leads the report.
+    // Each stage shows only its own work. A fit report is not a résumé, and a
+    // résumé draft does not re-explain the posting.
+    const fit = outcome.filter((o) => o.startsWith("적합도 "));
+    const strong = outcome.filter((o) => o.startsWith("강한 일치 · ")).map((o) => o.replace("강한 일치 · ", ""));
+    const partial = outcome.filter((o) => o.startsWith("부분 일치 · ")).map((o) => o.replace("부분 일치 · ", ""));
+    const gaps = outcome.filter((o) => o.startsWith("빈 곳 · ")).map((o) => o.replace("빈 곳 · ", ""));
     const draft = outcome.filter((o) => o.startsWith("초안 · ")).map((o) => o.replace("초안 · ", ""));
-    const positioning = outcome.filter((o) => o.startsWith("앞세운 요건 · ") || o.startsWith("적합성 · "));
+    const closed = outcome.filter((o) => o.startsWith("보류로") || o.startsWith("지원하지"));
 
-    const sections = [
-      ...section("이력서 첫 문단 초안", draft),
-      ...section("핵심 요구", facts),
-      ...section("내 경험과의 적합성", positioning),
-    ];
+    const sections = fit.length > 0
+      ? [
+          ...section("적합도", fit),
+          ...section("강한 일치", strong),
+          ...section("부분 일치", partial),
+          ...section("빈 곳", gaps),
+        ]
+      : [
+          ...section("이력서 첫 문단 초안", draft),
+          ...section("결정", closed),
+        ];
 
     if (state === "awaiting") {
       return {
-        summary: "첫 문단에 무엇을 앞세울지 하나만 정해 주시면, 이력서 정리는 끝납니다.",
+        summary: fit.length > 0
+          ? `적합도를 재 봤습니다. ${fit[0]}`
+          : "어느 쪽으로 설지 정해 주시면 이력서를 씁니다.",
         sections,
-        recommendation:
-          "두 가지로 좁혀 두었습니다. 어느 쪽으로 기억되고 싶으신지에 달린 문제라 제가 정하지 않았습니다.",
+        recommendation: fit.length > 0
+          ? "이력서는 아직 손대지 않았습니다. 지원하기로 정하시면 그때 시작합니다."
+          : "고르신 방향으로 첫 문단을 쓰겠습니다.",
         decision: question,
       };
     }
 
     if (state === "done") {
       return {
-        summary: "이력서 첫 문단 초안을 올립니다. 〈 〉 부분만 채우시면 그대로 쓰실 수 있습니다.",
+        summary: fit.length > 0
+          ? `적합도를 재 봤습니다. ${fit[0]}`
+          : draft.length > 0
+            ? "이력서 첫 문단 초안을 올립니다. 〈 〉 부분만 채우시면 그대로 쓰실 수 있습니다."
+            : "정하신 대로 처리했습니다.",
         sections,
         recommendation: `확정 전 초안입니다. 고치실 부분을 말씀해 주시면 그대로 반영하겠습니다. ${NO_DECISION}`,
         decision: null,
