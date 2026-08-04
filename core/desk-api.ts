@@ -33,10 +33,11 @@ import {
   producesReports,
   runnableResponsibilities,
   runnerModuleFor,
+  validateRunners,
   scopeOf,
   validateManifest,
 } from "./company/manifest.ts";
-import { loadRunner } from "./company/runner.ts";
+import { loadRunner, registeredResponsibilities } from "./company/runner.ts";
 import type { ResponsibilityId } from "./company/responsibilities.ts";
 import { runSchedule } from "./company/schedule.ts";
 
@@ -351,10 +352,10 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
   res.end(payload);
 }
 
-// The company refuses to start if its own description is inconsistent, or if a
-// capability it says is runnable has no runner behind it.
+// The company refuses to start if its own description is inconsistent. What
+// actually loaded is checked later, in the boot sequence, because it cannot be
+// known until the runners have been warmed.
 validateManifest();
-void warmRunners();
 
 
 /**
@@ -520,16 +521,20 @@ const server = createServer((req, res) => {
   json(res, 404, { ok: false, reason: "없는 경로입니다." });
 });
 
-// Nothing is served until the database can answer for itself: a login that
-// arrived first would fail on a missing table.
+// Nothing is served until the database can answer for itself and every declared
+// runner is behind its responsibility. Warming used to be fire-and-forget while
+// the port opened alongside it, so a runner that failed to load surfaced as an
+// unhandled rejection and the first request to need it was the first to know.
 void (hosted ? ensureSchema() : Promise.resolve())
+  .then(() => warmRunners())
+  .then(() => { validateRunners(registeredResponsibilities()); })
   .then(() => {
     server.listen(port, process.env.HOST ?? "127.0.0.1", () => {
       console.log(`desk api: :${String(port)}/api/desk`);
     });
   })
   .catch((error: unknown) => {
-    console.error("스키마를 준비하지 못했습니다:", error instanceof Error ? error.message : error);
+    console.error("시작하지 못했습니다:", error instanceof Error ? error.message : error);
     process.exit(1);
   });
 

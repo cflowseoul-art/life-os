@@ -323,6 +323,77 @@ export function runnerModuleFor(id: ResponsibilityId): string {
   return declared;
 }
 
+/**
+ * Problems between what the manifest declares and what actually loaded.
+ *
+ * Pure over both inputs, so the rules can be checked against a synthetic
+ * manifest rather than only against the one that happens to be correct today.
+ *
+ * Two rules:
+ *
+ *   - a declared runner must be registered. An enabled capability that names a
+ *     module for a responsibility and then has nothing behind it is a promise
+ *     the company cannot keep, and the request that discovers it would be the
+ *     first to know.
+ *   - a registered runner must be declared. Execution that no declaration
+ *     accounts for is work the company cannot explain afterwards (Art. 8).
+ *
+ * Note what is deliberately *not* required: that every responsibility of an
+ * enabled capability has a runner. Career declares seven and staffs one, and
+ * that is a true statement about the company rather than a misconfiguration.
+ * The responsibility accountable for a capability must be runnable, and that is
+ * checked in `validateManifest`.
+ */
+export function runnerProblems(
+  capabilities: CapabilityManifest[],
+  registered: ResponsibilityId[],
+): string[] {
+  const problems: string[] = [];
+  const declaredBy = new Map<string, string>();
+  const shouldRun = new Set<string>();
+
+  for (const c of capabilities) {
+    for (const id of Object.keys(c.runners ?? {}) as ResponsibilityId[]) {
+      // Exactly one runner per responsibility, across the whole company.
+      const owner = declaredBy.get(id);
+      if (owner) problems.push(`책임 ${id}의 러너가 ${owner}와 ${c.id}에 중복 선언되었습니다`);
+      declaredBy.set(id, c.id);
+
+      // Only an enabled capability is warmed, so only it must have loaded.
+      if (c.enabled) shouldRun.add(id);
+    }
+  }
+
+  const loaded = new Set<string>(registered);
+
+  for (const id of shouldRun) {
+    if (!loaded.has(id)) problems.push(`${id}: 러너가 선언되었으나 등록되지 않았습니다`);
+  }
+
+  for (const id of loaded) {
+    if (!declaredBy.has(id)) {
+      problems.push(`${id}: 선언되지 않은 책임의 러너가 등록되었습니다`);
+    }
+  }
+
+  return problems;
+}
+
+/**
+ * Startup check, run after the runners are warmed and before the port opens.
+ *
+ * Separate from `validateManifest` because it needs the registry to have been
+ * populated: the manifest can be checked the moment it is imported, but what
+ * actually loaded cannot.
+ */
+export function validateRunners(registered: ResponsibilityId[]): void {
+  const problems = runnerProblems(CAPABILITIES, registered);
+
+  if (problems.length > 0) {
+    throw new Error(`러너 선언이 올바르지 않습니다:\n  - ${problems.join("\n  - ")}`);
+  }
+}
+
 /** Every responsibility that can execute today, with its module. */
 export function runnableResponsibilities(): { id: ResponsibilityId; module: string }[] {
   return CAPABILITIES.filter((c) => c.enabled).flatMap((c) =>
