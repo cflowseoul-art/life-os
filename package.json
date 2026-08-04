@@ -15,7 +15,7 @@
     "desk": "tsx core/desk-api.ts",
     "db:schema": "bash scripts/db-schema.sh",
     "db:seed": "bash scripts/db-seed.sh",
-    "build": "npm ci --prefix frontend && npm run build --prefix frontend",
+    "build": "npm ci --prefix frontend --include=dev && npm run build --prefix frontend",
     "serve": "node --import tsx core/desk-api.ts",
     "start:web": "npm run build && npm run serve",
     "db:lifeos": "bash -c 'psql \"$DATABASE_URL\" -f database/lifeos.sql'",
