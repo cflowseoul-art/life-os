@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { applicationFor, readQuery, reportApplications } from "./applications.ts";
+import { findApplication, readQuery, reportApplications } from "./applications.ts";
 import { readCommand } from "./application-commands.ts";
 import { careerKnowledgeFor } from "./knowledge/provider.ts";
 import { STATUS_LABEL } from "./knowledge/types.ts";
@@ -140,8 +140,21 @@ function record(
   input: { actor: AcceptInput["actor"]; log: EventStream; knowledge: CareerKnowledge },
   command: ApplicationCommand,
 ): AcceptResult {
-  const { actor, log, knowledge } = input;
-  const existing = applicationFor(knowledge, command.company);
+  const { log, knowledge } = input;
+  const position = command.kind === "status" ? command.position : null;
+  const found = findApplication(knowledge, command.company, position);
+
+  if (found && "ambiguous" in found) {
+    return {
+      ok: false,
+      reasons: [
+        `${command.company}에 지원한 기록이 ${String(found.matches.length)}건 있습니다. `
+        + `직무까지 말씀해 주십시오 (${found.matches.map((m) => m.position).join(", ")}).`,
+      ],
+    };
+  }
+
+  const existing = found;
 
   if (command.kind === "status" && command.creates && existing) {
     return {
@@ -196,8 +209,8 @@ function record(
   );
 
   // Read back through the same view, so the report reflects what was written.
-  const updated = applicationFor(knowledge, state.company);
-  if (!updated) return { ok: false, reasons: ["기록하지 못했습니다."] };
+  const updated = findApplication(knowledge, state.company, state.position);
+  if (!updated || "ambiguous" in updated) return { ok: false, reasons: ["기록하지 못했습니다."] };
 
   log.append(
     {
@@ -235,7 +248,7 @@ export const runner: ResponsibilityRunner = {
     const command = readCommand(asked);
 
     if (command && command.kind !== "refused") {
-      return record({ actor, log, knowledge }, command);
+      return record({ log, knowledge }, command);
     }
 
     const query = readQuery(asked);
@@ -252,8 +265,10 @@ export const runner: ResponsibilityRunner = {
         holdId,
         capability: "career",
         // The question stands in for the subject: an operations query is not
-        // about one company, so there is no company to record.
-        handover: { company: "지원 현황", role: "확인", jdText: asked },
+        // about one company, so there is no company to record. `jdText` stays
+        // empty because nothing was handed over — a question is not a document,
+        // and rendering it back as an attachment called it one.
+        handover: { company: "지원 현황", role: "확인", jdText: "" },
       },
       { kind: "user" },
       "career",

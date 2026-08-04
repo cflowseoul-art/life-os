@@ -118,6 +118,19 @@ function section(heading: string, bullets: string[]): ReportSection[] {
 
 const NO_DECISION = "현재 대표님께 결정을 요청드릴 사항은 없습니다.";
 
+/**
+ * Career's one-line conclusion.
+ *
+ * A status report is not a posting. Saying "공고를 읽었습니다" over a list of
+ * applications claimed work nobody did, and it was the default whenever no fit
+ * score was present — which is every answer the Application Operator gives.
+ */
+function careerSummary(fit: string[], statuses: string[]): string {
+  if (fit.length > 0) return `적합도를 재 봤습니다. ${fit[0]}`;
+  if (statuses.length > 0) return statuses[0];
+  return "맡은 일을 정리했습니다.";
+}
+
 export const career: ReportTemplate = {
   capability: "career",
   contributor: contributorName("career"),
@@ -152,7 +165,7 @@ export const career: ReportTemplate = {
 
     if (state === "awaiting") {
       return {
-        summary: fit.length > 0 ? `적합도를 재 봤습니다. ${fit[0]}` : "공고를 읽었습니다.",
+        summary: careerSummary(fit, statuses),
         sections,
         recommendation: "이력서는 손대지 않았습니다. 지원하기로 정하시면 그때 다음 단계로 넘깁니다.",
         decision: question,
@@ -163,9 +176,7 @@ export const career: ReportTemplate = {
       return {
         summary: decided.length > 0
           ? "정하신 대로 기록했습니다."
-          : fit.length > 0
-            ? `적합도를 재 봤습니다. ${fit[0]}`
-            : "공고를 읽었습니다.",
+          : careerSummary(fit, statuses),
         sections,
         recommendation: `판단 근거는 모두 기록에서 확인하실 수 있습니다. ${NO_DECISION}`,
         decision: null,

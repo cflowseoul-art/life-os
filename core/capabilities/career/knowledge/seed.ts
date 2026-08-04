@@ -292,6 +292,25 @@ export const SEEDED_FACTS: CareerKnowledgeFact[] = [
   ].map((question, index) =>
     fact(`IVQ-${String(index + 1).padStart(2, "0")}`, "interview_question", { question }, "interview/questions.md")),
 
+  // ── Application history ─────────────────────────────────────────────────
+  //
+  // One application, imported from what the archive actually records:
+  // `inbox/archive/2026-08-02_원프레딕트_데이터-애널리스트/metadata.md` names the
+  // company, the role and the date, and the run it produced ends with a
+  // conditional recommendation rather than a submission. So the status is
+  // `planned` — prepared, not sent — because that is what the record supports.
+  fact("APP-001", "application", {
+    company: "원프레딕트",
+    position: "데이터 애널리스트",
+    status: "planned",
+    appliedAt: null,
+    nextStep: "MS Office 활용 능력과 산업·공정 데이터 경험을 보완할 수 있을지 확인",
+    interviewAt: null,
+    interviewStage: null,
+    memo: "적합도 검토 결과 조건부 권장. 필수 요건 중 MS Office 근거 없음, 산업·제조 공정 데이터 경험 없음.",
+    updatedAt: "2026-08-02T16:02:00.000Z",
+  }, "inbox/archive/2026-08-02_원프레딕트_데이터-애널리스트/metadata.md"),
+
   ...[
     ["Story 1 — KPI 한계 발견", "클리어율만으로 실패 경험을 설명하기 어려움 → 실패 시 진척도 정의 → Welch 검증 → 개선 우선순위."],
     ["Story 2 — 실험 체계", "외생 변수로 해석 어려움 → 통제 기준·D3·롤백 가드 → 마케팅 협업 → Go/No-Go 지원."],
@@ -340,8 +359,8 @@ export const SEEDED_GAPS: Gap[] = [
   },
   {
     category: "application_history",
-    what: "지원 이력",
-    why: "지원한 공고와 진행 상태를 기록한 적이 없습니다.",
+    what: "지원 완료 여부와 이후 진행",
+    why: "보관된 기록은 지원 준비까지이고, 실제 접수 여부는 남아 있지 않습니다.",
   },
   {
     category: "recruiter_feedback",

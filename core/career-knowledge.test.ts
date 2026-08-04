@@ -164,7 +164,8 @@ describe("Never ask for what Career already owns", () => {
     expect(store.owns("preferred_roles")).toBe(true);
 
     // Not held — these are the only ones an employee may raise, as gaps.
-    expect(store.owns("application_history")).toBe(false);
+    // One application was imported from the archive, so this is now held.
+    expect(store.owns("application_history")).toBe(true);
     expect(store.owns("recruiter_feedback")).toBe(false);
     expect(store.owns("portfolio")).toBe(false);
   });

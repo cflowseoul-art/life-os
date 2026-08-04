@@ -213,7 +213,7 @@ function attachmentFor(
   if (lines.length === 0) return null;
 
   return {
-    name: `${hold.company} 공고 원문`,
+    name: `${hold.company} 원문`,
     lines: lines.length,
     preview: lines.slice(0, 6),
   };

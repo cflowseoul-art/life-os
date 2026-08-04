@@ -179,19 +179,31 @@ describe("An empty record says so", () => {
     expect(report.summary).toBe("기록된 지원 내역이 없습니다.");
   });
 
-  it("answers the seeded representative that way, since nothing is recorded yet", () => {
-    const report = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR));
+  it("says so for a representative Career holds nothing about", () => {
+    const stranger = {
+      user: { id: "usr-2", email: "partner@example.com" },
+      household: { id: "hh-1", ownerUserId: "usr-1" },
+    } as ActorContext;
+
+    const report = reportApplications({ kind: "all" }, careerKnowledgeFor(stranger));
 
     expect(report.empty).toBe(true);
     expect(report.summary).toBe("기록된 지원 내역이 없습니다.");
+  });
+
+  it("is not empty for the seeded representative, whose record was imported", () => {
+    const report = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR));
+
+    expect(report.empty).toBe(false);
+    expect(report.total).toBeGreaterThan(0);
   });
 
   it("never mentions a posting in the answer", () => {
     const artifact = ask(freshLog(), "지금 지원현황 알려줘");
     const rendered = [artifact.title, ...artifact.sections.flatMap((s) => [s.heading, s.body])].join("\n");
 
-    expect(rendered).toContain("기록된 지원 내역이 없습니다");
-    for (const word of ["공고", "채용공고", "JD", "붙여"]) {
+    // A list of applications is not a posting, and never claims to be one.
+    for (const word of ["공고", "채용공고", "JD", "붙여", "읽었습니다"]) {
       expect(rendered).not.toContain(word);
     }
   });
@@ -326,13 +338,13 @@ describe("Natural language writes", () => {
   it("updates an existing application and keeps what came before", () => {
     const { say, knowledge } = fresh();
 
-    say("원프레딕트 지원 완료");
-    say("원프레딕트 서류 합격");
-    say("원프레딕트 1차 면접");
-    say("원프레딕트 2차 면접");
-    say("원프레딕트 최종 합격");
+    say("당근 지원 완료");
+    say("당근 서류 합격");
+    say("당근 1차 면접");
+    say("당근 2차 면접");
+    say("당근 최종 합격");
 
-    const record = applicationFor(knowledge(), "원프레딕트")!;
+    const record = applicationFor(knowledge(), "당근")!;
 
     expect(record.status).toBe("offer");
     expect(record.history.map((h) => h.status)).toEqual([
@@ -428,14 +440,14 @@ describe("Queries reflect writes immediately", () => {
     const say = (text: string) =>
       operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
 
-    expect(reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log)).empty).toBe(true);
+    const before = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log)).total;
 
     say("채널톡 지원 완료");
     say("당근 지원 완료");
     say("당근 서류 합격");
 
     const all = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log));
-    expect(all.total).toBe(2);
+    expect(all.total).toBe(before + 2);
 
     const passed = reportApplications(readQuery("서류합격한 곳")!, careerKnowledgeFor(ACTOR, log));
     expect(passed.groups.flatMap((g) => g.applications.map((a) => a.company))).toEqual(["당근"]);
@@ -446,14 +458,17 @@ describe("Queries reflect writes immediately", () => {
     const say = (text: string) =>
       operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
 
+    const before = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log)).total;
+
     say("토스 지원 완료");
     say("토스 서류 합격");
     say("토스 1차 면접");
 
     const all = reportApplications({ kind: "all" }, careerKnowledgeFor(ACTOR, log));
 
-    expect(all.total).toBe(1);
-    expect(all.groups.map((g) => g.status)).toEqual(["interview"]);
+    // Three movements, one application.
+    expect(all.total).toBe(before + 1);
+    expect(all.groups.map((g) => g.status)).toContain("interview");
   });
 });
 
@@ -508,5 +523,133 @@ describe("Only the operator writes application history", () => {
 
     // Two facts, both intact. The first still says 지원함.
     expect(facts.map((f) => f.status)).toEqual(["applied", "rejected"]);
+  });
+});
+
+describe("이직 지원 현황 알려줘", () => {
+  const PHRASE = "이직 지원 현황 알려줘";
+
+  it("reaches Career, and the Application Operator inside it", () => {
+    // Routing names the department; the manifest names who in it answers.
+    expect(route({ subject: PHRASE }).capability).toBe("career");
+    expect(responsibilityForRequest("career", PHRASE)).toBe("career.application_operator");
+  });
+
+  it("reads as a question about the whole search", () => {
+    expect(readQuery(PHRASE)).toEqual({ kind: "all" });
+  });
+
+  it("returns the imported records, end to end", () => {
+    const log = freshLog();
+
+    const result = operator.accept({
+      actor: ACTOR, log, subject: PHRASE, request: "", attachment: "",
+    });
+
+    expect(result).toEqual({ ok: true });
+
+    const kept = log.read().filter((e) => e.event.type === "ArtifactKept");
+    const last = kept[kept.length - 1];
+    if (last?.event.type !== "ArtifactKept") throw new Error("no artifact");
+
+    const artifact = last.event.artifact;
+    const rendered = [artifact.title, ...artifact.sections.flatMap((s) => [s.heading, s.body])].join("\n");
+
+    // The archived application is there, named, under its own status.
+    expect(rendered).toContain("원프레딕트");
+    expect(rendered).toContain("데이터 애널리스트");
+    expect(rendered).toContain("지원 예정");
+
+    // Not the empty state, and nothing about a posting.
+    expect(rendered).not.toContain("기록된 지원 내역이 없습니다");
+    expect(rendered).not.toContain("공고");
+    expect(rendered).not.toContain("읽었습니다");
+
+    // Nothing was asked back.
+    expect(log.read().some((e) => e.event.type === "AskRaised")).toBe(false);
+  });
+
+  it("hands nothing over, so nothing renders as an attachment", () => {
+    const log = freshLog();
+    operator.accept({ actor: ACTOR, log, subject: PHRASE, request: "", attachment: "" });
+
+    const handed = log.read().find((e) => e.event.type === "HandedOver");
+    if (handed?.event.type !== "HandedOver") throw new Error("no handover");
+
+    // `attachmentFor` renders nothing when there are no lines.
+    expect(handed.event.handover.jdText).toBe("");
+  });
+
+  it("reflects a movement recorded against the imported application", () => {
+    const log = freshLog();
+    const say = (text: string) =>
+      operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" });
+
+    // The company alone identifies it, because only one role is on file there.
+    expect(say("원프레딕트 서류 합격")).toEqual({ ok: true });
+
+    const record = applicationFor(careerKnowledgeFor(ACTOR, log), "원프레딕트")!;
+
+    expect(record.position).toBe("데이터 애널리스트");
+    expect(record.status).toBe("screening");
+    // The imported state is still the first thing that happened.
+    expect(record.history.map((h) => h.status)).toEqual(["planned", "screening"]);
+  });
+});
+
+describe("Company and position together are the key", () => {
+  function fresh() {
+    const log = freshLog();
+    return {
+      log,
+      say: (text: string) =>
+        operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" }),
+      knowledge: () => careerKnowledgeFor(ACTOR, log),
+    };
+  }
+
+  it("keeps two roles at one employer apart", () => {
+    const { say, knowledge } = fresh();
+
+    say("토스 · Data Analyst 지원 완료");
+    say("토스 · Product Manager 지원 완료");
+    say("토스 · Data Analyst 최종 탈락");
+
+    const analyst = applicationFor(knowledge(), "토스", "Data Analyst")!;
+    const manager = applicationFor(knowledge(), "토스", "Product Manager")!;
+
+    expect(analyst.status).toBe("rejected");
+    // One rejection does not close the other role.
+    expect(manager.status).toBe("applied");
+  });
+
+  it("does not read a second role as a duplicate of the first", () => {
+    const { say } = fresh();
+
+    say("토스 · Data Analyst 지원 완료");
+
+    expect(say("토스 · Product Manager 지원 완료")).toEqual({ ok: true });
+  });
+
+  it("asks which role only when the company alone is ambiguous", () => {
+    const { say } = fresh();
+
+    say("토스 · Data Analyst 지원 완료");
+    say("토스 · Product Manager 지원 완료");
+
+    const result = say("토스 서류 합격");
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ reasons: [expect.stringContaining("직무까지")] });
+  });
+
+  it("counts two roles at one employer as two applications", () => {
+    const { say, knowledge } = fresh();
+    const before = reportApplications({ kind: "all" }, knowledge()).total;
+
+    say("토스 · Data Analyst 지원 완료");
+    say("토스 · Product Manager 지원 완료");
+
+    expect(reportApplications({ kind: "all" }, knowledge()).total).toBe(before + 2);
   });
 });

@@ -170,9 +170,50 @@ export type ApplicationRecord = ApplicationFact["value"] & {
   history: { status: ApplicationStatus; label: string; at: string; interviewStage: number | null }[];
 };
 
-/** Applications are keyed by company: it is what the representative names. */
-export function applicationKey(company: string): string {
-  return company.trim().toLowerCase().replace(/\s+/g, "");
+/**
+ * Applications are keyed by company **and** position.
+ *
+ * Two roles at one employer are two applications with two outcomes, and keying
+ * on the company alone collapsed them — the second 지원 완료 read as a duplicate
+ * of the first, and a rejection from one closed both.
+ *
+ * A position the representative never wrote is empty, which is its own key. So
+ * "채널톡" and "채널톡 · Data Analyst" are distinct records, and the lookup below
+ * is what bridges them when only one exists.
+ */
+export function applicationKey(company: string, position: string): string {
+  const flatten = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+  return `${flatten(company)}|${flatten(position)}`;
+}
+
+/** More than one role at the same employer, when the command named neither. */
+export type AmbiguousApplication = { ambiguous: true; matches: ApplicationRecord[] };
+
+/**
+ * Finds the application a command means.
+ *
+ * With a position, the key is exact. Without one — which is how people speak,
+ * "원프레딕트 서류 합격" — the company is enough as long as it identifies one
+ * application. Two would be a guess, so it says so rather than picking.
+ */
+export function findApplication(
+  knowledge: CareerKnowledge,
+  company: string,
+  position: string | null,
+): ApplicationRecord | AmbiguousApplication | null {
+  const all = projectApplications(knowledge);
+
+  if (position !== null) {
+    const key = applicationKey(company, position);
+    return all.find((a) => applicationKey(a.company, a.position) === key) ?? null;
+  }
+
+  const flatten = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+  const matches = all.filter((a) => flatten(a.company) === flatten(company));
+
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+  return { ambiguous: true, matches };
 }
 
 /**
@@ -182,14 +223,14 @@ export function applicationKey(company: string): string {
  * is where it stands and the rest are how it got there.
  */
 export function projectApplications(knowledge: CareerKnowledge): ApplicationRecord[] {
-  const byCompany = new Map<string, ApplicationFact["value"][]>();
+  const byKey = new Map<string, ApplicationFact["value"][]>();
 
   for (const fact of knowledge.factsOfType("application")) {
-    const key = applicationKey(fact.value.company);
-    byCompany.set(key, [...(byCompany.get(key) ?? []), fact.value]);
+    const key = applicationKey(fact.value.company, fact.value.position);
+    byKey.set(key, [...(byKey.get(key) ?? []), fact.value]);
   }
 
-  return [...byCompany.values()].map((entries) => {
+  return [...byKey.values()].map((entries) => {
     const current = entries[entries.length - 1];
 
     return {
@@ -204,11 +245,12 @@ export function projectApplications(knowledge: CareerKnowledge): ApplicationReco
   });
 }
 
-/** The application recorded for a company, or null when there is none. */
+/** The one application recorded for a company, when exactly one is. */
 export function applicationFor(
   knowledge: CareerKnowledge,
   company: string,
+  position: string | null = null,
 ): ApplicationRecord | null {
-  const key = applicationKey(company);
-  return projectApplications(knowledge).find((a) => applicationKey(a.company) === key) ?? null;
+  const found = findApplication(knowledge, company, position);
+  return found && "ambiguous" in found ? null : found;
 }
