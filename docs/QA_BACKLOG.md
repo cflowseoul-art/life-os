@@ -3,7 +3,12 @@
 Open items only. Resolved items are removed, not archived — `CHANGELOG.md`
 records what was fixed and when.
 
-Last reviewed: end of Phase 1.
+**Ids are permanent.** A `QA-nn` always means the same defect for as long as
+this file exists, and is never reused after that item is resolved. Gaps in the
+sequence are the point: a missing number means resolved, and renumbering would
+silently repoint every reference made in a commit message or a review.
+
+Last reviewed: after Step 4.4.
 
 ---
 
@@ -17,8 +22,9 @@ bullets and yields two, failing `held work survives a process boundary`,
 observations, asks, or artifacts` in `core/proof.test.ts`.
 
 Either the filter is wrong (`SQL` is a real requirement) or the tests are. Both
-readings are defensible, which is why this has not been patched. Settle it when
-the Job Fit Analyst is rebuilt.
+readings are defensible, which is why this has not been patched. Note that this
+code path is now only reached by the dormant custody-engine route; the live Job
+Fit Analyst does not use it.
 
 **QA-02 — `test/inventory-command-parser.contract.test.ts` collects no suite.**
 The file fails to load, so the run reports a failing test file with no failing
@@ -31,12 +37,6 @@ recent work, but they mean `tsc -b` in `frontend/` never exits clean.
 ---
 
 ## Correctness
-
-**QA-04 — Fit percentage is token overlap presented as a decision.**
-`core/capabilities/career/fit.ts` scores ≥2 shared tokens as a strong match, 1 as
-partial, 0 as a gap. Requirements come only from lines beginning `-`, `*`, or
-`•`, capped at seven, so a posting written in prose scores 0% and recommends
-보류. The figure appears in the report title and in the Ask.
 
 **QA-05 — Continuation fires on a job-title substring.**
 `core/company/continuation.ts` starts 면접 준비 when a completed Career hold's
@@ -51,14 +51,16 @@ sits in 진행 중 permanently.
 marks the hold `kept`. The copy promises to resume a held posting later; nothing
 implements resumption.
 
+**QA-18 — Career's routes are separated by request length.**
+`core/company/manifest.ts` bounds the Application Operator's routes at 120
+characters, because a posting's 전형 절차 contains `1차 면접` and `최종 합격`
+exactly as a person reporting one does. Signal narrowness cannot separate them;
+length can, and it is a heuristic. A long instruction or a very short posting
+will misroute.
+
 ---
 
 ## Architecture debt
-
-**QA-07 — Career's runner executes three responsibilities.**
-It declares `career.fit-analysis` and also performs application strategy and
-résumé editing inside `answer()`. Dispatch can address them separately now;
-splitting the runner is scheduled work, not an accident.
 
 **QA-08 — A hold does not record which responsibility raised an Ask.**
 Answering resolves the capability's accountable responsibility instead. Correct
@@ -86,6 +88,12 @@ office depicts one set of people; reports are signed by another.
 `core/company/treasury-runner.ts` is unreferenced, and
 `core/company/asset-runner.ts` is reachable only from it.
 
+**QA-19 — Career Knowledge is keyed on tools, not capabilities.**
+ADR-025 makes business capability the primary unit. Knowledge still records
+`skill` facts whose values are tool names, and the Job Fit Analyst matches those
+names against a posting. The code satisfies the constraint it was given at the
+time and is keyed on the wrong unit; it must be migrated rather than extended.
+
 ---
 
 ## Provenance
@@ -93,22 +101,36 @@ office depicts one set of people; reports are signed by another.
 **QA-13 — `INFERENCE_CONFIDENCE = 0.5` is declared, not measured.**
 No scale exists for interpretive confidence. The constant is documented as a
 stated value rather than a precise-looking invention, but it needs a real scale
-before more inference types land. Blocks nothing; should be settled early in
-Phase 2.
-
-**QA-14 — `derivedFrom` is carried but never populated.**
-No department derives a fact from other facts yet. The field is typed and tested
-and becomes load-bearing when Career Knowledge lands.
+before more inference types land.
 
 ---
 
 ## Reporting
 
-**QA-15 — The posting is pasted back into the report.**
+**QA-15 — The posting is pasted back as an attachment.**
 `core/desk-api.ts` returns six raw lines of the handed-over text and the screen
 renders them uncollapsed. Evidence and progress are correctly collapsed; the
-attachment is not.
+attachment is not. Narrowed since first raised: the Job Fit report no longer
+quotes the posting, and an operations answer hands over nothing, so this is now
+only about the attachment on a posting hold.
 
-**QA-16 — The report is not shorter than its source.**
-Career emits one section per requirement across three match groups, each
-carrying the posting's own words, and the report template re-groups them.
+---
+
+## Retired ids
+
+Removed from the list above and kept here only so a reference to a retired id
+still resolves. Detail is in `CHANGELOG.md`.
+
+| Id | What it was | Closed by |
+|---|---|---|
+| QA-04 | Fit percentage was token overlap presented as a decision | Step 3.1 — the analyst compares typed knowledge; an unrecognised posting is unscored rather than 0% |
+| QA-07 | Career's runner executed three responsibilities | Step 3.1 — strategy and résumé editing removed from `career.job_fit` |
+| QA-14 | `derivedFrom` was carried but never populated | Step 3.1 — every fit finding points at the knowledge behind it |
+| QA-16 | The report was not shorter than its source | Step 3.1 — asserted against a realistic posting |
+| QA-17 | A status question was answered by asking for a posting | Steps 4.1–4.3 — `career.application_operator` answers from the record, and 공고 language is gone from status reports |
+
+**On the numbering.** `QA-17` never sat in this list: it was found during Step
+4.1 and fixed in the same stretch of work. It is given an id here because it was
+referred to by number in review, and a reference that resolves to nothing is
+worse than one that resolves to a retired entry. It is **not** `QA-08`, which is
+a different and still-open defect about holds and Asks.

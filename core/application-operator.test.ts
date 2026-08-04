@@ -653,3 +653,110 @@ describe("Company and position together are the key", () => {
     expect(reportApplications({ kind: "all" }, knowledge()).total).toBe(before + 2);
   });
 });
+
+describe("지원 완료 on a planned application", () => {
+  function fresh() {
+    const log = freshLog();
+    return {
+      log,
+      say: (text: string) =>
+        operator.accept({ actor: ACTOR, log, subject: text, request: "", attachment: "" }),
+      knowledge: () => careerKnowledgeFor(ACTOR, log),
+    };
+  }
+
+  it("moves the imported 원프레딕트 record from planned to applied", () => {
+    const { say, knowledge } = fresh();
+
+    const before = applicationFor(knowledge(), "원프레딕트")!;
+    expect(before.status).toBe("planned");
+
+    expect(say("원프레딕트 지원 완료")).toEqual({ ok: true });
+
+    const after = applicationFor(knowledge(), "원프레딕트")!;
+    expect(after.status).toBe("applied");
+    expect(after.appliedAt).not.toBeNull();
+  });
+
+  it("creates no duplicate", () => {
+    const { say, knowledge } = fresh();
+    const before = reportApplications({ kind: "all" }, knowledge()).total;
+
+    say("원프레딕트 지원 완료");
+
+    expect(reportApplications({ kind: "all" }, knowledge()).total).toBe(before);
+  });
+
+  it("preserves company, position, and everything already recorded", () => {
+    const { say, knowledge } = fresh();
+    const before = applicationFor(knowledge(), "원프레딕트")!;
+
+    say("원프레딕트 지원 완료");
+    const after = applicationFor(knowledge(), "원프레딕트")!;
+
+    expect(after.company).toBe(before.company);
+    expect(after.position).toBe("데이터 애널리스트");
+    expect(after.memo).toBe(before.memo);
+    expect(after.nextStep).toBe(before.nextStep);
+  });
+
+  it("appends rather than overwriting, so the planned state survives", () => {
+    const { say, knowledge } = fresh();
+
+    say("원프레딕트 지원 완료");
+
+    const record = applicationFor(knowledge(), "원프레딕트")!;
+    expect(record.history.map((h) => h.status)).toEqual(["planned", "applied"]);
+  });
+
+  it("still moves forward normally afterwards", () => {
+    const { say, knowledge } = fresh();
+
+    say("원프레딕트 지원 완료");
+    say("원프레딕트 서류 합격");
+
+    const record = applicationFor(knowledge(), "원프레딕트")!;
+    expect(record.status).toBe("screening");
+    expect(record.history.map((h) => h.status)).toEqual(["planned", "applied", "screening"]);
+  });
+
+  it("rejects a second 지원 완료 once it is applied", () => {
+    const { say } = fresh();
+
+    say("원프레딕트 지원 완료");
+    const again = say("원프레딕트 지원 완료");
+
+    expect(again.ok).toBe(false);
+    expect(again).toMatchObject({ reasons: [expect.stringContaining("이미")] });
+  });
+
+  it("rejects 지원 완료 on anything past applied", () => {
+    for (const movement of ["서류 합격", "1차 면접", "최종 합격", "최종 탈락"]) {
+      const { say } = fresh();
+
+      say("당근 지원 완료");
+      say(`당근 ${movement}`);
+
+      const again = say("당근 지원 완료");
+      expect(again.ok, `${movement} should still reject a duplicate`).toBe(false);
+    }
+  });
+
+  it("reports the movement it made, not a creation", () => {
+    const { log, say } = fresh();
+
+    say("원프레딕트 지원 완료");
+
+    const kept = log.read().filter((e) => e.event.type === "ArtifactKept");
+    const last = kept[kept.length - 1];
+    if (last?.event.type !== "ArtifactKept") throw new Error("no artifact");
+
+    expect(last.event.artifact.sections.map((s) => s.heading)).toEqual([
+      "회사 · 원프레딕트",
+      "직무 · 데이터 애널리스트",
+      "이전 상태 · 지원 예정",
+      "현재 상태 · 지원함",
+      "기록 2건",
+    ]);
+  });
+});

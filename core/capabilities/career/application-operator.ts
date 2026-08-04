@@ -157,12 +157,18 @@ function record(
   const existing = found;
 
   if (command.kind === "status" && command.creates && existing) {
-    return {
-      ok: false,
-      reasons: [
-        `${existing.company}은(는) 이미 ${STATUS_LABEL[existing.status]} 상태로 기록돼 있습니다.`,
-      ],
-    };
+    // A planned application is one Career prepared and the representative had
+    // not yet sent. "지원 완료" on it is the movement that was always going to
+    // follow, not a second application — so it moves rather than duplicating,
+    // and company, position and everything recorded so far carry forward.
+    if (existing.status !== "planned") {
+      return {
+        ok: false,
+        reasons: [
+          `${existing.company}은(는) 이미 ${STATUS_LABEL[existing.status]} 상태로 기록돼 있습니다.`,
+        ],
+      };
+    }
   }
 
   if ((command.kind === "memo" || !command.creates) && !existing) {

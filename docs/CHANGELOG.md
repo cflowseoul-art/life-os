@@ -5,6 +5,57 @@ Newest first. One entry per phase. Architecture as it stands is in
 
 ---
 
+## Phase 4 — Application Operator
+
+`e70367e` · `40b9764` · `a9fabcc` · Step 4.4
+
+Career can now say where the search stands, and record it moving.
+
+**Added** — `career.application_operator` as the second runnable Career
+responsibility; an `application` knowledge fact with the seven-status
+vocabulary; natural-language commands ("채널톡 지원 완료", "에이블리 1차 면접",
+"미리디 최종 탈락", memos); status queries grouped by stage;
+`EventReplayRepository` and `CompositeRepository`, so recorded knowledge reads
+alongside the verified seed behind one port.
+
+**Changed** — routing gained a level: capability routing names the department,
+and the manifest now names who inside it takes the work. Applications are keyed
+by company **and** position, so two roles at one employer are two records. A
+`지원 완료` on a `planned` application moves it to `applied` rather than reading
+as a duplicate.
+
+**Imported** — one application, from what the archive actually records:
+원프레딕트 · 데이터 애널리스트, status `planned`. Nothing else was imported; the
+other prototype outputs are a replay, an analysis with no archive entry, and a
+company named 테스트회사.
+
+**Fixed (QA-17)** — a status question used to reach the Job Fit Analyst, which
+split it into a company and a position, found neither, and refused. Status
+reports no longer claim to have read a posting, and an operations answer hands
+over nothing so it cannot render one back as an attachment.
+
+**Tests** — 298 total, 295 passing. Three inherited failures (QA-01).
+
+---
+
+## Phase 3 — Job Fit Analyst
+
+`982e180` · `cd6af2a` · `f6506dc`
+
+The first Career employee that works. The analyst reads a posting against typed
+knowledge rather than counting words shared with pasted profile text, and
+evaluates without writing anything — no résumé, no positioning, no strategy
+question.
+
+**Changed** — `fit.ts` deleted; knowledge follows the authenticated
+representative; the seed names its owner explicitly rather than inferring it
+from household ownership; the two reasons a fit cannot be scored are separate
+findings rather than matching copy.
+
+**Closed** — QA-04, QA-07, QA-14, QA-16.
+
+---
+
 ## Phase 2 — Career Knowledge Foundation
 
 Career owns the representative's professional knowledge. One store, read by
