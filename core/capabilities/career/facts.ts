@@ -16,6 +16,7 @@
 import { UNSTRUCTURED } from "../../events/migrate.ts";
 import type { UnstructuredFact } from "../../events/migrate.ts";
 import type { KnowledgeFact } from "../../events/types.ts";
+import { display as displayKnowledge, isKnowledgeFact } from "./knowledge/index.ts";
 
 /** One requirement, as the posting states it. */
 export type JdRequirementFact = KnowledgeFact<"jd_requirement", { statement: string }>;
@@ -66,5 +67,7 @@ export function statementOf(fact: KnowledgeFact): string {
  * new fact type changes this file and nothing in the UI (§4, and Art. 15).
  */
 export function display(fact: KnowledgeFact): string {
+  // Career Knowledge has its own vocabulary and phrases itself.
+  if (isKnowledgeFact(fact)) return displayKnowledge(fact);
   return statementOf(fact);
 }

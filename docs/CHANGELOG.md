@@ -5,6 +5,47 @@ Newest first. One entry per phase. Architecture as it stands is in
 
 ---
 
+## Phase 2 — Career Knowledge Foundation
+
+Career owns the representative's professional knowledge. One store, read by
+every Career employee, seeded from the hand-verified source data in
+`prototypes/resume-tailoring/source-data/`.
+
+**Added**
+- `core/capabilities/career/knowledge/` — `types.ts` (categories, fact types,
+  `Gap`), `seed.ts` (the verified material), `index.ts` (the store).
+- 12 knowledge fact types, each backed by real source data: profile,
+  employment, experience, project, achievement, skill, prohibited_claim,
+  strength, weakness, preferred_role, interview_question, interview_story.
+- 16 knowledge categories, including every category the department
+  specification names. A category with no data is a stated **Gap**, never an
+  empty model.
+- `owns(category)` — how an employee checks before asking the representative
+  anything, and `gapsIn(category)` — what they report instead.
+- `prohibitions()` — the claims the record forbids, collected from the skills
+  list and from each experience's and project's own limits.
+- `core/career-knowledge.test.ts` — 20 tests.
+
+**Changed**
+- `core/capabilities/career/facts.ts` delegates display of a knowledge fact to
+  the knowledge module, so Career still phrases its own vocabulary.
+
+**Not added** — no model for résumé, portfolio, KPIs, interview history,
+application history, recruiter feedback, or preferred industries. None has
+source data, and each is declared as a gap with the reason it is missing. A
+résumé in particular is an output generated from this knowledge, not knowledge
+itself.
+
+**Read-only.** The seeded material was verified by the representative and is
+durable in the repository. How new knowledge is written — a recruiter's
+feedback, an interview that happened — is an open decision, and guessing at it
+would put a write path into the one store that must not accumulate unverified
+claims.
+
+**Tests** — 172 total, 169 passing. Three inherited failures (QA-01).
+
+---
+
 ## Phase 1 — Organization Layer Reconstruction
 
 `f8f58a8` · report: `PHASE_1_IMPLEMENTATION_REPORT.md`
