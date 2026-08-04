@@ -202,3 +202,66 @@ engine be removed without changing domain behavior.
 engine only — never history, which remains the event log under ADR-002. Ambient
 readings carry freshness and confidence so a depiction cannot imply certainty the
 projection does not have.
+
+## ADR-021 — Department-owned fact vocabulary
+
+**Decision:** A `KnowledgeFact` carries a `type` and a `value` owned by the
+department that wrote them. The kernel stores and transports both and never
+inspects either. Each department declares its own discriminated union over the
+fact type and narrows on read. There is no global domain enum in the kernel.
+
+**Reason:** A shared vocabulary in the kernel makes the kernel know Career, Home,
+and Finance, which is the coupling ADR-001's dependency direction forbids.
+Adding a department fact type must change that department's own module and
+nothing else.
+
+**Caveat:** Because the kernel transports the value opaquely, a department must
+validate shape on read. That re-validation is required regardless — events are
+persisted as JSON and re-read — so it is a property of durability, not overhead.
+
+## ADR-022 — Actor, author, and source are three concepts
+
+**Decision:** `actor` (on the event envelope) is who caused the event to be
+written. `author` (on the fact) is who asserts the fact is true. `source` (on the
+fact) is where the evidence came from. All three are recorded and none may be
+derived from another. An author that is not known is recorded as `unattributed`.
+
+**Reason:** A runner recording what the representative said last month is not the
+one claiming it. Collapsing actor into author attributes a person's own statement
+to the machinery that filed it, and a guessed author cannot be told apart from a
+real one.
+
+**Caveat:** Events written before authorship existed are upcast on read with
+`author: unattributed` and are never back-filled. History is not rewritten to fix
+a shape (Art. 18); the upcast is a read-time projection, applied identically by
+every storage adapter.
+
+## ADR-023 — Employee, Responsibility, Capability, Runner
+
+**Decision:** Accountability flows `Employee → Responsibility → Capability →
+Runner`. Employees own responsibilities; capabilities own business logic; runners
+execute it. Departments organize employees and never resolve one. Responsibilities
+are typed ids assigned to exactly one employee in a single table. The manifest
+binds responsibilities, not a department and an employee. Runner dispatch is keyed
+by responsibility. Signatures come from the employee accountable for the
+responsibility.
+
+**Reason:** Resolving an employee from a department made a department and a person
+the same thing, so a department could hold exactly one accountable employee
+regardless of how many worked there. Employees change and capabilities do not;
+replacing a person must not reach code that decides what the company does.
+
+**Caveat:** No fallback of any kind is permitted in this chain. An unassigned
+responsibility, an unknown employee, or a missing runner is an error at the point
+of use — never a substitution of whoever or whatever is listed first. Silent
+substitution is what made both previous failures invisible.
+
+## ADR-024 — Progress requires an act, not a fact
+
+**Decision:** Recording a `KnowledgeFact` does not advance a work order. A work
+order moves to `working` only when something actually moves it. Until a work-start
+event exists, an order stays `assigned` after facts are recorded.
+
+**Reason:** Knowing something is not the same as having started the work. A
+department may record what it read and get no further, and reporting that as
+progress tells the representative something the record does not support (Art. 9).

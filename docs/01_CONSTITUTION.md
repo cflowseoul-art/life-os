@@ -190,20 +190,31 @@ fabricated detail is not the detail — it is every true statement that follows 
 
 ## Article 10 — Memory and Provenance
 
-**Law.** Every fact the system holds must carry its source, its acquisition time, and its
-confidence; facts without provenance may not be used in an Ask or an artifact.
+**Law.** Every fact the system holds must carry its source, its author, its acquisition time, and
+its confidence; facts without provenance may not be used in an Ask or an artifact.
 
 **Why.** Custody over time means answering "how do you know that?" for anything the system acts
 on, including facts it inferred from earlier facts.
 
+Source and author are different questions and both must be answerable. The source is where the
+evidence came from; the author is who asserts the fact is true. Neither may be substituted for
+the actor that caused the event to be written — a runner recording what the representative said
+is not the one claiming it.
+
+An author that is not known is recorded as unattributed. It is never inferred, and never
+back-filled from the actor: a guessed author is worse than an absent one, because it cannot be
+told apart from a real one.
+
 **Compliant**
-- A stored preference records the utterance and date it came from.
-- An inference records the facts it derived from.
+- A stored preference records the utterance and date it came from, authored by the representative.
+- An inference records the facts it derived from, authored by whoever inferred it.
+- A fact recorded before authorship was carried reads as unattributed, permanently.
 
 **Violation**
 - A user profile field with no origin.
 - Treating an inference as an observation.
 - Presenting stale data without indicating when it was acquired.
+- Naming the event's actor as the author of a fact it merely transcribed.
 
 ---
 
