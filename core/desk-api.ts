@@ -70,6 +70,11 @@ import { isStaffed, route } from "./company/routing.ts";
 import { signature } from "./company/employees.ts";
 import { projectWorkOrders, workOrderFor } from "./company/work-order.ts";
 import type { WorkOrder } from "./company/work-order.ts";
+import {
+  careerTermDecide,
+  careerTermReview,
+  readDecisions,
+} from "./capabilities/career/ontology/api.ts";
 import { templateFor } from "./reports/templates.ts";
 import type { ReportSection } from "./reports/templates.ts";
 
@@ -726,6 +731,53 @@ function handle(
         )
         .then(() => { void ctx.flush().then(() => { json(res, 200, { ok: true, desk: ctx.view() }); }); })
         .catch(() => { json(res, 500, { ok: false, reasons: ["영수증을 정리하지 못했습니다."] }); });
+    });
+    return;
+  }
+
+  // The unknown-term review. Read it, then decide a batch — both scoped to the
+  // representative the session established, never to anything in the request.
+  if (req.method === "GET" && url.pathname === "/api/career/terms") {
+    void careerTermReview(actor, ctx.logFor("career"))
+      .then((review) => ctx.flush().then(() => { json(res, 200, { ok: true, review }); }))
+      .catch((error: unknown) => {
+        json(res, 400, {
+          ok: false,
+          reason: error instanceof Error ? error.message : "검토 목록을 열지 못했습니다.",
+        });
+      });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/career/terms/decide") {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+    req.on("end", () => {
+      let sent: unknown;
+
+      try {
+        sent = JSON.parse(body || "{}");
+      } catch {
+        json(res, 400, { ok: false, reasons: ["요청을 읽을 수 없습니다."] });
+        return;
+      }
+
+      const parsed = readDecisions(sent);
+
+      if (!parsed.ok) {
+        json(res, 400, { ok: false, reasons: parsed.reasons });
+        return;
+      }
+
+      try {
+        const outcome = careerTermDecide(actor, ctx.logFor("career"), parsed.decisions);
+        void ctx.flush().then(() => { json(res, 200, { ok: true, outcome }); });
+      } catch (error: unknown) {
+        json(res, 400, {
+          ok: false,
+          reasons: [error instanceof Error ? error.message : "결정을 남기지 못했습니다."],
+        });
+      }
     });
     return;
   }
