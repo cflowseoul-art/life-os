@@ -37,6 +37,8 @@ import {
 } from "./company/manifest.ts";
 import { loadRunner } from "./company/runner.ts";
 import { runner as careerRunner } from "./capabilities/career/runner.ts";
+import { BootstrapRepository } from "./capabilities/career/knowledge/index.ts";
+import { useKnowledgeResolver } from "./capabilities/career/knowledge/provider.ts";
 import type { ActorContext } from "./identity/types.ts";
 
 const JD = `Data Analyst
@@ -52,14 +54,33 @@ function freshLog(): EventLog {
 }
 
 /** Runs Career's intake and returns everything it recorded. */
-function runCareer(log: EventLog): { facts: unknown[]; headings: string[]; askFacts: string[] } {
-  careerRunner.accept({
-    actor: {} as ActorContext,
-    log,
-    subject: "OpenAI · Data Analyst",
-    request: JD,
-    attachment: "",
-  });
+const ACTOR = {
+  user: { id: "usr-1" },
+  household: { id: "hh-1" },
+} as ActorContext;
+
+function runCareer(log: EventLog): {
+  facts: { value: unknown; author: unknown }[];
+  headings: string[];
+  askFacts: string[];
+} {
+  // Career Knowledge has to be reachable, or the analyst reports that instead
+  // and records nothing — which would make this test prove nothing.
+  const restore = useKnowledgeResolver(
+    () => new BootstrapRepository({ householdId: "hh-1", userId: "usr-1" }),
+  );
+
+  try {
+    careerRunner.accept({
+      actor: ACTOR,
+      log,
+      subject: "OpenAI · Data Analyst",
+      request: JD,
+      attachment: "",
+    });
+  } finally {
+    useKnowledgeResolver(restore);
+  }
 
   const events = log.read();
 
@@ -68,7 +89,7 @@ function runCareer(log: EventLog): { facts: unknown[]; headings: string[]; askFa
     // two different moments, and that difference is not the department's doing.
     facts: events.flatMap((e) =>
       e.event.type === "KnowledgeFactRecorded"
-        ? [{ ...e.event.fact, acquiredAt: "<when>" }]
+        ? [{ value: e.event.fact.value, author: e.event.fact.author }]
         : [],
     ),
     headings: events.flatMap((e) =>
@@ -149,19 +170,19 @@ describe("Employee replacement", () => {
 
       expect(afterName).not.toBe(beforeName);
 
-      // Knowledge is untouched: same facts, same ids, same types, same values.
-      expect(after.facts).toEqual(before.facts);
+      // The report is identical. No heading and no body carries a person's
+      // name — the desk renders the signature, so the content need not.
+      expect(after.headings).toEqual(before.headings);
 
       // The Ask the representative sees is untouched.
       expect(after.askFacts).toEqual(before.askFacts);
 
-      // Exactly one artifact heading carries a person, and only it differs.
-      expect(after.headings).toHaveLength(before.headings.length);
-
-      const differing = after.headings.filter((h, i) => h !== before.headings[i]);
-      expect(differing).toHaveLength(1);
-      expect(differing[0]).toContain(afterName);
-      expect(differing[0]).not.toContain(beforeName);
+      // Conclusions are identical; only who authored them moved.
+      expect(after.facts.map((f) => f.value)).toEqual(before.facts.map((f) => f.value));
+      expect(after.facts.map((f) => f.author)).not.toEqual(before.facts.map((f) => f.author));
+      for (const fact of after.facts) {
+        expect(fact.author).toEqual({ kind: "employee", employeeId: "emp-career-004" });
+      }
     } finally {
       target.employeeId = original;
     }
@@ -170,7 +191,7 @@ describe("Employee replacement", () => {
   it("requires no capability code to know a person", () => {
     const capabilitySources = [
       "capabilities/career/index.ts",
-      "capabilities/career/fit.ts",
+      "capabilities/career/job-fit.ts",
       "capabilities/career/facts.ts",
       "capabilities/home/index.ts",
       "capabilities/home/facts.ts",

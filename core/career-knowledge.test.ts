@@ -295,7 +295,7 @@ describe("Knowledge comes through a repository", () => {
       "capabilities/career/facts.ts",
       "capabilities/career/runner.ts",
       "capabilities/career/index.ts",
-      "capabilities/career/fit.ts",
+      "capabilities/career/job-fit.ts",
     ];
 
     for (const file of careerFiles) {

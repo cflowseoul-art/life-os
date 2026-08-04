@@ -18,11 +18,25 @@ import type { UnstructuredFact } from "../../events/migrate.ts";
 import type { KnowledgeFact } from "../../events/types.ts";
 import { display as displayKnowledge, isKnowledgeFact } from "./knowledge/index.ts";
 
-/** One requirement, as the posting states it. */
+/** One requirement, as the posting states it. Written by the legacy path only. */
 export type JdRequirementFact = KnowledgeFact<"jd_requirement", { statement: string }>;
 
+/**
+ * One finding from a fit analysis.
+ *
+ * Evidence for a report, not knowledge about the representative: it records what
+ * the analyst concluded about *this posting*, and `derivedFrom` points at the
+ * knowledge that supports it. Bounded by Career's own vocabulary rather than by
+ * the length of the posting, so a long posting cannot produce a long report.
+ */
+export type FitFindingFact = KnowledgeFact<"fit_finding", {
+  requirement: string;
+  kind: "strong" | "partial" | "gap" | "risk";
+  reason: string;
+}>;
+
 /** Everything Career can record, plus the legacy shape it may still read. */
-export type CareerFact = JdRequirementFact | UnstructuredFact;
+export type CareerFact = JdRequirementFact | FitFindingFact | UnstructuredFact;
 
 /**
  * The posting asserts its own requirements.
@@ -41,6 +55,11 @@ export const POSTING_AUTHOR = { kind: "external", name: "채용공고" } as cons
  * fact belonging to another department returns null rather than being coerced.
  */
 export function asCareerFact(fact: KnowledgeFact): CareerFact | null {
+  if (fact.type === "fit_finding") {
+    const value = fact.value as Partial<FitFindingFact["value"]>;
+    return typeof value?.requirement === "string" ? (fact as FitFindingFact) : null;
+  }
+
   if (fact.type === "jd_requirement") {
     const value = fact.value as Partial<JdRequirementFact["value"]>;
     return typeof value?.statement === "string" ? (fact as JdRequirementFact) : null;
@@ -57,7 +76,15 @@ export function asCareerFact(fact: KnowledgeFact): CareerFact | null {
 export function statementOf(fact: KnowledgeFact): string {
   const known = asCareerFact(fact);
   if (!known) return "";
-  return known.type === "jd_requirement" ? known.value.statement : known.value;
+
+  switch (known.type) {
+    case "fit_finding":
+      return `${known.value.requirement} — ${known.value.reason}`;
+    case "jd_requirement":
+      return known.value.statement;
+    default:
+      return known.value;
+  }
 }
 
 /**
