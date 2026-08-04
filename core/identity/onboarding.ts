@@ -1,9 +1,12 @@
 /**
  * First login, and joining.
  *
- * An unknown Google account becomes a user. A user with no household gets one,
- * and becomes its owner. An invited user joins the household they were invited
- * to — the seam exists; the invitation UI does not.
+ * Entry is decided before this runs (see `allowlist.ts`); by the time a caller
+ * gets here, the account is one the household expects.
+ *
+ * The first allowed account creates the household and owns it. Every allowed
+ * account after that joins that same household — there is no public
+ * registration, and no path where a stranger's first login makes them owner.
  */
 
 import type { IdentityStore } from "./store.ts";
@@ -18,12 +21,14 @@ export async function resolveOrCreate(
   const existing = await store.userByGoogleId(identity.googleId);
   if (existing) return { userId: existing.id, householdId: existing.householdId };
 
-  if (invitedHouseholdId) {
-    const household = await store.householdById(invitedHouseholdId);
-    if (!household) throw new Error("초대받은 가구를 찾지 못했습니다.");
+  // An allowed account that arrives after the household exists joins it.
+  const household = invitedHouseholdId
+    ? await store.householdById(invitedHouseholdId)
+    : await store.firstHousehold();
 
+  if (household) {
     const joined = await store.joinHousehold({
-      householdId: invitedHouseholdId,
+      householdId: household.id,
       googleId: identity.googleId,
       email: identity.email,
       displayName: identity.displayName,

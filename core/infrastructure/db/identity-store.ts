@@ -64,6 +64,13 @@ export class PostgresIdentityStore implements IdentityStore {
     return rows[0] ? toHousehold(rows[0]) : null;
   }
 
+  async firstHousehold(): Promise<Household | null> {
+    const { rows } = await db().query<HouseholdRow>(
+      "SELECT * FROM lifeos.households ORDER BY created_at LIMIT 1",
+    );
+    return rows[0] ? toHousehold(rows[0]) : null;
+  }
+
   async createHouseholdWithOwner(input: {
     householdName: string; googleId: string; email: string; displayName: string;
   }): Promise<{ user: User; household: Household }> {

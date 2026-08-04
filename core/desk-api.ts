@@ -15,6 +15,7 @@ import { createServer } from "node:http";
 
 import { staticSite } from "./infrastructure/http/static.ts";
 
+import { allowlistEmpty, isAllowed } from "./identity/allowlist.ts";
 import { verifyGoogleIdToken } from "./identity/google.ts";
 import { contextFor, resolveOrCreate } from "./identity/onboarding.ts";
 import { FileIdentityStore } from "./identity/store.ts";
@@ -308,16 +309,6 @@ const identity: IdentityStore = hosted ? new PostgresIdentityStore() : new FileI
 const events: EventStore = hosted ? new PostgresEventStore() : new FileEventStore();
 
 console.log(`storage: ${STORAGE}`);
-// The database describes itself in database/lifeos.sql. Applying it on start is
-// idempotent, so a fresh deployment needs no manual step — and a failure here
-// stops the process rather than surfacing as a missing table at first login.
-if (hosted) {
-  void ensureSchema().catch((error: unknown) => {
-    console.error("스키마를 준비하지 못했습니다:", error instanceof Error ? error.message : error);
-    process.exit(1);
-  });
-}
-
 
 /** Everything a request needs, resolved from the actor and nothing else. */
 function desk(actor: ActorContext) {
@@ -376,7 +367,7 @@ const port = Number(process.env.PORT ?? 3000);
 const site = staticSite();
 console.log(site ? "web: frontend/dist" : "web: (build 없음 — Vite 개발 서버 사용)");
 
-createServer((req, res) => {
+const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
 
   if (req.method === "GET" && url.pathname === "/healthz") {
@@ -392,6 +383,19 @@ createServer((req, res) => {
         if (!sent.credential) { json(res, 400, { ok: false, reason: "로그인 정보가 오지 않았습니다." }); return; }
 
         const verified = await verifyGoogleIdToken(sent.credential);
+
+        // Entry is decided here, before anything is created. The list is
+        // server-side only and there is no way to add to it from outside.
+        if (allowlistEmpty()) {
+          json(res, 403, { ok: false, reason: "아직 허용된 계정이 없습니다." });
+          return;
+        }
+
+        if (!isAllowed(verified.email, verified.emailVerified)) {
+          json(res, 403, { ok: false, reason: "이 계정으로는 들어오실 수 없습니다." });
+          return;
+        }
+
         const { userId, householdId } = await resolveOrCreate(identity, verified, sent.householdId);
         const token = issueSession(userId, householdId);
         const context = await contextFor(identity, readSession(token)!);
@@ -448,9 +452,20 @@ createServer((req, res) => {
   if (site?.(req, res, url)) return;
 
   json(res, 404, { ok: false, reason: "없는 경로입니다." });
-}).listen(port, process.env.HOST ?? "127.0.0.1", () => {
-  console.log(`desk api: :${String(port)}/api/desk`);
 });
+
+// Nothing is served until the database can answer for itself: a login that
+// arrived first would fail on a missing table.
+void (hosted ? ensureSchema() : Promise.resolve())
+  .then(() => {
+    server.listen(port, process.env.HOST ?? "127.0.0.1", () => {
+      console.log(`desk api: :${String(port)}/api/desk`);
+    });
+  })
+  .catch((error: unknown) => {
+    console.error("스키마를 준비하지 못했습니다:", error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
 
 /** Domain routes. They receive the actor; they never parse a request for it. */
 function handle(

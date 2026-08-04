@@ -16,6 +16,8 @@ export interface IdentityStore {
   userByGoogleId(googleId: string): Promise<User | null>;
   userById(id: string): Promise<User | null>;
   householdById(id: HouseholdId): Promise<Household | null>;
+  /** The household this deployment serves, if one has been created. */
+  firstHousehold(): Promise<Household | null>;
   /** Households with no members yet cannot exist: the creator joins on creation. */
   createHouseholdWithOwner(input: {
     householdName: string;
@@ -63,6 +65,11 @@ export class FileIdentityStore implements IdentityStore {
 
   householdById(id: HouseholdId): Promise<Household | null> {
     return Promise.resolve(this.read().households.find((h) => h.id === id) ?? null);
+  }
+
+  firstHousehold(): Promise<Household | null> {
+    const [oldest] = [...this.read().households].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return Promise.resolve(oldest ?? null);
   }
 
   createHouseholdWithOwner(input: {
