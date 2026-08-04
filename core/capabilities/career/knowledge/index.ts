@@ -24,17 +24,27 @@ import type {
   Gap,
   KnowledgeCategory,
 } from "./types.ts";
-import { BootstrapRepository } from "./repository.ts";
 import type { CareerKnowledgeRepository } from "./repository.ts";
+import { assertRepresentative } from "./representative.ts";
+import type { RepresentativeKey } from "./representative.ts";
 import type { KnowledgeFact } from "../../../events/types.ts";
 
 export type { CareerKnowledgeFact, Gap, KnowledgeCategory } from "./types.ts";
 export { KNOWLEDGE_CATEGORIES, CATEGORY_OF } from "./types.ts";
 export { BootstrapRepository, InMemoryRepository } from "./repository.ts";
 export type { CareerKnowledgeRepository } from "./repository.ts";
+export {
+  assertRepresentative,
+  describeRepresentative,
+  representativeOf,
+  sameRepresentative,
+} from "./representative.ts";
+export type { RepresentativeKey } from "./representative.ts";
 
 /** Everything a Career employee may ask of the representative's knowledge. */
 export type CareerKnowledge = {
+  /** Whose knowledge this view reads. Fixed when the view is built. */
+  readonly representative: RepresentativeKey;
   /** Everything Career knows. */
   facts(): CareerKnowledgeFact[];
   /** Everything Career knows it does not know. */
@@ -65,34 +75,45 @@ export type CareerKnowledge = {
 };
 
 /**
- * Career's knowledge, read through one provider.
+ * One representative's knowledge, read through one provider.
+ *
+ * The representative is named once, here, and carried into every read — so a
+ * query cannot be written that forgets to scope itself, and there is no view
+ * that means "everyone". A malformed key is refused before the provider is
+ * touched.
  *
  * Every query re-reads from the repository rather than snapshotting, so a
  * provider backed by a live store is never serving a stale view. Caching, if a
  * provider needs it, is the provider's business.
  */
-export function careerKnowledge(repository: CareerKnowledgeRepository): CareerKnowledge {
+export function careerKnowledge(
+  repository: CareerKnowledgeRepository,
+  representative: RepresentativeKey,
+): CareerKnowledge {
+  const whose = assertRepresentative(representative);
+
   const factsIn = (category: KnowledgeCategory): CareerKnowledgeFact[] =>
-    repository.facts().filter((f) => CATEGORY_OF[f.type] === category);
+    repository.facts(whose).filter((f) => CATEGORY_OF[f.type] === category);
 
   const gapsIn = (category: KnowledgeCategory): Gap[] =>
-    repository.gaps().filter((g) => g.category === category);
+    repository.gaps(whose).filter((g) => g.category === category);
 
   const factsOfType = <T extends CareerKnowledgeType>(
     type: T,
   ): Extract<CareerKnowledgeFact, { type: T }>[] =>
-    repository.facts().filter(
+    repository.facts(whose).filter(
       (f): f is Extract<CareerKnowledgeFact, { type: T }> => f.type === type,
     );
 
   return {
-    facts: () => repository.facts(),
-    gaps: () => repository.gaps(),
+    representative: whose,
+    facts: () => repository.facts(whose),
+    gaps: () => repository.gaps(whose),
     factsOfType,
     factsIn,
     gapsIn,
     owns: (category) => factsIn(category).length > 0,
-    byId: (id) => repository.facts().find((f) => f.id === id) ?? null,
+    byId: (id) => repository.facts(whose).find((f) => f.id === id) ?? null,
     prohibitions: () => [
       ...factsOfType("prohibited_claim").map((f) => f.value.claim),
       ...factsOfType("experience").map((f) => f.value.limits),
@@ -105,17 +126,6 @@ export function careerKnowledge(repository: CareerKnowledgeRepository): CareerKn
         gaps: gapsIn(category).length,
       })),
   };
-}
-
-/**
- * The provider in use until knowledge becomes writable.
- *
- * The single place the current arrangement is named. A caller that wants
- * knowledge asks for this and gets a repository — never the seed, and never a
- * module that knows what a seed is.
- */
-export function knowledgeRepository(): CareerKnowledgeRepository {
-  return new BootstrapRepository();
 }
 
 /**

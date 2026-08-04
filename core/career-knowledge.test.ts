@@ -19,14 +19,20 @@ import {
   careerKnowledge,
   display,
   isKnowledgeFact,
-  knowledgeRepository,
 } from "./capabilities/career/knowledge/index.ts";
+import type { RepresentativeKey } from "./capabilities/career/knowledge/index.ts";
 import { display as displayCareerFact } from "./capabilities/career/facts.ts";
 import { employeeForResponsibility } from "./company/employees.ts";
 import type { ResponsibilityId } from "./company/responsibilities.ts";
 
+/** The representative the seeded material belongs to. */
+const OWNER: RepresentativeKey = { householdId: "hh-1", userId: "usr-1" };
+
+/** Somebody else entirely. Shares a household with nobody. */
+const OTHER: RepresentativeKey = { householdId: "hh-2", userId: "usr-2" };
+
 /** The knowledge every test reads, through the port rather than the seed. */
-const store = careerKnowledge(knowledgeRepository());
+const store = careerKnowledge(new BootstrapRepository(OWNER), OWNER);
 
 /** Every Career employee, by the responsibility they own. */
 const CAREER_EMPLOYEES: ResponsibilityId[] = [
@@ -240,7 +246,7 @@ describe("Nothing was invented in transcription", () => {
 
 describe("Knowledge comes through a repository", () => {
   it("reads identically whichever way the bootstrap provider is obtained", () => {
-    const direct = careerKnowledge(new BootstrapRepository());
+    const direct = careerKnowledge(new BootstrapRepository(OWNER), OWNER);
 
     expect(direct.facts()).toEqual(store.facts());
     expect(direct.gaps()).toEqual(store.gaps());
@@ -248,7 +254,7 @@ describe("Knowledge comes through a repository", () => {
   });
 
   it("swaps the provider without changing a single query", () => {
-    const empty = careerKnowledge(new InMemoryRepository());
+    const empty = careerKnowledge(new InMemoryRepository(OWNER), OWNER);
 
     // Same code paths, different provider, different answers.
     expect(empty.facts()).toEqual([]);
@@ -260,9 +266,11 @@ describe("Knowledge comes through a repository", () => {
     const achievement = store.byId("ACH-001")!;
     const one = careerKnowledge(
       new InMemoryRepository(
+        OWNER,
         [achievement],
         [{ category: "portfolio", what: "포트폴리오", why: "테스트" }],
       ),
+      OWNER,
     );
 
     expect(one.owns("achievements")).toBe(true);
@@ -274,11 +282,11 @@ describe("Knowledge comes through a repository", () => {
   });
 
   it("prepares a provider before it is read", async () => {
-    const repository = new BootstrapRepository();
-    await repository.load();
+    const repository = new BootstrapRepository(OWNER);
+    await repository.load(OWNER);
 
     expect(repository.name).toBe("bootstrap");
-    expect(repository.facts().length).toBeGreaterThan(0);
+    expect(repository.facts(OWNER).length).toBeGreaterThan(0);
   });
 
   it("keeps the seed reachable only through a provider", () => {
@@ -297,5 +305,103 @@ describe("Knowledge comes through a repository", () => {
       expect(source).not.toContain("SEEDED_FACTS");
       expect(source).not.toContain("SEEDED_GAPS");
     }
+  });
+});
+
+describe("Knowledge belongs to one representative", () => {
+  it("gives two representatives isolated knowledge", () => {
+    const mine = careerKnowledge(new BootstrapRepository(OWNER), OWNER);
+    const theirs = careerKnowledge(new InMemoryRepository(OTHER), OTHER);
+
+    expect(mine.facts().length).toBeGreaterThan(0);
+    expect(theirs.facts()).toEqual([]);
+    expect(theirs.owns("skills")).toBe(false);
+    expect(mine.owns("skills")).toBe(true);
+  });
+
+  it("leaks nothing between two providers holding different people", () => {
+    const achievement = store.byId("ACH-001")!;
+    const theirs = careerKnowledge(
+      new InMemoryRepository(OTHER, [achievement]),
+      OTHER,
+    );
+
+    // The same fact object, held for someone else, is reachable only as theirs.
+    expect(theirs.byId("ACH-001")).toBe(achievement);
+    expect(theirs.representative).toEqual(OTHER);
+    expect(store.representative).toEqual(OWNER);
+    expect(theirs.factsIn("skills")).toEqual([]);
+  });
+
+  it("refuses to serve a different representative from the same provider", async () => {
+    const repository = new BootstrapRepository(OWNER);
+
+    expect(() => repository.facts(OTHER)).toThrow(/드릴 수 없습니다/);
+    expect(() => repository.gaps(OTHER)).toThrow(/드릴 수 없습니다/);
+    // A refusal on an async entry point rejects; it does not throw at the call.
+    await expect(repository.load(OTHER)).rejects.toThrow(/드릴 수 없습니다/);
+    await expect(repository.load(OWNER)).resolves.toBeUndefined();
+  });
+
+  it("refuses a view built for somebody the provider does not serve", () => {
+    const wrong = careerKnowledge(new BootstrapRepository(OWNER), OTHER);
+
+    // The view constructs — the mismatch is the provider's to refuse, and it does.
+    expect(() => wrong.facts()).toThrow(/드릴 수 없습니다/);
+  });
+
+  it("distinguishes a shared household from a shared person", () => {
+    const partner: RepresentativeKey = { householdId: OWNER.householdId, userId: "usr-partner" };
+    const repository = new BootstrapRepository(OWNER);
+
+    // Same household, different person: one career is not the household's.
+    expect(() => repository.facts(partner)).toThrow(/드릴 수 없습니다/);
+  });
+});
+
+describe("Missing identity fails", () => {
+  const incomplete: { label: string; key: unknown }[] = [
+    { label: "no key at all", key: undefined },
+    { label: "null", key: null },
+    { label: "missing userId", key: { householdId: "hh-1" } },
+    { label: "missing householdId", key: { userId: "usr-1" } },
+    { label: "blank userId", key: { householdId: "hh-1", userId: "" } },
+    { label: "blank householdId", key: { householdId: "   ", userId: "usr-1" } },
+  ];
+
+  for (const { label, key } of incomplete) {
+    it(`refuses a repository built with ${label}`, () => {
+      expect(() => new BootstrapRepository(key as RepresentativeKey)).toThrow();
+    });
+
+    it(`refuses a read for ${label}`, () => {
+      const repository = new BootstrapRepository(OWNER);
+      expect(() => repository.facts(key as RepresentativeKey)).toThrow();
+    });
+
+    it(`refuses a view for ${label}`, () => {
+      expect(() =>
+        careerKnowledge(new BootstrapRepository(OWNER), key as RepresentativeKey),
+      ).toThrow();
+    });
+  }
+
+  it("says which half is missing", () => {
+    expect(() => new BootstrapRepository({ householdId: "", userId: "usr-1" }))
+      .toThrow(/householdId/);
+    expect(() => new BootstrapRepository({ householdId: "hh-1", userId: "" }))
+      .toThrow(/userId/);
+  });
+
+  it("offers no unscoped way in", () => {
+    const source = readFileSync(
+      join(import.meta.dirname, "capabilities/career/knowledge/index.ts"),
+      "utf8",
+    );
+
+    // No factory that returns knowledge without naming whose it is.
+    expect(source).not.toContain("knowledgeRepository(");
+    // Every query on the view is built from a bound representative.
+    expect(source).toContain("assertRepresentative(representative)");
   });
 });
