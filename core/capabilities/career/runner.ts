@@ -125,7 +125,7 @@ export const runner: ResponsibilityRunner = {
     // somebody else's — and the analysis says so in its own terms.
     const knowledge = careerKnowledgeFor(actor);
 
-    const ontology = careerOntologyFor(actor);
+    const ontology = careerOntologyFor(actor, log);
 
     const report = analyseFit(
       { company, position: role, posting },

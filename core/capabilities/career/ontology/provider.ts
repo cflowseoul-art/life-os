@@ -11,22 +11,35 @@
  */
 
 import { BootstrapOntologyRepository, InMemoryOntologyRepository } from "./repository.ts";
+import { ApprovedOntologyRepository } from "./changes.ts";
 import { careerOntology } from "./index.ts";
 import { ownsBootstrapKnowledge } from "../knowledge/bootstrap.ts";
 import { representativeOf } from "../knowledge/representative.ts";
 import type { CareerOntology } from "./index.ts";
 import type { CareerOntologyRepository } from "./repository.ts";
 import type { ActorContext } from "../../../identity/types.ts";
+import type { EventStream } from "../../../storage/event-store.ts";
 
-export function ontologyRepositoryFor(actor: ActorContext): CareerOntologyRepository {
+export function ontologyRepositoryFor(
+  actor: ActorContext,
+  log?: EventStream,
+): CareerOntologyRepository {
   const representative = representativeOf(actor);
 
-  return ownsBootstrapKnowledge(actor)
+  const seeded = ownsBootstrapKnowledge(actor)
     ? new BootstrapOntologyRepository(representative)
     : new InMemoryOntologyRepository(representative);
+
+  // Seeded first, approvals after, so a later label supersedes an earlier one.
+  return log ? new ApprovedOntologyRepository(representative, seeded, log) : seeded;
 }
 
-/** One authenticated representative's vocabulary. Never anybody else's. */
-export function careerOntologyFor(actor: ActorContext): CareerOntology {
-  return careerOntology(ontologyRepositoryFor(actor), representativeOf(actor));
+/**
+ * One authenticated representative's vocabulary. Never anybody else's.
+ *
+ * Given a stream, everything they have approved reads alongside what was
+ * seeded — so a term approved a moment ago resolves on the next posting.
+ */
+export function careerOntologyFor(actor: ActorContext, log?: EventStream): CareerOntology {
+  return careerOntology(ontologyRepositoryFor(actor, log), representativeOf(actor));
 }
