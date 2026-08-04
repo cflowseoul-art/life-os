@@ -23,22 +23,29 @@ import {
   careerKnowledgeFor,
   knowledgeRepositoryFor,
 } from "./capabilities/career/knowledge/provider.ts";
-import { ownsBootstrapKnowledge } from "./capabilities/career/knowledge/bootstrap.ts";
+import {
+  ownsBootstrapKnowledge,
+  seedOwnerBinding,
+} from "./capabilities/career/knowledge/bootstrap.ts";
 import { runner as analyst } from "./capabilities/career/runner.ts";
 import type { RepresentativeKey } from "./capabilities/career/knowledge/index.ts";
 import type { ActorContext } from "./identity/types.ts";
 
 const OWNER: RepresentativeKey = { householdId: "hh-1", userId: "usr-1" };
 
-/** The representative who founded the household — the seed describes them. */
+/** The account the seed is bound to, declared before anything reads it. */
+const SEED_EMAIL = "owner@example.com";
+process.env.LIFE_OS_CAREER_SEED_EMAIL = SEED_EMAIL;
+
+/** The representative the binding names. */
 const ACTOR = {
-  user: { id: "usr-1" },
+  user: { id: "usr-1", email: SEED_EMAIL },
   household: { id: "hh-1", ownerUserId: "usr-1" },
 } as ActorContext;
 
-/** A partner who joined the same household later. */
+/** A partner in the same household. Not the person the seed describes. */
 const PARTNER = {
-  user: { id: "usr-2" },
+  user: { id: "usr-2", email: "partner@example.com" },
   household: { id: "hh-1", ownerUserId: "usr-1" },
 } as ActorContext;
 
@@ -380,7 +387,7 @@ describe("Knowledge follows the authenticated representative", () => {
 
   it("gives an owner of a different household nothing of this one", () => {
     const stranger = {
-      user: { id: "usr-9" },
+      user: { id: "usr-9", email: "stranger@example.com" },
       household: { id: "hh-9", ownerUserId: "usr-9" },
     } as ActorContext;
 
@@ -405,10 +412,20 @@ describe("Knowledge follows the authenticated representative", () => {
     ).toThrow(/userId/);
   });
 
-  it("treats a blank household owner as owning nothing", () => {
+  it("gives an owner of a different household nothing", () => {
+    const elsewhere = {
+      user: { id: "usr-9", email: "elsewhere@example.com" },
+      household: { id: "hh-9", ownerUserId: "usr-9" },
+    } as ActorContext;
+
+    // Founding a household is not evidence about whose résumé this is.
+    expect(careerKnowledgeFor(elsewhere).facts()).toEqual([]);
+  });
+
+  it("treats a blank email as matching nothing", () => {
     const blank = {
-      user: { id: "usr-1" },
-      household: { id: "hh-1", ownerUserId: "" },
+      user: { id: "usr-1", email: "" },
+      household: { id: "hh-1", ownerUserId: "usr-1" },
     } as ActorContext;
 
     expect(ownsBootstrapKnowledge(blank)).toBe(false);
@@ -433,5 +450,112 @@ describe("Knowledge follows the authenticated representative", () => {
     expect(source).not.toContain("useKnowledgeResolver");
     expect(source).not.toContain("let ");
     expect(source).not.toContain("process.env");
+  });
+});
+
+describe("The seed binding is declared, not inferred", () => {
+  function withBinding<T>(value: string | undefined, run: () => T): T {
+    const previous = process.env.LIFE_OS_CAREER_SEED_EMAIL;
+    if (value === undefined) delete process.env.LIFE_OS_CAREER_SEED_EMAIL;
+    else process.env.LIFE_OS_CAREER_SEED_EMAIL = value;
+
+    try {
+      return run();
+    } finally {
+      if (previous === undefined) delete process.env.LIFE_OS_CAREER_SEED_EMAIL;
+      else process.env.LIFE_OS_CAREER_SEED_EMAIL = previous;
+    }
+  }
+
+  it("names exactly one account", () => {
+    expect(seedOwnerBinding()).toEqual({ email: SEED_EMAIL });
+  });
+
+  it("exposes nothing when the binding is missing", () => {
+    withBinding(undefined, () => {
+      expect(seedOwnerBinding()).toBeNull();
+      expect(ownsBootstrapKnowledge(ACTOR)).toBe(false);
+      expect(careerKnowledgeFor(ACTOR).facts()).toEqual([]);
+    });
+  });
+
+  it("exposes nothing when the binding is blank", () => {
+    withBinding("   ", () => {
+      expect(seedOwnerBinding()).toBeNull();
+      expect(careerKnowledgeFor(ACTOR).facts()).toEqual([]);
+    });
+  });
+
+  it("exposes nothing when the binding is ambiguous", () => {
+    withBinding(`${SEED_EMAIL},partner@example.com`, () => {
+      // Two names is a question, not a binding. It is refused, not resolved by
+      // taking the first — that would quietly widen who receives a career.
+      expect(seedOwnerBinding()).toBeNull();
+      expect(careerKnowledgeFor(ACTOR).facts()).toEqual([]);
+    });
+  });
+
+  it("matches the account regardless of case or surrounding space", () => {
+    withBinding(`  ${SEED_EMAIL.toUpperCase()}  `, () => {
+      expect(ownsBootstrapKnowledge(ACTOR)).toBe(true);
+    });
+  });
+
+  it("binds to somebody who is not the household owner just as well", () => {
+    withBinding("partner@example.com", () => {
+      // The partner does not own the household, and that is irrelevant.
+      expect(ownsBootstrapKnowledge(PARTNER)).toBe(true);
+      expect(ownsBootstrapKnowledge(ACTOR)).toBe(false);
+      expect(careerKnowledgeFor(PARTNER).facts().length).toBeGreaterThan(0);
+    });
+  });
+
+  it("keeps no household or ownership heuristic anywhere", () => {
+    const source = readFileSync(
+      join(import.meta.dirname, "capabilities/career/knowledge/bootstrap.ts"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+
+    expect(source).not.toContain("ownerUserId");
+    expect(source).not.toContain("household");
+  });
+});
+
+describe("판단 불가 says which kind", () => {
+  it("distinguishes an empty record from an unrecognised posting", () => {
+    const empty = careerKnowledge(new InMemoryRepository(OWNER), OWNER);
+
+    const noKnowledge = analyseFit({ company: "C", position: "R", posting: STRONG_JD }, empty);
+    const noRequirement = analyseFit(
+      { company: "C", position: "R", posting: "우리는 좋은 분을 찾습니다." },
+      KNOWLEDGE,
+    );
+
+    expect(noKnowledge.percent).toBeNull();
+    expect(noRequirement.percent).toBeNull();
+
+    // Same absence of a score, two different findings.
+    expect(noKnowledge.unscored).toBe("no_knowledge");
+    expect(noRequirement.unscored).toBe("no_recognised_requirement");
+    expect(noKnowledge.formula).not.toBe(noRequirement.formula);
+    expect(noKnowledge.reason).not.toBe(noRequirement.reason);
+  });
+
+  it("carries the distinction into what the representative reads", () => {
+    const mine = freshLog();
+    run(mine, "우리는 좋은 분을 찾습니다.", ACTOR);
+
+    const theirs = freshLog();
+    run(theirs, STRONG_JD, PARTNER);
+
+    expect(artifactOf(mine).title).toContain("공고에서 아는 요건 없음");
+    expect(artifactOf(theirs).title).toContain("커리어 지식 없음");
+  });
+
+  it("sets unscored exactly when there is no percentage", () => {
+    for (const posting of [STRONG_JD, FORBIDDEN_JD, "무관한 내용", "- SQL"]) {
+      const report = analyseFit({ company: "C", position: "R", posting }, KNOWLEDGE);
+      expect(report.unscored === null).toBe(report.percent !== null);
+    }
   });
 });

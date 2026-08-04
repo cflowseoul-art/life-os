@@ -53,6 +53,21 @@ export type Risk = {
 /** Exactly three. The representative decides; the analyst recommends. */
 export type Recommendation = "Apply" | "Hold" | "Skip";
 
+/**
+ * Why no score was produced.
+ *
+ * Two different findings that used to read identically. "We hold nothing about
+ * you" is about the representative's record; "this posting asks for nothing we
+ * recognise" is about the posting. Reporting them the same way told the
+ * representative to go looking in the wrong place.
+ */
+export type Unscored = "no_knowledge" | "no_recognised_requirement";
+
+export const UNSCORED_LABEL: Record<Unscored, string> = {
+  no_knowledge: "커리어 지식 없음",
+  no_recognised_requirement: "공고에서 아는 요건 없음",
+};
+
 export type FitReport = {
   company: string;
   position: string;
@@ -64,6 +79,8 @@ export type FitReport = {
    * only the first is true.
    */
   percent: number | null;
+  /** Set whenever `percent` is null, and null whenever it is not. */
+  unscored: Unscored | null;
   /** The arithmetic, stated so the figure can be checked by hand (Art. 9). */
   formula: string;
   strong: RequirementMatch[];
@@ -215,15 +232,25 @@ export function analyseFit(
   const scored = strong.length + partial.length * 0.5;
   const percent = total === 0 ? null : Math.round((scored / total) * 100);
 
+  // An empty record and an unrecognised posting both leave nothing to score,
+  // and they are not the same problem to fix.
+  const unscored: Unscored | null =
+    percent !== null ? null : knowledge.facts().length === 0 ? "no_knowledge" : "no_recognised_requirement";
+
   const formula =
-    total === 0
-      ? "공고에서 저희가 아는 요건을 찾지 못했습니다."
-      : `강한 일치 ${String(strong.length)}건 × 1 + 부분 일치 ${String(partial.length)}건 × 0.5 `
-        + `÷ 확인한 요건 ${String(total)}건`;
+    unscored === "no_knowledge"
+      ? "대표님의 커리어 지식이 아직 없어, 공고를 견줄 기준이 없습니다."
+      : unscored === "no_recognised_requirement"
+        ? "공고에서 저희가 아는 요건을 찾지 못했습니다."
+        : `강한 일치 ${String(strong.length)}건 × 1 + 부분 일치 ${String(partial.length)}건 × 0.5 `
+          + `÷ 확인한 요건 ${String(total)}건`;
 
-  const { recommendation, reason } = decide(percent, forbidden);
+  const { recommendation, reason } = decide(percent, forbidden, unscored);
 
-  return { company, position, percent, formula, strong, partial, gaps, risks, recommendation, reason };
+  return {
+    company, position, percent, unscored, formula,
+    strong, partial, gaps, risks, recommendation, reason,
+  };
 }
 
 /**
@@ -236,11 +263,14 @@ export function analyseFit(
 function decide(
   percent: number | null,
   forbidden: boolean,
+  unscored: Unscored | null,
 ): { recommendation: Recommendation; reason: string } {
   if (percent === null) {
     return {
       recommendation: "Hold",
-      reason: "공고에서 저희가 아는 요건을 찾지 못해 판단을 미룹니다.",
+      reason: unscored === "no_knowledge"
+        ? "대표님에 대해 저희가 아는 것이 없어 판단하지 못했습니다."
+        : "공고에서 저희가 아는 요건을 찾지 못해 판단을 미룹니다.",
     };
   }
 

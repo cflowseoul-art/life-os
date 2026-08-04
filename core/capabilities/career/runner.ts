@@ -17,10 +17,10 @@ import { randomUUID } from "node:crypto";
 
 import { project } from "../../custody/engine.ts";
 import { employeeForResponsibility } from "../../company/employees.ts";
-import { analyseFit, RECOMMENDATION_LABEL } from "./job-fit.ts";
+import { analyseFit, RECOMMENDATION_LABEL, UNSCORED_LABEL } from "./job-fit.ts";
 import { careerKnowledgeFor } from "./knowledge/provider.ts";
 import type { FitReport, RequirementMatch } from "./job-fit.ts";
-import type { Artifact, ArtifactSection } from "../../events/types.ts";
+import type { ArtifactSection } from "../../events/types.ts";
 
 import type {
   AcceptInput,
@@ -34,6 +34,13 @@ const ACTOR = { kind: "capability" as const, id: "career" };
 
 /** How many findings of one kind reach the report. The rest are counted, not listed. */
 const SHOWN = 4;
+
+/** The headline. Says which judgement was reached, or precisely why none was. */
+function headline(report: FitReport): string {
+  return report.unscored === null
+    ? `적합도 ${String(report.percent ?? 0)}%`
+    : `판단 불가 · ${UNSCORED_LABEL[report.unscored]}`;
+}
 
 function splitSubject(subject: string): { company: string; role: string } {
   const parts = subject.split(/[·|,\-—]/).map((p) => p.trim()).filter((p) => p !== "");
@@ -60,9 +67,7 @@ function sections(report: FitReport): ArtifactSection[] {
 
   return [
     {
-      heading: report.percent === null
-        ? `적합도 판단 불가 · ${RECOMMENDATION_LABEL[report.recommendation]}`
-        : `적합도 ${String(report.percent)}% · ${RECOMMENDATION_LABEL[report.recommendation]}`,
+      heading: `${headline(report)} · ${RECOMMENDATION_LABEL[report.recommendation]}`,
       body: `${report.formula} ${report.reason}`,
       derivedFrom: [],
     },
@@ -78,26 +83,6 @@ function sections(report: FitReport): ArtifactSection[] {
       derivedFrom: r.derivedFrom,
     })),
   ];
-}
-
-/** When Career holds nothing for this representative, it says so and stops. */
-function noKnowledge(company: string, role: string): Artifact {
-  return {
-    id: `fit-${company}-${role}`.replace(/\s+/g, "-"),
-    title: `${company} · ${role} — 적합도 판단 불가`,
-    sections: [
-      {
-        heading: "적합도 판단 불가 · 보류",
-        body: "대표님의 커리어 지식이 아직 연결되지 않아, 공고를 견줄 기준이 없습니다.",
-        derivedFrom: [],
-      },
-      {
-        heading: "빈 곳 · 커리어 지식",
-        body: "지식이 연결되면 같은 공고를 다시 읽어 적합도를 내겠습니다.",
-        derivedFrom: [],
-      },
-    ],
-  };
 }
 
 export const runner: ResponsibilityRunner = {
@@ -126,18 +111,8 @@ export const runner: ResponsibilityRunner = {
 
     // Resolved from the authenticated actor the boundary already established.
     // A representative the seed does not describe gets an empty view, never
-    // somebody else's — so "we know nothing about you" is the honest report.
+    // somebody else's — and the analysis says so in its own terms.
     const knowledge = careerKnowledgeFor(actor);
-
-    if (knowledge.facts().length === 0) {
-      log.append(
-        { type: "ArtifactKept", holdId, artifact: noKnowledge(company, role) },
-        ACTOR,
-        "career",
-        "career:fit",
-      );
-      return { ok: true };
-    }
 
     const report = analyseFit({ company, position: role, posting }, knowledge);
 
@@ -178,9 +153,7 @@ export const runner: ResponsibilityRunner = {
         holdId,
         artifact: {
           id: `fit-${company}-${role}`.replace(/\s+/g, "-"),
-          title: report.percent === null
-            ? `${company} · ${role} — 적합도 판단 불가`
-            : `${company} · ${role} — 적합도 ${String(report.percent)}%`,
+          title: `${company} · ${role} — ${headline(report)}`,
           sections: sections(report),
         },
       },
@@ -199,9 +172,7 @@ export const runner: ResponsibilityRunner = {
           holdId,
           question: `${company} ${role}, 지원하시겠습니까?`,
           facts: [
-            report.percent === null
-              ? `적합도 판단 불가 · ${RECOMMENDATION_LABEL[report.recommendation]}`
-              : `적합도 ${String(report.percent)}% · ${RECOMMENDATION_LABEL[report.recommendation]}`,
+            `${headline(report)} · ${RECOMMENDATION_LABEL[report.recommendation]}`,
             report.reason,
             ...report.risks.slice(0, SHOWN).map((r) => `위험: ${r.statement}`),
           ],

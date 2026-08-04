@@ -129,7 +129,7 @@ export const career: ReportTemplate = {
     // draft itself is the deliverable and leads the report.
     // Each stage shows only its own work. A fit report is not a résumé, and a
     // résumé draft does not re-explain the posting.
-    const fit = outcome.filter((o) => o.startsWith("적합도 "));
+    const fit = outcome.filter((o) => o.startsWith("적합도 ") || o.startsWith("판단 불가 · "));
     const strong = outcome.filter((o) => o.startsWith("강한 일치 · ")).map((o) => o.replace("강한 일치 · ", ""));
     const partial = outcome.filter((o) => o.startsWith("부분 일치 · ")).map((o) => o.replace("부분 일치 · ", ""));
     const gaps = outcome.filter((o) => o.startsWith("빈 곳 · ")).map((o) => o.replace("빈 곳 · ", ""));

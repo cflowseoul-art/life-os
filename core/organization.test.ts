@@ -52,9 +52,11 @@ function freshLog(): EventLog {
 }
 
 /** Runs Career's intake and returns everything it recorded. */
-/** The founding representative, so the analyst reads real knowledge. */
+/** The representative the seed is bound to, so the analyst reads real knowledge. */
+process.env.LIFE_OS_CAREER_SEED_EMAIL = "owner@example.com";
+
 const ACTOR = {
-  user: { id: "usr-1" },
+  user: { id: "usr-1", email: "owner@example.com" },
   household: { id: "hh-1", ownerUserId: "usr-1" },
 } as ActorContext;
 
