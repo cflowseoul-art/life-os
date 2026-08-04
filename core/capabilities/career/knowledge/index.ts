@@ -1,15 +1,14 @@
 /**
- * Career Knowledge — the store every Career employee reads.
+ * Career Knowledge — the one view every Career employee reads.
  *
  * One store, not one per employee. The job fit analyst, the strategist, the
  * résumé editor and the interview coach all read exactly these facts, so two
  * Career employees can never hold different beliefs about the representative.
  *
- * Read-only by design in this phase. The seeded material was verified by the
- * representative and is durable in the repository; how *new* knowledge is
- * written — a recruiter's feedback, an interview that happened — is a decision
- * that has not been made, and guessing at it would put a write path into the
- * one store that must not accumulate unverified claims.
+ * Everything here reads through a `CareerKnowledgeRepository`. Nothing in this
+ * file knows where the knowledge came from, and nothing outside `repository.ts`
+ * knows the bootstrap seed exists — swapping the provider changes no Career
+ * logic and no query below.
  *
  * The rule that gives this module its purpose:
  *
@@ -25,91 +24,110 @@ import type {
   Gap,
   KnowledgeCategory,
 } from "./types.ts";
-import { SEEDED_FACTS, SEEDED_GAPS, VERIFIED_AT } from "./seed.ts";
+import { BootstrapRepository } from "./repository.ts";
+import type { CareerKnowledgeRepository } from "./repository.ts";
 import type { KnowledgeFact } from "../../../events/types.ts";
 
 export type { CareerKnowledgeFact, Gap, KnowledgeCategory } from "./types.ts";
 export { KNOWLEDGE_CATEGORIES, CATEGORY_OF } from "./types.ts";
-export { VERIFIED_AT } from "./seed.ts";
+export { BootstrapRepository, InMemoryRepository } from "./repository.ts";
+export type { CareerKnowledgeRepository } from "./repository.ts";
 
-/** Everything Career knows, in the order it was verified. */
-export function knowledge(): CareerKnowledgeFact[] {
-  return SEEDED_FACTS;
-}
+/** Everything a Career employee may ask of the representative's knowledge. */
+export type CareerKnowledge = {
+  /** Everything Career knows. */
+  facts(): CareerKnowledgeFact[];
+  /** Everything Career knows it does not know. */
+  gaps(): Gap[];
+  factsOfType<T extends CareerKnowledgeType>(type: T): Extract<CareerKnowledgeFact, { type: T }>[];
+  factsIn(category: KnowledgeCategory): CareerKnowledgeFact[];
+  gapsIn(category: KnowledgeCategory): Gap[];
+  /**
+   * Whether Career already holds knowledge in this category.
+   *
+   * An employee checks this before asking the representative anything. True
+   * means the answer is already here and asking would be asking twice.
+   */
+  owns(category: KnowledgeCategory): boolean;
+  /** One fact by the id it was verified under — `ACH-001`, `SKL-004`, `EXP-002`. */
+  byId(id: string): CareerKnowledgeFact | null;
+  /**
+   * Every limit the record carries.
+   *
+   * Experiences and projects record what they do *not* support, and the skills
+   * list records what may not be claimed at all. Collected here because a
+   * consumer that reads a fact and misses its limit is exactly how a verified
+   * experience becomes an overstatement.
+   */
+  prohibitions(): string[];
+  /** What Career holds and lacks, category by category. For reporting, not logic. */
+  coverage(): { category: KnowledgeCategory; facts: number; gaps: number }[];
+};
 
-/** Everything Career knows it does not know. */
-export function gaps(): Gap[] {
-  return SEEDED_GAPS;
-}
+/**
+ * Career's knowledge, read through one provider.
+ *
+ * Every query re-reads from the repository rather than snapshotting, so a
+ * provider backed by a live store is never serving a stale view. Caching, if a
+ * provider needs it, is the provider's business.
+ */
+export function careerKnowledge(repository: CareerKnowledgeRepository): CareerKnowledge {
+  const factsIn = (category: KnowledgeCategory): CareerKnowledgeFact[] =>
+    repository.facts().filter((f) => CATEGORY_OF[f.type] === category);
 
-/** Facts of one type. */
-export function factsOfType<T extends CareerKnowledgeType>(
-  type: T,
-): Extract<CareerKnowledgeFact, { type: T }>[] {
-  return SEEDED_FACTS.filter(
-    (f): f is Extract<CareerKnowledgeFact, { type: T }> => f.type === type,
-  );
-}
+  const gapsIn = (category: KnowledgeCategory): Gap[] =>
+    repository.gaps().filter((g) => g.category === category);
 
-/** Facts answering for one category. */
-export function factsIn(category: KnowledgeCategory): CareerKnowledgeFact[] {
-  return SEEDED_FACTS.filter((f) => CATEGORY_OF[f.type] === category);
-}
+  const factsOfType = <T extends CareerKnowledgeType>(
+    type: T,
+  ): Extract<CareerKnowledgeFact, { type: T }>[] =>
+    repository.facts().filter(
+      (f): f is Extract<CareerKnowledgeFact, { type: T }> => f.type === type,
+    );
 
-/** What is missing in one category. */
-export function gapsIn(category: KnowledgeCategory): Gap[] {
-  return SEEDED_GAPS.filter((g) => g.category === category);
+  return {
+    facts: () => repository.facts(),
+    gaps: () => repository.gaps(),
+    factsOfType,
+    factsIn,
+    gapsIn,
+    owns: (category) => factsIn(category).length > 0,
+    byId: (id) => repository.facts().find((f) => f.id === id) ?? null,
+    prohibitions: () => [
+      ...factsOfType("prohibited_claim").map((f) => f.value.claim),
+      ...factsOfType("experience").map((f) => f.value.limits),
+      ...factsOfType("project").map((f) => f.value.limits),
+    ],
+    coverage: () =>
+      KNOWLEDGE_CATEGORIES.map((category) => ({
+        category,
+        facts: factsIn(category).length,
+        gaps: gapsIn(category).length,
+      })),
+  };
 }
 
 /**
- * Whether Career already holds knowledge in this category.
+ * The provider in use until knowledge becomes writable.
  *
- * An employee checks this before asking the representative anything. True means
- * the answer is already here and asking would be asking twice.
+ * The single place the current arrangement is named. A caller that wants
+ * knowledge asks for this and gets a repository — never the seed, and never a
+ * module that knows what a seed is.
  */
-export function owns(category: KnowledgeCategory): boolean {
-  return factsIn(category).length > 0;
-}
-
-/** One fact by the id it was verified under — `ACH-001`, `SKL-004`, `EXP-002`. */
-export function byId(id: string): CareerKnowledgeFact | null {
-  return SEEDED_FACTS.find((f) => f.id === id) ?? null;
-}
-
-/**
- * Every limit the record carries.
- *
- * Experiences and projects record what they do *not* support, and the skills
- * list records what may not be claimed at all. Collected here because a
- * consumer that reads a fact and misses its limit is exactly how a verified
- * experience becomes an overstatement.
- */
-export function prohibitions(): string[] {
-  return [
-    ...factsOfType("prohibited_claim").map((f) => f.value.claim),
-    ...factsOfType("experience").map((f) => f.value.limits),
-    ...factsOfType("project").map((f) => f.value.limits),
-  ];
-}
-
-/** What Career holds and lacks, category by category. For reporting, not logic. */
-export function coverage(): { category: KnowledgeCategory; facts: number; gaps: number }[] {
-  return KNOWLEDGE_CATEGORIES.map((category) => ({
-    category,
-    facts: factsIn(category).length,
-    gaps: gapsIn(category).length,
-  }));
+export function knowledgeRepository(): CareerKnowledgeRepository {
+  return new BootstrapRepository();
 }
 
 /**
  * How Career writes one of its knowledge facts for a person to read.
  *
  * Career owns the phrasing of its own vocabulary, exactly as it does for the
- * facts it records against a hold.
+ * facts it records against a hold. Deliberately takes only the fact: formatting
+ * needs no store, so display works on a fact from any provider — or on one that
+ * came from nowhere at all.
  */
 export function display(fact: KnowledgeFact): string {
-  const known = SEEDED_FACTS.find((f) => f.id === fact.id && f.type === fact.type);
-  const subject = (known ?? fact) as CareerKnowledgeFact;
+  const subject = fact as CareerKnowledgeFact;
 
   switch (subject.type) {
     case "profile":
