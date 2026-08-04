@@ -186,14 +186,29 @@ function toWork(
   const sign = signature(hold.capability);
   const title = `${hold.company} · ${hold.role}`;
 
-  const history = events
-    .filter((e) => e.event.holdId === hold.id)
+  // One entry per thing that happened. Reading a posting is one act, however
+  // many lines it had — a progress log per line is noise, not history.
+  const own = events.filter((e) => e.event.holdId === hold.id);
+  const observed = own.filter((e) => e.event.type === "ObservationRecorded");
+
+  const history = own
+    .filter((e) => e.event.type !== "ObservationRecorded")
     .map((e) => ({
       at: e.at,
       actor: actorLabel(e.actor),
       capability: e.capability,
       what: describe(e.event),
     }));
+
+  if (observed.length > 0) {
+    const first = observed[0];
+    history.splice(1, 0, {
+      at: first.at,
+      actor: actorLabel(first.actor),
+      capability: first.capability,
+      what: `확인했습니다 — 요건 ${String(observed.length)}건`,
+    });
+  }
 
   const attachment = attachmentFor(hold, events);
   const template = templateFor(hold.capability);
@@ -240,7 +255,8 @@ function toWork(
     })(),
     ask: hold.outstandingAsk,
     artifact: hold.artifact,
-    observations: hold.observations,
+    // The few that carry the result, not every line that was read.
+    observations: hold.observations.slice(0, 5),
     history,
     withdrawnReason: null,
   };

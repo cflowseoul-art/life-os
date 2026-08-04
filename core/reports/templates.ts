@@ -87,9 +87,15 @@ export const career: ReportTemplate = {
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("이 건은", "준비되는 대로 바로 올려드리겠습니다.");
 
+    // The posting's requirements appear once, as what the draft answers. The
+    // draft itself is the deliverable and leads the report.
+    const draft = outcome.filter((o) => o.startsWith("초안 · ")).map((o) => o.replace("초안 · ", ""));
+    const positioning = outcome.filter((o) => o.startsWith("앞세운 요건 · ") || o.startsWith("적합성 · "));
+
     const sections = [
-      ...section("공고 요건", facts),
-      ...section("추천 포지셔닝", outcome),
+      ...section("이력서 첫 문단 초안", draft),
+      ...section("핵심 요구", facts),
+      ...section("내 경험과의 적합성", positioning),
     ];
 
     if (state === "awaiting") {
@@ -104,9 +110,9 @@ export const career: ReportTemplate = {
 
     if (state === "done") {
       return {
-        summary: `이력서 정리본이 준비됐습니다. 정해 주신 순서 그대로 ${String(outcome.length)}개 항목을 배치했습니다.`,
+        summary: "이력서 첫 문단 초안을 올립니다. 〈 〉 부분만 채우시면 그대로 쓰실 수 있습니다.",
         sections,
-        recommendation: `이대로 쓰셔도 됩니다. 제출은 대표님이 하실 때 따로 여쭙겠습니다. ${NO_DECISION}`,
+        recommendation: `확정 전 초안입니다. 고치실 부분을 말씀해 주시면 그대로 반영하겠습니다. ${NO_DECISION}`,
         decision: null,
       };
     }

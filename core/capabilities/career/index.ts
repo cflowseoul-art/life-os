@@ -44,23 +44,36 @@ export function validateHandover(input: Partial<CareerHandover>): {
  * inference, no summarisation, no invented counts. If the requirement is not in
  * the text, it does not exist.
  */
-export function observe(handover: CareerHandover, acquiredAt: string): Observation[] {
-  const lines = handover.jdText.split("\n");
-  const observations: Observation[] = [];
+/** A requirement worth carrying. Headings, boilerplate and duplicates are not. */
+const MAX_REQUIREMENTS = 7;
 
-  lines.forEach((raw, index) => {
+function shorten(statement: string): string {
+  const clean = statement.replace(/\s+/g, " ").trim();
+  return clean.length <= 60 ? clean : `${clean.slice(0, 57)}…`;
+}
+
+/**
+ * Reads the posting into requirements — at most seven, deduplicated, each short
+ * enough to scan. The full posting stays attached as the source; nothing here
+ * re-renders it.
+ */
+export function observe(handover: CareerHandover, acquiredAt: string): Observation[] {
+  const observations: Observation[] = [];
+  const seen = new Set<string>();
+
+  handover.jdText.split("\n").forEach((raw, index) => {
+    if (observations.length >= MAX_REQUIREMENTS) return;
+
     const line = raw.trim();
     const isBullet = line.startsWith("-") || line.startsWith("*") || line.startsWith("•");
+    if (!isBullet) return;
 
-    if (!isBullet) {
-      return;
-    }
+    const statement = shorten(line.replace(/^[-*•]\s*/, ""));
+    if (statement === "" || statement.length < 4) return;
 
-    const statement = line.replace(/^[-*•]\s*/, "").trim();
-
-    if (statement === "") {
-      return;
-    }
+    const key = statement.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
 
     observations.push({
       id: `req-${String(observations.length + 1)}`,
@@ -118,23 +131,52 @@ export function judgmentNeeded(
  * Art. 8 (Transparency): every section names the observation it came from, so
  * "why does it say this?" is answerable from the record alone.
  */
+/**
+ * The deliverable.
+ *
+ * What the representative asked for is a résumé opening, so that is what this
+ * produces: a labelled draft they approve or correct. The posting's own words
+ * appear once, as the requirements the draft answers — never again.
+ *
+ * Art. 9: nothing here claims experience the record does not hold. Where a
+ * sentence needs a fact about the representative, it leaves a blank for them
+ * rather than inventing one.
+ */
 export function proposeArtifact(
   handover: CareerHandover,
   observations: Observation[],
   leadObservationId: string,
 ): Artifact {
-  const lead = observations.find((o) => o.id === leadObservationId);
-  const rest = observations.filter((o) => o.id !== leadObservationId);
-  const ordered = lead ? [lead, ...rest] : observations;
+  const lead = observations.find((o) => o.id === leadObservationId) ?? observations[0];
+  const others = observations.filter((o) => o.id !== lead?.id);
+
+  const draft = lead
+    ? `${handover.company} ${handover.role} 지원자 〈이름〉입니다. `
+      + `${lead.statement}에 해당하는 일을 〈어디서·언제〉 맡아 〈무엇을 바꿨는지〉 중심으로 말씀드리겠습니다.`
+    : `${handover.company} ${handover.role} 지원자 〈이름〉입니다.`;
 
   return {
     id: `artifact-${handover.company}-${handover.role}`.replace(/\s+/g, "-"),
-    title: `${handover.company} · ${handover.role} — 강조 순서`,
-    sections: ordered.map((observation, index) => ({
-      heading: `${String(index + 1)}. ${observation.statement}`,
-      body: `공고 원문 ${observation.source} 에서 확인한 요건입니다.`,
-      derivedFrom: [observation.id],
-    })),
+    title: `${handover.company} · ${handover.role} — 이력서 첫 문단 초안`,
+    sections: [
+      {
+        heading: `초안 · ${draft}`,
+        body: "〈 〉 부분만 채우시면 그대로 쓰실 수 있습니다. 확정 전 초안입니다.",
+        derivedFrom: lead ? [lead.id] : [],
+      },
+      {
+        heading: `앞세운 요건 · ${lead?.statement ?? "없음"}`,
+        body: "대표님이 고르신 순서입니다.",
+        derivedFrom: lead ? [lead.id] : [],
+      },
+      {
+        heading: `적합성 · 대조할 이력서가 없습니다`,
+        body: others.length === 0
+          ? "이력서를 주시면 요건별로 대조해 표시하겠습니다."
+          : `나머지 요건 ${String(others.length)}개는 초안 뒤 문단에서 다루겠습니다. 이력서를 주시면 요건별로 대조하겠습니다.`,
+        derivedFrom: [],
+      },
+    ],
   };
 }
 
