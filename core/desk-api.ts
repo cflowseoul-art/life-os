@@ -23,6 +23,7 @@ import { FileEventStore } from "./storage/event-store.ts";
 import type { EventStore } from "./storage/event-store.ts";
 import { PostgresIdentityStore } from "./infrastructure/db/identity-store.ts";
 import { PostgresEventStore, markReportRead, readReports } from "./infrastructure/db/event-store.ts";
+import { ensureSchema } from "./infrastructure/db/init.ts";
 import {
   CAPABILITIES,
   companyRoster,
@@ -291,6 +292,16 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
 // capability it says is runnable has no runner behind it.
 validateManifest();
 void warmRunners();
+
+// The database describes itself in database/lifeos.sql. Applying it on start is
+// idempotent, so a fresh deployment needs no manual step — and a failure here
+// stops the process rather than surfacing as a missing table at first login.
+if (hosted) {
+  void ensureSchema().catch((error: unknown) => {
+    console.error("스키마를 준비하지 못했습니다:", error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
 
 /**
  * The composition root.

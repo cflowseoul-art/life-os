@@ -19,7 +19,8 @@
     "serve": "node --import tsx core/desk-api.ts",
     "start:web": "npm run build && npm run serve",
     "db:lifeos": "bash -c 'psql \"$DATABASE_URL\" -f database/lifeos.sql'",
-    "db:migrate": "tsx core/infrastructure/db/migrate.ts"
+    "db:migrate": "tsx core/infrastructure/db/migrate.ts",
+    "db:init": "tsx core/infrastructure/db/init-cli.ts"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
