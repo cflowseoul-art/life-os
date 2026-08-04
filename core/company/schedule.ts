@@ -12,6 +12,7 @@
 import { scheduled } from "./manifest.ts";
 import { loadRunner } from "./runner.ts";
 import { runnerModuleFor } from "./manifest.ts";
+
 import type { EventStream } from "../storage/event-store.ts";
 import type { ActorContext } from "../identity/types.ts";
 
@@ -24,7 +25,9 @@ export async function runSchedule(
   const woken: string[] = [];
 
   for (const capability of scheduled(kind)) {
-    const runner = await loadRunner(capability.id, runnerModuleFor(capability.id));
+    // The schedule wakes a responsibility, which is the thing that can execute.
+    const intake = capability.accountableFor;
+    const runner = await loadRunner(intake, runnerModuleFor(intake));
     if (!runner.tick) continue;
 
     await runner.tick({ actor, log: logFor(capability.id), now });

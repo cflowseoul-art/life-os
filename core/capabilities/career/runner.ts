@@ -6,7 +6,7 @@
  */
 
 import { CustodyEngine, project } from "../../custody/engine.ts";
-import { employeeForDuty } from "../../company/employees.ts";
+import { employeeForResponsibility } from "../../company/employees.ts";
 import { analyse, readProfile } from "./fit.ts";
 import { statementOf } from "./facts.ts";
 import { observe } from "./index.ts";
@@ -16,7 +16,7 @@ import type {
   AcceptInput,
   AcceptResult,
   AnswerInput,
-  CapabilityRunner,
+  ResponsibilityRunner,
   ReviseInput,
 } from "../../company/runner.ts";
 
@@ -52,8 +52,8 @@ function splitSubject(subject: string): { company: string; role: string } {
  * the representative decides to apply, 윤진로 edits the résumé once positioning
  * is settled. Each runs only when its turn comes.
  */
-export const runner: CapabilityRunner = {
-  id: "career",
+export const runner: ResponsibilityRunner = {
+  responsibility: "career.fit-analysis",
 
   accept({ log, subject, request, attachment }: AcceptInput): AcceptResult {
     const { company, role } = splitSubject(subject);
@@ -66,7 +66,7 @@ export const runner: CapabilityRunner = {
 
     const holdId = randomUUID();
     const now = new Date().toISOString();
-    const analyst = employeeForDuty("career", "적합성 분석");
+    const analyst = employeeForResponsibility("career.fit-analysis");
     const actor = { kind: "capability" as const, id: "career" };
 
     log.append(
@@ -206,7 +206,7 @@ export const runner: CapabilityRunner = {
     }
 
     if (optionId === "apply") {
-      const strategist = employeeForDuty("career", "지원 전략");
+      const strategist = employeeForResponsibility("career.application-strategy");
       const top = requirements.slice(0, 3);
 
       log.append(
@@ -238,7 +238,7 @@ export const runner: CapabilityRunner = {
 
     // A positioning choice: the résumé editor's turn.
     const chosen = requirements.find((o) => `strategy-${o.id}` === optionId);
-    const editor = employeeForDuty("career", "이력서 편집");
+    const editor = employeeForResponsibility("career.resume-editing");
 
     log.append(
       {

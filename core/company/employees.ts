@@ -18,6 +18,9 @@
  * `Lee Jaemu (Staff)` differ by title alone.
  */
 
+import { responsibility } from "./responsibilities.ts";
+import type { ResponsibilityId } from "./responsibilities.ts";
+
 export type EmployeeTitle =
   | "Manager" | "Deputy Manager" | "Senior" | "Associate" | "Staff" | "Intern";
 
@@ -51,10 +54,6 @@ export type Employee = {
   displayTitle: string;
 
   status: EmployeeStatus;
-  /** What this person does inside the department. Not seniority. */
-  duty?: string;
-  /** Hold id currently carried, when the department runner sets one. */
-  currentWork?: string;
 };
 
 /**
@@ -136,22 +135,24 @@ export const SURNAMES = [
 ];
 
 /**
- * The roster.
+ * The roster — who works here.
  *
- * One accountable employee per department today. A second employee in a
- * department takes the next unused surname and keeps the given name.
+ * Only that. What each person is accountable for lives in
+ * `responsibilities.ts`, because an employee and a responsibility change on
+ * different schedules and for different reasons. The order of this list carries
+ * no meaning: nothing resolves an employee by being listed first.
  */
-const ROSTER: { id: string; department: string; surname: string; title: Title; duty?: string }[] = [
+const ROSTER: { id: string; department: Department; surname: string; title: Title }[] = [
   { id: "emp-finance-001", department: "finance", surname: "Kim", title: "Manager" },
   { id: "emp-asset-001", department: "asset", surname: "Choi", title: "Manager" },
   { id: "emp-treasury-001", department: "treasury", surname: "Oh", title: "Manager" },
   // Career is a team: one person per stage of an application.
-  { id: "emp-career-001", department: "career", surname: "Park", title: "Senior", duty: "적합성 분석" },
-  { id: "emp-career-002", department: "career", surname: "Lee", title: "Senior", duty: "지원 전략" },
-  { id: "emp-career-003", department: "career", surname: "Yoon", title: "Associate", duty: "이력서 편집" },
-  { id: "emp-career-004", department: "career", surname: "Shin", title: "Associate", duty: "자기소개서" },
-  { id: "emp-career-005", department: "career", surname: "Bae", title: "Associate", duty: "면접 준비" },
-  { id: "emp-career-006", department: "career", surname: "Song", title: "Staff", duty: "지원 관리" },
+  { id: "emp-career-001", department: "career", surname: "Park", title: "Senior" },
+  { id: "emp-career-002", department: "career", surname: "Lee", title: "Senior" },
+  { id: "emp-career-003", department: "career", surname: "Yoon", title: "Associate" },
+  { id: "emp-career-004", department: "career", surname: "Shin", title: "Associate" },
+  { id: "emp-career-005", department: "career", surname: "Bae", title: "Associate" },
+  { id: "emp-career-006", department: "career", surname: "Song", title: "Staff" },
   { id: "emp-home-001", department: "home", surname: "Han", title: "Senior" },
   { id: "emp-health-001", department: "health", surname: "Jung", title: "Associate" },
   { id: "emp-ceo-001", department: "ceo", surname: "Seo", title: "Manager" },
@@ -163,7 +164,6 @@ function compose(
   department: string,
   surname: string,
   title: EmployeeTitle,
-  duty?: string,
 ): Employee {
   const givenName = GIVEN_NAME_BY_DEPARTMENT[department] ?? department;
   const displaySurname = DISPLAY_SURNAME[surname] ?? surname;
@@ -182,60 +182,66 @@ function compose(
     title,
     displayDepartment: DEPARTMENT_LABEL[department] ?? department,
     displayTitle: TITLE_OVERRIDE[department]?.[title] ?? DISPLAY_TITLE[title],
-    duty,
     status: "active",
   };
 }
 
 function build(entry: (typeof ROSTER)[number]): Employee {
-  return compose(entry.id, entry.department, entry.surname, entry.title, entry.duty);
+  return compose(entry.id, entry.department, entry.surname, entry.title);
 }
 
 export const EMPLOYEES: Employee[] = ROSTER.map(build);
 
-/** The person in a department who does a particular duty. */
-export function employeeForDuty(department: string, duty: string): Employee {
-  const found = EMPLOYEES.find(
-    (e) => e.department === department && e.duty === duty && e.status === "active",
-  );
-  return found ?? employeeFor(department);
+const BY_ID = new Map(EMPLOYEES.map((e) => [e.id, e]));
+
+/**
+ * One employee, by id.
+ *
+ * Throws rather than inventing a person. A roster that cannot answer who
+ * somebody is has a real problem, and the previous behaviour — deriving a
+ * surname from the department name so a report could still be signed — hid it
+ * behind a plausible-looking name.
+ */
+export function employeeById(id: string): Employee {
+  const found = BY_ID.get(id);
+  if (!found) throw new Error(`명부에 없는 담당자입니다: ${id}`);
+  if (found.status !== "active") throw new Error(`재직 중이 아닌 담당자입니다: ${id}`);
+  return found;
 }
 
-/** The employee accountable for a department's work. */
-export function employeeFor(department: string): Employee {
-  const found = EMPLOYEES.find((e) => e.department === department && e.status === "active");
-  if (found) return found;
-
-  // An unstaffed department still has a name, so a report can still be signed.
-  // The surname is derived from the department, so it is stable across runs and
-  // two departments never end up with the same one by accident.
-  const taken = new Set(EMPLOYEES.map((e) => e.surname));
-  const free = SURNAMES.filter((s) => !taken.has(s));
-  const pool = free.length > 0 ? free : SURNAMES;
-  const seed = [...department].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  const surname = pool[seed % pool.length];
-
-  return compose(`emp-${department}-000`, department, surname, "Staff");
+/**
+ * The employee accountable for a responsibility.
+ *
+ * The only way to reach a person. There is deliberately no lookup by
+ * department: a department organizes employees, it does not stand in for one,
+ * and treating the two as interchangeable is what limited every department to a
+ * single accountable name.
+ */
+export function employeeForResponsibility(id: ResponsibilityId): Employee {
+  return employeeById(responsibility(id).employeeId);
 }
 
 /**
  * How a report is signed — 김재무 팀장.
  *
- * A person and a title, in the representative's language. The department is
- * metadata; the romanized name stays internal.
+ * Signed by the person accountable for the responsibility, never by the
+ * department. Two responsibilities in one department produce two different
+ * signatures, which is the point.
  */
-export function signature(department: string): {
+export function signature(id: ResponsibilityId): {
   name: string;
   title: string;
+  responsibility: ResponsibilityId;
   department: string;
   displayDepartment: string;
 } {
-  const employee = employeeFor(department);
+  const employee = employeeForResponsibility(id);
 
   return {
     name: employee.displayName,
     title: employee.displayTitle,
-    department,
+    responsibility: id,
+    department: String(employee.department),
     displayDepartment: employee.displayDepartment,
   };
 }

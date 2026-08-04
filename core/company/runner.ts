@@ -1,18 +1,21 @@
 /**
  * The runner registry.
  *
- * A capability owns its execution. The desk asks the manifest for a runner and
- * calls it; it never learns which capability answered, and no part of the
- * application switches on a capability id.
+ * A runner executes one **responsibility**, not a capability. That is the whole
+ * distinction this registry exists to hold: an employee owns a responsibility, a
+ * capability owns business logic, and a runner executes it. Keying execution by
+ * capability collapsed those three into one, which is why a department could
+ * only ever have a single executable thing in it.
  *
- * Runners are loaded lazily from the path their manifest entry declares, so
- * adding a capability is: write the runner, add the entry. Nothing imports it
- * by name.
+ * Runners are loaded lazily from the path the manifest declares for their
+ * responsibility, so adding one is: write the runner, add the entry. Nothing
+ * imports it by name, and nothing switches on who answered.
  */
 
 import type { EventStream } from "../storage/event-store.ts";
 import type { Ask } from "../events/types.ts";
 import type { ActorContext } from "../identity/types.ts";
+import type { ResponsibilityId } from "./responsibilities.ts";
 
 /** What a capability is given when work arrives. */
 export type AcceptInput = {
@@ -52,8 +55,9 @@ export type AcceptResult =
   | { ok: true }
   | { ok: false; reasons: string[] };
 
-export type CapabilityRunner = {
-  id: string;
+export type ResponsibilityRunner = {
+  /** The responsibility this runner executes. One, always. */
+  responsibility: ResponsibilityId;
   /** Take custody, then do everything that does not need the representative. */
   accept(input: AcceptInput): Promise<AcceptResult> | AcceptResult;
   /**
@@ -70,28 +74,34 @@ export type CapabilityRunner = {
   tick?(input: TickInput): Promise<void> | void;
 };
 
-const loaded = new Map<string, CapabilityRunner>();
+const loaded = new Map<ResponsibilityId, ResponsibilityRunner>();
 
 /**
- * Loads a capability's runner from the module its manifest entry names.
+ * Loads a responsibility's runner from the module the manifest names.
  *
- * Throws when the module is missing, exports no runner, or exports one whose id
- * does not match — a mismatch would silently run the wrong capability.
+ * Throws when the module is missing, exports no runner, or exports one declaring
+ * a different responsibility — a mismatch would silently run somebody else's
+ * work under this responsibility's name.
  */
-export async function loadRunner(id: string, modulePath: string): Promise<CapabilityRunner> {
+export async function loadRunner(
+  id: ResponsibilityId,
+  modulePath: string,
+): Promise<ResponsibilityRunner> {
   const cached = loaded.get(id);
   if (cached) return cached;
 
-  const module = (await import(modulePath)) as { runner?: CapabilityRunner };
+  const module = (await import(modulePath)) as { runner?: ResponsibilityRunner };
   const runner = module.runner;
 
   if (!runner) throw new Error(`${id}: 러너를 내보내지 않았습니다 (${modulePath})`);
-  if (runner.id !== id) throw new Error(`${id}: 러너 id가 다릅니다 (${runner.id})`);
+  if (runner.responsibility !== id) {
+    throw new Error(`${id}: 러너가 맡은 책임이 다릅니다 (${runner.responsibility})`);
+  }
 
   loaded.set(id, runner);
   return runner;
 }
 
-export function loadedRunner(id: string): CapabilityRunner | null {
+export function loadedRunner(id: ResponsibilityId): ResponsibilityRunner | null {
   return loaded.get(id) ?? null;
 }

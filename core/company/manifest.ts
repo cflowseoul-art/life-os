@@ -10,7 +10,9 @@
  * fallback and no default — an unknown capability is not a capability.
  */
 
-import { employeeFor } from "./employees.ts";
+import { employeeForResponsibility } from "./employees.ts";
+import { knownResponsibility, responsibility } from "./responsibilities.ts";
+import type { ResponsibilityId } from "./responsibilities.ts";
 import type { Scope } from "../identity/types.ts";
 
 export type CapabilityId =
@@ -35,12 +37,21 @@ export type CapabilityManifest = {
   id: CapabilityId;
   /** What the representative calls it. */
   displayName: string;
-  /** The accountable department. One, always. */
-  department: string;
+  /**
+   * The responsibilities this capability comprises.
+   *
+   * The manifest binds responsibilities, not a department: a department is a
+   * way of organizing people, and binding one here made a capability and a
+   * single person the same thing.
+   */
+  responsibilities: ResponsibilityId[];
+  /**
+   * The responsibility accountable for the whole capability. Exactly one (§3).
+   * It signs the reports and receives incoming work.
+   */
+  accountableFor: ResponsibilityId;
   /** Which stream its data belongs to. Declared, never inferred. */
   scope: Scope;
-  /** The employee who signs its reports. Resolved from the roster. */
-  employeeId: string;
   /** Which floor its desk is on. Ordered by how often the team reports. */
   officeFloor: number;
   /** Whether it may put a report in front of the representative. */
@@ -51,10 +62,10 @@ export type CapabilityManifest = {
   /** The words that route work here. Declared with the capability, nowhere else. */
   routing: RoutingSignals;
   /**
-   * Where this capability's runner lives. Required when enabled; a department
-   * that cannot execute yet declares none.
+   * Where each responsibility's runner lives. Dispatch is by responsibility, so
+   * a responsibility that nobody can execute yet simply has no entry here.
    */
-  runnerModule?: string;
+  runners?: Partial<Record<ResponsibilityId, string>>;
   /** Whether it can accept work today. A department may exist unstaffed. */
   enabled: boolean;
 };
@@ -70,9 +81,19 @@ export const CAPABILITIES: CapabilityManifest[] = [
   {
     id: "career",
     displayName: "커리어",
-    department: "career",
+    // Six stages of an application, six people. Only fit analysis can execute
+    // today; the rest are declared and unstaffed, which is a fact about the
+    // company rather than something to discover at runtime.
+    responsibilities: [
+      "career.fit-analysis",
+      "career.application-strategy",
+      "career.resume-editing",
+      "career.cover-letter",
+      "career.interview-prep",
+      "career.application-operations",
+    ],
+    accountableFor: "career.fit-analysis",
     scope: "personal",
-    employeeId: employeeFor("career").id,
     officeFloor: 1,
     producesReports: true,
     appearsInOffice: true,
@@ -81,15 +102,15 @@ export const CAPABILITIES: CapabilityManifest[] = [
       subjectSignals: ["회사", "직무", "경력", "연봉 협상"],
     },
     scheduler: "none",
-    runnerModule: "../capabilities/career/runner.ts",
+    runners: { "career.fit-analysis": "../capabilities/career/runner.ts" },
     enabled: true,
   },
   {
     id: "home",
     displayName: "살림",
-    department: "home",
+    responsibilities: ["home.provisioning"],
+    accountableFor: "home.provisioning",
     scope: "household",
-    employeeId: employeeFor("home").id,
     officeFloor: 2,
     producesReports: true,
     appearsInOffice: true,
@@ -98,15 +119,15 @@ export const CAPABILITIES: CapabilityManifest[] = [
       subjectSignals: ["냉장고", "집", "살림", "택배", "생필품"],
     },
     scheduler: "none",
-    runnerModule: "../capabilities/home/runner.ts",
+    runners: { "home.provisioning": "../capabilities/home/runner.ts" },
     enabled: true,
   },
   {
     id: "health",
     displayName: "건강",
-    department: "health",
+    responsibilities: ["health.scheduling"],
+    accountableFor: "health.scheduling",
     scope: "personal",
-    employeeId: employeeFor("health").id,
     officeFloor: 2,
     producesReports: true,
     appearsInOffice: true,
@@ -121,9 +142,9 @@ export const CAPABILITIES: CapabilityManifest[] = [
   {
     id: "finance",
     displayName: "재무",
-    department: "finance",
+    responsibilities: ["finance.ledger-review"],
+    accountableFor: "finance.ledger-review",
     scope: "household",
-    employeeId: employeeFor("finance").id,
     officeFloor: 4,
     producesReports: true,
     appearsInOffice: true,
@@ -132,15 +153,15 @@ export const CAPABILITIES: CapabilityManifest[] = [
       subjectSignals: ["카드", "명세", "요금"],
     },
     scheduler: "household",
-    runnerModule: "../capabilities/finance/runner.ts",
+    runners: { "finance.ledger-review": "../capabilities/finance/runner.ts" },
     enabled: true,
   },
   {
     id: "asset",
     displayName: "자산관리",
-    department: "asset",
+    responsibilities: ["asset.custody"],
+    accountableFor: "asset.custody",
     scope: "household",
-    employeeId: employeeFor("asset").id,
     officeFloor: 4,
     producesReports: true,
     appearsInOffice: true,
@@ -154,9 +175,9 @@ export const CAPABILITIES: CapabilityManifest[] = [
   {
     id: "treasury",
     displayName: "자산운용",
-    department: "treasury",
+    responsibilities: ["treasury.capacity"],
+    accountableFor: "treasury.capacity",
     scope: "household",
-    employeeId: employeeFor("treasury").id,
     officeFloor: 3,
     producesReports: true,
     appearsInOffice: true,
@@ -198,6 +219,42 @@ export function appearsInOffice(id: string): boolean {
   return knownCapability(id) && manifestFor(id).appearsInOffice;
 }
 
+/**
+ * The responsibility accountable for a capability's work.
+ *
+ * The single bridge from "which capability" to "which person". Everything that
+ * used to ask a department for an employee asks this instead.
+ */
+export function accountableResponsibility(capability: string): ResponsibilityId {
+  return manifestFor(capability).accountableFor;
+}
+
+/**
+ * The responsibility accountable for work recorded against a name.
+ *
+ * The name is usually a capability, but work may also be held by a function
+ * department that owns none — Operations keeps a request until a domain
+ * department can be named — so its own intake responsibility answers instead.
+ * Returns null when the name means nothing to the company; the caller decides
+ * whether that is an error or simply nobody to display.
+ */
+export function accountableForWork(name: string): ResponsibilityId | null {
+  const intake = `${name}.intake`;
+  if (knownResponsibility(intake)) return intake;
+  if (!knownCapability(name)) return null;
+  return manifestFor(name).accountableFor;
+}
+
+/** The department a capability sits in, derived from who is accountable for it. */
+export function departmentOf(capability: string): string {
+  return responsibility(accountableResponsibility(capability)).department;
+}
+
+/** The capability a responsibility belongs to, or null when it belongs to none. */
+export function capabilityForResponsibility(id: ResponsibilityId): CapabilityId | null {
+  return CAPABILITIES.find((c) => c.responsibilities.includes(id))?.id ?? null;
+}
+
 /** Capabilities the scheduler may wake, by how they are scheduled. */
 export function scheduled(kind: Exclude<SchedulerKind, "none">): CapabilityManifest[] {
   return CAPABILITIES.filter((c) => c.enabled && c.scheduler === kind);
@@ -214,7 +271,9 @@ export function companyRoster(): {
   capability: CapabilityId;
 }[] {
   const desks = CAPABILITIES.filter((c) => c.appearsInOffice).map((c) => {
-    const employee = employeeFor(c.department);
+    // The desk shows whoever is accountable, resolved through the
+    // responsibility rather than by asking the department for its first name.
+    const employee = employeeForResponsibility(c.accountableFor);
 
     return {
       id: employee.id,
@@ -228,7 +287,7 @@ export function companyRoster(): {
   });
 
   // The CEO office is not a capability; it is where the representative sits.
-  const ceo = employeeFor("ceo");
+  const ceo = employeeForResponsibility("ceo.office");
   desks.push({
     id: ceo.id,
     name: ceo.displayName,
@@ -246,31 +305,95 @@ export function companyRoster(): {
  * Startup validation. The company refuses to start if its own description is
  * inconsistent — a silent misconfiguration would be discovered by a user.
  */
-export function runnerModuleFor(id: string): string {
-  const declared = manifestFor(id).runnerModule;
+/**
+ * Where a responsibility's runner lives.
+ *
+ * Keyed by responsibility, not by capability: a capability is several
+ * responsibilities, and only some of them can execute today. A responsibility
+ * with no runner is an error at the point of use, never a quiet substitution of
+ * somebody else's runner.
+ */
+export function runnerModuleFor(id: ResponsibilityId): string {
+  const capability = capabilityForResponsibility(id);
+  if (!capability) throw new Error(`${id}: 어느 capability에도 속하지 않습니다.`);
+
+  const declared = manifestFor(capability).runners?.[id];
   if (!declared) throw new Error(`${id}: 실행할 러너가 선언되지 않았습니다.`);
   return declared;
+}
+
+/** Every responsibility that can execute today, with its module. */
+export function runnableResponsibilities(): { id: ResponsibilityId; module: string }[] {
+  return CAPABILITIES.filter((c) => c.enabled).flatMap((c) =>
+    Object.entries(c.runners ?? {}).map(([id, module]) => ({
+      id: id as ResponsibilityId,
+      module: module,
+    })),
+  );
 }
 
 export function validateManifest(): void {
   const problems: string[] = [];
   const seen = new Set<string>();
   const keywords = new Map<string, string>();
+  const claimed = new Map<string, string>();
 
   for (const c of CAPABILITIES) {
     if (seen.has(c.id)) problems.push(`중복 선언: ${c.id}`);
     seen.add(c.id);
 
-    if (c.department.trim() === "") problems.push(`${c.id}: 부서가 없습니다`);
+    // Responsibilities: declared, assigned, and owned by exactly one capability.
+    if (c.responsibilities.length === 0) problems.push(`${c.id}: 책임이 선언되지 않았습니다`);
+
+    if (!c.responsibilities.includes(c.accountableFor)) {
+      problems.push(`${c.id}: 총괄 책임이 선언 목록에 없습니다 (${c.accountableFor})`);
+    }
+
+    for (const id of c.responsibilities) {
+      if (!knownResponsibility(id)) {
+        problems.push(`${c.id}: 등록되지 않은 책임입니다 (${id})`);
+        continue;
+      }
+
+      const owner = claimed.get(id);
+      if (owner && owner !== c.id) problems.push(`책임 ${id}이 ${owner}와 ${c.id}에 중복됩니다`);
+      claimed.set(id, c.id);
+
+      // An assignment that cannot resolve to an active employee is a failure at
+      // startup, not a name invented at the moment a report needs signing.
+      try {
+        employeeForResponsibility(id);
+      } catch (error) {
+        problems.push(`${c.id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    // Every responsibility of a capability sits in one department (§3).
+    const departments = new Set(
+      c.responsibilities.filter(knownResponsibility).map((id) => responsibility(id).department),
+    );
+    if (departments.size > 1) {
+      problems.push(`${c.id}: 책임이 여러 부서에 걸쳐 있습니다 (${[...departments].join(", ")})`);
+    }
+
+    // A runner may only be declared for a responsibility this capability owns.
+    for (const id of Object.keys(c.runners ?? {})) {
+      if (!c.responsibilities.includes(id as ResponsibilityId)) {
+        problems.push(`${c.id}: 맡지 않은 책임의 러너를 선언했습니다 (${id})`);
+      }
+    }
+
     if (c.scope !== "personal" && c.scope !== "household") problems.push(`${c.id}: scope가 올바르지 않습니다`);
     if (!["none", "household", "personal"].includes(c.scheduler)) problems.push(`${c.id}: scheduler 값이 올바르지 않습니다`);
     if (!Number.isInteger(c.officeFloor) || c.officeFloor < 1 || c.officeFloor > 5) {
       problems.push(`${c.id}: 없는 층입니다 (${String(c.officeFloor)})`);
     }
 
-    // An enabled capability must be able to run; a disabled one must not claim to.
-    if (c.enabled && !c.runnerModule) problems.push(`${c.id}: 러너가 선언되지 않았습니다`);
-    if (c.scheduler !== "none" && !c.runnerModule) {
+    // An enabled capability must be able to run the work it receives, which is
+    // the responsibility accountable for it.
+    const intakeRunner = c.runners?.[c.accountableFor];
+    if (c.enabled && !intakeRunner) problems.push(`${c.id}: 러너가 선언되지 않았습니다`);
+    if (c.scheduler !== "none" && !intakeRunner) {
       problems.push(`${c.id}: 러너 없이 스케줄될 수 없습니다`);
     }
 
@@ -287,10 +410,6 @@ export function validateManifest(): void {
       if (owner && owner !== c.id) problems.push(`"${word}" 신호가 ${owner}와 ${c.id}에 중복됩니다`);
       keywords.set(word, c.id);
     }
-
-    const employee = employeeFor(c.department);
-    if (employee.id !== c.employeeId) problems.push(`${c.id}: 담당자가 명부와 다릅니다`);
-    if (employee.status !== "active") problems.push(`${c.id}: 담당자가 재직 중이 아닙니다`);
   }
 
   if (problems.length > 0) {

@@ -26,22 +26,24 @@ import { PostgresIdentityStore } from "./infrastructure/db/identity-store.ts";
 import { PostgresEventStore, markReportRead, readReports } from "./infrastructure/db/event-store.ts";
 import { ensureSchema } from "./infrastructure/db/init.ts";
 import {
-  CAPABILITIES,
+  accountableForWork,
+  accountableResponsibility,
   companyRoster,
   isEnabled,
   producesReports,
+  runnableResponsibilities,
   runnerModuleFor,
-  scheduled,
   scopeOf,
   validateManifest,
 } from "./company/manifest.ts";
 import { loadRunner } from "./company/runner.ts";
+import type { ResponsibilityId } from "./company/responsibilities.ts";
 import { runSchedule } from "./company/schedule.ts";
 
 /** Loads every declared runner once, so a missing one fails at boot. */
 async function warmRunners(): Promise<void> {
-  for (const capability of CAPABILITIES.filter((c) => c.enabled)) {
-    await loadRunner(capability.id, runnerModuleFor(capability.id));
+  for (const { id, module } of runnableResponsibilities()) {
+    await loadRunner(id, module);
   }
 }
 import type { ActorContext } from "./identity/types.ts";
@@ -78,6 +80,18 @@ import type { ReportSection } from "./reports/templates.ts";
  */
 function contributorFor(capability: string): string {
   return templateFor(capability).contributor;
+}
+
+/**
+ * The responsibility accountable for work held under a capability's name.
+ *
+ * The desk resolves a person exactly once, here, and only through a
+ * responsibility. It never asks a department who works there.
+ */
+function accountableFor(capability: string): ResponsibilityId {
+  const found = accountableForWork(capability);
+  if (!found) throw new Error(`담당 책임을 찾을 수 없습니다: ${capability}`);
+  return found;
 }
 
 /**
@@ -213,7 +227,7 @@ function toWork(
   if (hold.state === "withdrawn") return null;
 
   const contributor = contributorFor(hold.capability);
-  const sign = signature(hold.capability);
+  const sign = signature(accountableFor(hold.capability));
   const title = `${hold.company} · ${hold.role}`;
 
   // One entry per thing that happened. Reading a posting is one act, however
@@ -380,7 +394,11 @@ function desk(actor: ActorContext) {
       const holds = [...project(readable.flatMap((l) => l.read())).values()];
       const asking = holds.find((h) => h.outstandingAsk !== null);
       return asking?.outstandingAsk
-        ? { ask: asking.outstandingAsk, capability: asking.capability }
+        ? {
+            ask: asking.outstandingAsk,
+            capability: asking.capability,
+            responsibility: accountableFor(asking.capability),
+          }
         : null;
     },
     view: () => deskView(new CustodyEngine(personal), readable),
@@ -584,7 +602,9 @@ function handle(
       // The manifest names the runner; the desk never learns which capability
       // answered. Adding a capability changes nothing here.
       if (routed.capability) {
-        void loadRunner(routed.capability, runnerModuleFor(routed.capability))
+        const intake = accountableResponsibility(routed.capability);
+
+        void loadRunner(intake, runnerModuleFor(intake))
           .then((runner) =>
             runner.accept({
               actor,
@@ -689,7 +709,9 @@ function handle(
         return;
       }
 
-      void loadRunner(owner, runnerModuleFor(owner))
+      const intake = accountableResponsibility(owner);
+
+      void loadRunner(intake, runnerModuleFor(intake))
         .then((runner) =>
           runner.accept({ actor, log: ctx.logFor(owner), subject: store, request: "영수증 정리", attachment: text }),
         )
@@ -719,7 +741,7 @@ function handle(
 
       const owner = outstanding.capability;
 
-      void loadRunner(owner, runnerModuleFor(owner))
+      void loadRunner(outstanding.responsibility, runnerModuleFor(outstanding.responsibility))
         .then((runner) => {
           if (!runner.revise) throw new Error("이 건은 아직 수정 요청을 받지 못합니다.");
           return runner.revise({ actor, log: ctx.logFor(owner), ask: outstanding.ask, feedback });
@@ -762,7 +784,7 @@ function handle(
 
         const owner = outstanding.capability;
 
-        void loadRunner(owner, runnerModuleFor(owner))
+        void loadRunner(outstanding.responsibility, runnerModuleFor(outstanding.responsibility))
           .then((runner) =>
             runner.answer?.({
               actor,

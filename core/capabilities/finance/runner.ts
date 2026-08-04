@@ -14,7 +14,7 @@ import type {
   AcceptInput,
   AcceptResult,
   AnswerInput,
-  CapabilityRunner,
+  ResponsibilityRunner,
   TickInput,
 } from "../../company/runner.ts";
 
@@ -23,8 +23,8 @@ function splitSubject(subject: string): { company: string; role: string } {
   return { company: parts[0] ?? "", role: parts.slice(1).join(" ") };
 }
 
-export const runner: CapabilityRunner = {
-  id: "finance",
+export const runner: ResponsibilityRunner = {
+  responsibility: "finance.ledger-review",
 
   async accept({ log, subject, request, attachment }: AcceptInput): Promise<AcceptResult> {
     const { company, role } = splitSubject(subject);

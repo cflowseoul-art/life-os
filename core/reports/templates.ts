@@ -13,8 +13,8 @@
  * capability observed, and every count is the length of a real array.
  */
 
-import { employeeFor } from "../company/employees.ts";
-import { producesReports } from "../company/manifest.ts";
+import { employeeForResponsibility } from "../company/employees.ts";
+import { accountableForWork, producesReports } from "../company/manifest.ts";
 import { display as displayCareerFact } from "../capabilities/career/facts.ts";
 import { display as displayFinanceFact } from "../capabilities/finance/facts.ts";
 import { display as displayHomeFact } from "../capabilities/home/facts.ts";
@@ -78,6 +78,19 @@ function displayUnknownFact(fact: KnowledgeFact): string {
 }
 
 /**
+ * The name that signs a capability's reports.
+ *
+ * Resolved through the responsibility accountable for the work, never by asking
+ * a department for whoever it lists first. A name the company does not
+ * recognise gets no person at all: inventing one is how an unsigned report used
+ * to look signed.
+ */
+function contributorName(capability: string): string {
+  const accountable = accountableForWork(capability);
+  return accountable ? employeeForResponsibility(accountable).displayName : "회사";
+}
+
+/**
  * A department that owns work it cannot execute yet says so plainly: it keeps
  * the work, states the limit, and names what happens next. Never a refusal.
  */
@@ -107,7 +120,7 @@ const NO_DECISION = "현재 대표님께 결정을 요청드릴 사항은 없습
 
 export const career: ReportTemplate = {
   capability: "career",
-  contributor: employeeFor("career").displayName,
+  contributor: contributorName("career"),
   displayFact: displayCareerFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("이 건은", "준비되는 대로 바로 올려드리겠습니다.");
@@ -182,7 +195,7 @@ export const career: ReportTemplate = {
 
 export const finance: ReportTemplate = {
   capability: "finance",
-  contributor: employeeFor("finance").displayName,
+  contributor: contributorName("finance"),
   displayFact: displayFinanceFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("지출 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
@@ -247,7 +260,7 @@ export const finance: ReportTemplate = {
 
 export const health: ReportTemplate = {
   capability: "health",
-  contributor: employeeFor("health").displayName,
+  contributor: contributorName("health"),
   // Health writes no facts yet; legacy prose is all it could have.
   displayFact: displayUnknownFact,
   compose({ state, staffed, facts, outcome, question }) {
@@ -278,7 +291,7 @@ export const health: ReportTemplate = {
 
 export const home: ReportTemplate = {
   capability: "home",
-  contributor: employeeFor("home").displayName,
+  contributor: contributorName("home"),
   displayFact: displayHomeFact,
   compose({ state, staffed, facts, outcome, question }) {
     if (!staffed) return notYetStaffed("살림 관련 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.");
@@ -334,7 +347,7 @@ export const home: ReportTemplate = {
 /** Operations holds a request only until a domain department is accountable. */
 export const operations: ReportTemplate = {
   capability: "operations",
-  contributor: employeeFor("operations").displayName,
+  contributor: contributorName("operations"),
   // Operations owns no content memory (§2). It has no facts to format.
   displayFact: displayUnknownFact,
   compose: () => notYetStaffed(
@@ -355,7 +368,7 @@ export function templateFor(capability: string): ReportTemplate {
   if (!producesReports(capability)) {
     return {
       capability,
-      contributor: employeeFor(capability).displayName,
+      contributor: contributorName(capability),
       displayFact: displayUnknownFact,
       compose: () => ({
         summary: "이 일은 보고 대상이 아닙니다.",
@@ -369,7 +382,7 @@ export function templateFor(capability: string): ReportTemplate {
   return (
     TEMPLATES.find((t) => t.capability === capability) ?? {
       capability,
-      contributor: employeeFor(capability).displayName,
+      contributor: contributorName(capability),
       displayFact: displayUnknownFact,
       compose: ({ state, staffed, facts, question }) => (!staffed
         ? notYetStaffed("이 건은", "처리할 수 있게 되는 대로 올려드리겠습니다.")

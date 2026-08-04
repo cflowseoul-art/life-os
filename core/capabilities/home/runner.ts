@@ -8,15 +8,15 @@
 import { randomUUID } from "node:crypto";
 
 import { advanceHome } from "../../company/home-runner.ts";
-import type { AcceptInput, AcceptResult, CapabilityRunner } from "../../company/runner.ts";
+import type { AcceptInput, AcceptResult, ResponsibilityRunner } from "../../company/runner.ts";
 
 function splitSubject(subject: string): { company: string; role: string } {
   const parts = subject.split(/[·|,\-—]/).map((p) => p.trim()).filter((p) => p !== "");
   return { company: parts[0] ?? "", role: parts.slice(1).join(" ") };
 }
 
-export const runner: CapabilityRunner = {
-  id: "home",
+export const runner: ResponsibilityRunner = {
+  responsibility: "home.provisioning",
 
   accept({ log, subject, request, attachment }: AcceptInput): AcceptResult {
     const { company, role } = splitSubject(subject);

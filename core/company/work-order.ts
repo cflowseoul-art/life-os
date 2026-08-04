@@ -26,7 +26,16 @@
  */
 
 import type { EventEnvelope } from "../events/types.ts";
-import { employeeFor, signature } from "./employees.ts";
+import { employeeForResponsibility, signature } from "./employees.ts";
+import { accountableForWork } from "./manifest.ts";
+import type { ResponsibilityId } from "./responsibilities.ts";
+
+/** Work always has an owner. A name the company does not recognise is an error. */
+function accountableFor(capability: string): ResponsibilityId {
+  const found = accountableForWork(capability);
+  if (!found) throw new Error(`담당 책임을 찾을 수 없습니다: ${capability}`);
+  return found;
+}
 
 export type WorkOrderState =
   | "accepted" | "assigned" | "working" | "awaiting" | "completed" | "withdrawn";
@@ -54,7 +63,11 @@ export type WorkOrder = {
   history: WorkOrderStep[];
 };
 
-const ACCEPTED_BY = "서비서 실장";
+/** Intake is signed by whoever holds the CEO office, not by a fixed string. */
+function acceptedBy(): string {
+  const sign = signature("ceo.office");
+  return `${sign.name} ${sign.title}`;
+}
 
 /**
  * Reads every work order out of the log.
@@ -69,8 +82,9 @@ export function projectWorkOrders(events: EventEnvelope[]): WorkOrder[] {
     const { event } = envelope;
 
     if (event.type === "HandedOver") {
-      const sign = signature(event.capability);
-      const employee = employeeFor(event.capability);
+      const accountable = accountableFor(event.capability);
+      const sign = signature(accountable);
+      const employee = employeeForResponsibility(accountable);
       const subject = `${event.handover.company} · ${event.handover.role}`.replace(/ · $/, "");
 
       orders.set(event.holdId, {
@@ -82,11 +96,11 @@ export function projectWorkOrders(events: EventEnvelope[]): WorkOrder[] {
         acceptedAt: envelope.at,
         completedAt: null,
         history: [
-          { state: "accepted", at: envelope.at, by: ACCEPTED_BY, note: "대표님 지시를 접수했습니다." },
+          { state: "accepted", at: envelope.at, by: acceptedBy(), note: "대표님 지시를 접수했습니다." },
           {
             state: "assigned",
             at: envelope.at,
-            by: ACCEPTED_BY,
+            by: acceptedBy(),
             note: `${sign.displayDepartment} ${sign.name} ${sign.title}에게 맡겼습니다.`,
           },
         ],
