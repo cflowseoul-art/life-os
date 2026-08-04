@@ -293,15 +293,6 @@ function json(res: import("node:http").ServerResponse, status: number, body: unk
 validateManifest();
 void warmRunners();
 
-// The database describes itself in database/lifeos.sql. Applying it on start is
-// idempotent, so a fresh deployment needs no manual step — and a failure here
-// stops the process rather than surfacing as a missing table at first login.
-if (hosted) {
-  void ensureSchema().catch((error: unknown) => {
-    console.error("스키마를 준비하지 못했습니다:", error instanceof Error ? error.message : error);
-    process.exit(1);
-  });
-}
 
 /**
  * The composition root.
@@ -317,6 +308,16 @@ const identity: IdentityStore = hosted ? new PostgresIdentityStore() : new FileI
 const events: EventStore = hosted ? new PostgresEventStore() : new FileEventStore();
 
 console.log(`storage: ${STORAGE}`);
+// The database describes itself in database/lifeos.sql. Applying it on start is
+// idempotent, so a fresh deployment needs no manual step — and a failure here
+// stops the process rather than surfacing as a missing table at first login.
+if (hosted) {
+  void ensureSchema().catch((error: unknown) => {
+    console.error("스키마를 준비하지 못했습니다:", error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
+
 
 /** Everything a request needs, resolved from the actor and nothing else. */
 function desk(actor: ActorContext) {
