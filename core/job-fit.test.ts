@@ -19,13 +19,28 @@ import {
   InMemoryRepository,
   careerKnowledge,
 } from "./capabilities/career/knowledge/index.ts";
-import { useKnowledgeResolver } from "./capabilities/career/knowledge/provider.ts";
+import {
+  careerKnowledgeFor,
+  knowledgeRepositoryFor,
+} from "./capabilities/career/knowledge/provider.ts";
+import { ownsBootstrapKnowledge } from "./capabilities/career/knowledge/bootstrap.ts";
 import { runner as analyst } from "./capabilities/career/runner.ts";
 import type { RepresentativeKey } from "./capabilities/career/knowledge/index.ts";
 import type { ActorContext } from "./identity/types.ts";
 
 const OWNER: RepresentativeKey = { householdId: "hh-1", userId: "usr-1" };
-const ACTOR = { user: { id: "usr-1" }, household: { id: "hh-1" } } as ActorContext;
+
+/** The representative who founded the household — the seed describes them. */
+const ACTOR = {
+  user: { id: "usr-1" },
+  household: { id: "hh-1", ownerUserId: "usr-1" },
+} as ActorContext;
+
+/** A partner who joined the same household later. */
+const PARTNER = {
+  user: { id: "usr-2" },
+  household: { id: "hh-1", ownerUserId: "usr-1" },
+} as ActorContext;
 
 const KNOWLEDGE = careerKnowledge(new BootstrapRepository(OWNER), OWNER);
 
@@ -70,13 +85,8 @@ function freshLog(): EventLog {
   return new EventLog(join(mkdtempSync(join(tmpdir(), "lifeos-fit-")), "events.jsonl"));
 }
 
-function run(log: EventLog, posting: string): void {
-  const restore = useKnowledgeResolver(() => new BootstrapRepository(OWNER));
-  try {
-    analyst.accept({ actor: ACTOR, log, subject: "OpenAI · Data Analyst", request: posting, attachment: "" });
-  } finally {
-    useKnowledgeResolver(restore);
-  }
+function run(log: EventLog, posting: string, actor: ActorContext = ACTOR): void {
+  analyst.accept({ actor, log, subject: "OpenAI · Data Analyst", request: posting, attachment: "" });
 }
 
 function artifactOf(log: EventLog) {
@@ -312,15 +322,7 @@ describe("The analyst only evaluates", () => {
 
   it("reports plainly when Career holds no knowledge for the representative", () => {
     const log = freshLog();
-    const restore = useKnowledgeResolver(() => null);
-
-    try {
-      analyst.accept({
-        actor: ACTOR, log, subject: "OpenAI · Data Analyst", request: STRONG_JD, attachment: "",
-      });
-    } finally {
-      useKnowledgeResolver(restore);
-    }
+    run(log, STRONG_JD, PARTNER);
 
     expect(artifactOf(log).title).toContain("판단 불가");
     // No score was invented from an empty record.
@@ -346,5 +348,90 @@ describe("Comparison is not word counting", () => {
       expect(code, `${path} tokenises text`).not.toContain("NOISE");
       expect(code, `${path} reads a pasted profile`).not.toContain("readProfile");
     }
+  });
+});
+
+describe("Knowledge follows the authenticated representative", () => {
+  it("gives the founding representative the seeded knowledge", () => {
+    const knowledge = careerKnowledgeFor(ACTOR);
+
+    expect(knowledge.facts().length).toBeGreaterThan(0);
+    expect(knowledge.owns("skills")).toBe(true);
+    expect(knowledge.representative).toEqual(OWNER);
+  });
+
+  it("no longer reports 판단 불가 for the seeded representative", () => {
+    const log = freshLog();
+    run(log, STRONG_JD);
+
+    const artifact = artifactOf(log);
+
+    expect(artifact.title).not.toContain("판단 불가");
+    expect(artifact.title).toMatch(/적합도 \d+%/);
+  });
+
+  it("gives another user in the same household nothing", () => {
+    const knowledge = careerKnowledgeFor(PARTNER);
+
+    expect(knowledge.facts()).toEqual([]);
+    expect(knowledge.owns("skills")).toBe(false);
+    expect(knowledge.representative).toEqual({ householdId: "hh-1", userId: "usr-2" });
+  });
+
+  it("gives an owner of a different household nothing of this one", () => {
+    const stranger = {
+      user: { id: "usr-9" },
+      household: { id: "hh-9", ownerUserId: "usr-9" },
+    } as ActorContext;
+
+    // They own their household, so they get their own bootstrap — scoped to
+    // them, and it refuses to answer for anybody else.
+    const repository = knowledgeRepositoryFor(stranger);
+
+    expect(() => repository.facts(OWNER)).toThrow(/드릴 수 없습니다/);
+  });
+
+  it("never hands one representative's provider another's knowledge", () => {
+    const mine = knowledgeRepositoryFor(ACTOR);
+
+    expect(() => mine.facts({ householdId: "hh-1", userId: "usr-2" })).toThrow(/드릴 수 없습니다/);
+  });
+
+  it("fails explicitly when the request carries no identity", () => {
+    expect(() => careerKnowledgeFor(undefined as unknown as ActorContext)).toThrow(/대표 정보가 없습니다/);
+    expect(() => careerKnowledgeFor({ user: {}, household: {} } as ActorContext)).toThrow(/householdId/);
+    expect(() =>
+      careerKnowledgeFor({ user: { id: "" }, household: { id: "hh-1" } } as ActorContext),
+    ).toThrow(/userId/);
+  });
+
+  it("treats a blank household owner as owning nothing", () => {
+    const blank = {
+      user: { id: "usr-1" },
+      household: { id: "hh-1", ownerUserId: "" },
+    } as ActorContext;
+
+    expect(ownsBootstrapKnowledge(blank)).toBe(false);
+    expect(careerKnowledgeFor(blank).facts()).toEqual([]);
+  });
+
+  it("keeps no resolver state between calls", () => {
+    const first = careerKnowledgeFor(ACTOR).facts().length;
+    careerKnowledgeFor(PARTNER);
+    const second = careerKnowledgeFor(ACTOR).facts().length;
+
+    // Nothing another representative did can change what this one reads.
+    expect(second).toBe(first);
+  });
+
+  it("offers no way to install a resolver", () => {
+    const source = readFileSync(
+      join(import.meta.dirname, "capabilities/career/knowledge/provider.ts"),
+      "utf8",
+    );
+
+    expect(source).not.toContain("useKnowledgeResolver");
+    expect(source).not.toContain("let ");
+    expect(source).not.toContain("process.env");
   });
 });

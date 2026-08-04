@@ -1,69 +1,46 @@
 /**
- * Which knowledge provider serves a representative.
+ * Which knowledge provider serves an authenticated representative.
  *
- * The one place the current arrangement is named. Career code asks for a
- * representative's knowledge and gets a view or nothing; it never learns that a
- * bootstrap seed exists, and it never receives somebody else's knowledge because
- * the configured one was closer to hand.
+ * One function, no state. There is no resolver to install, nothing to restore
+ * afterwards, and no order-dependent behaviour — the same actor always gets the
+ * same provider, and two requests in flight cannot see each other's.
  *
- * The bootstrap seed belongs to exactly one person. Who that is cannot be
- * inferred — the material carries no identity, and the real household and user
- * ids are minted at onboarding — so it is configuration. Unconfigured means no
- * knowledge, which the analyst reports as such. It never means everyone's.
+ * The previous version kept a module-level resolver that tests swapped in and
+ * out. That made "whose knowledge does this return?" a question about what had
+ * run before, which is exactly the wrong property for the store that holds one
+ * person's career.
+ *
+ * Every representative gets a view. A representative the seed does not describe
+ * gets an **empty** one — scoped to them, holding nothing — rather than null or
+ * somebody else's facts. Career then reports that it knows nothing about them,
+ * which is true, instead of quietly answering with a stranger's history.
  */
 
-import { BootstrapRepository } from "./repository.ts";
+import { BootstrapRepository, InMemoryRepository } from "./repository.ts";
 import { careerKnowledge } from "./index.ts";
-import { sameRepresentative } from "./representative.ts";
+import { ownsBootstrapKnowledge } from "./bootstrap.ts";
+import { representativeOf } from "./representative.ts";
 import type { CareerKnowledge } from "./index.ts";
 import type { CareerKnowledgeRepository } from "./repository.ts";
 import type { RepresentativeKey } from "./representative.ts";
-
-/** Who the seeded material belongs to, or null when nobody has claimed it. */
-export function configuredOwner(): RepresentativeKey | null {
-  const householdId = (process.env.LIFE_OS_CAREER_HOUSEHOLD_ID ?? "").trim();
-  const userId = (process.env.LIFE_OS_CAREER_USER_ID ?? "").trim();
-
-  if (householdId === "" || userId === "") return null;
-  return { householdId, userId };
-}
-
-/** Resolves the provider for one representative, or null when none serves them. */
-export type KnowledgeResolver = (
-  representative: RepresentativeKey,
-) => CareerKnowledgeRepository | null;
-
-const bootstrapResolver: KnowledgeResolver = (representative) => {
-  const owner = configuredOwner();
-  if (!owner) return null;
-  if (!sameRepresentative(owner, representative)) return null;
-
-  return new BootstrapRepository(owner);
-};
-
-let resolver: KnowledgeResolver = bootstrapResolver;
+import type { ActorContext } from "../../../identity/types.ts";
 
 /**
- * Replaces how providers are resolved.
+ * The provider for one authenticated representative.
  *
- * The composition seam. A runner cannot be handed a repository — the runner port
- * carries an actor, a log, and the request, and widening it would change a layer
- * this work does not own. Returns the previous resolver so a caller can restore
- * it.
+ * Throws when the request carries no usable identity: a read that cannot name
+ * whose knowledge it wants must not proceed, because the store it would reach
+ * has no safe default.
  */
-export function useKnowledgeResolver(next: KnowledgeResolver): KnowledgeResolver {
-  const previous = resolver;
-  resolver = next;
-  return previous;
+export function knowledgeRepositoryFor(actor: ActorContext): CareerKnowledgeRepository {
+  const representative: RepresentativeKey = representativeOf(actor);
+
+  return ownsBootstrapKnowledge(actor)
+    ? new BootstrapRepository(representative)
+    : new InMemoryRepository(representative);
 }
 
-/**
- * One representative's knowledge, or null when Career holds none for them.
- *
- * Null is a real answer and the analyst reports it. It is never substituted with
- * whatever knowledge happens to be loaded.
- */
-export function knowledgeFor(representative: RepresentativeKey): CareerKnowledge | null {
-  const repository = resolver(representative);
-  return repository ? careerKnowledge(repository, representative) : null;
+/** One authenticated representative's Career Knowledge. Never anybody else's. */
+export function careerKnowledgeFor(actor: ActorContext): CareerKnowledge {
+  return careerKnowledge(knowledgeRepositoryFor(actor), representativeOf(actor));
 }

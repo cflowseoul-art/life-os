@@ -37,8 +37,6 @@ import {
 } from "./company/manifest.ts";
 import { loadRunner } from "./company/runner.ts";
 import { runner as careerRunner } from "./capabilities/career/runner.ts";
-import { BootstrapRepository } from "./capabilities/career/knowledge/index.ts";
-import { useKnowledgeResolver } from "./capabilities/career/knowledge/provider.ts";
 import type { ActorContext } from "./identity/types.ts";
 
 const JD = `Data Analyst
@@ -54,9 +52,10 @@ function freshLog(): EventLog {
 }
 
 /** Runs Career's intake and returns everything it recorded. */
+/** The founding representative, so the analyst reads real knowledge. */
 const ACTOR = {
   user: { id: "usr-1" },
-  household: { id: "hh-1" },
+  household: { id: "hh-1", ownerUserId: "usr-1" },
 } as ActorContext;
 
 function runCareer(log: EventLog): {
@@ -64,23 +63,13 @@ function runCareer(log: EventLog): {
   headings: string[];
   askFacts: string[];
 } {
-  // Career Knowledge has to be reachable, or the analyst reports that instead
-  // and records nothing — which would make this test prove nothing.
-  const restore = useKnowledgeResolver(
-    () => new BootstrapRepository({ householdId: "hh-1", userId: "usr-1" }),
-  );
-
-  try {
-    careerRunner.accept({
-      actor: ACTOR,
-      log,
-      subject: "OpenAI · Data Analyst",
-      request: JD,
-      attachment: "",
-    });
-  } finally {
-    useKnowledgeResolver(restore);
-  }
+  careerRunner.accept({
+    actor: ACTOR,
+    log,
+    subject: "OpenAI · Data Analyst",
+    request: JD,
+    attachment: "",
+  });
 
   const events = log.read();
 

@@ -21,9 +21,20 @@ export type RepresentativeKey = {
   userId: UserId;
 };
 
-/** The representative a request is being handled for. */
-export function representativeOf(actor: ActorContext): RepresentativeKey {
-  return { householdId: actor.household.id, userId: actor.user.id };
+/**
+ * The representative a request is being handled for.
+ *
+ * Validates rather than trusting the context: a request that reached the domain
+ * without a usable identity must fail here, where the failure names what is
+ * missing, and not later inside a store that has no safe default.
+ */
+export function representativeOf(actor: ActorContext | undefined | null): RepresentativeKey {
+  if (!actor) throw new Error("요청에 대표 정보가 없습니다.");
+
+  return assertRepresentative({
+    householdId: actor.household?.id,
+    userId: actor.user?.id,
+  });
 }
 
 /**

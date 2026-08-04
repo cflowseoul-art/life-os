@@ -18,8 +18,7 @@ import { randomUUID } from "node:crypto";
 import { project } from "../../custody/engine.ts";
 import { employeeForResponsibility } from "../../company/employees.ts";
 import { analyseFit, RECOMMENDATION_LABEL } from "./job-fit.ts";
-import { knowledgeFor } from "./knowledge/provider.ts";
-import { representativeOf } from "./knowledge/representative.ts";
+import { careerKnowledgeFor } from "./knowledge/provider.ts";
 import type { FitReport, RequirementMatch } from "./job-fit.ts";
 import type { Artifact, ArtifactSection } from "../../events/types.ts";
 
@@ -125,9 +124,12 @@ export const runner: ResponsibilityRunner = {
       "ceo-office:accepted",
     );
 
-    const knowledge = knowledgeFor(representativeOf(actor));
+    // Resolved from the authenticated actor the boundary already established.
+    // A representative the seed does not describe gets an empty view, never
+    // somebody else's — so "we know nothing about you" is the honest report.
+    const knowledge = careerKnowledgeFor(actor);
 
-    if (!knowledge) {
+    if (knowledge.facts().length === 0) {
       log.append(
         { type: "ArtifactKept", holdId, artifact: noKnowledge(company, role) },
         ACTOR,
