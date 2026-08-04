@@ -265,3 +265,78 @@ event exists, an order stays `assigned` after facts are recorded.
 **Reason:** Knowing something is not the same as having started the work. A
 department may record what it read and get no further, and reporting that as
 progress tells the representative something the record does not support (Art. 9).
+
+## ADR-025 — Capability-first Career model
+
+**Decision:** Career is organized around **Business Capability**. Not skill, not
+tool, not résumé. Capability is the primary semantic unit; evidence supports a
+capability; tools support evidence; artifacts present evidence.
+
+The canonical model:
+
+```text
+Representative
+    ↓
+Business Capability      a durable business ability
+    ↓
+Evidence                 concrete work proving it
+    ↓
+Artifact                 how it is presented
+    ↓
+Tool                     implementation detail
+```
+
+**Definitions.**
+
+*Business Capability* — a durable business ability. Product Analytics, KPI
+Design, Experimentation, Dashboarding, Data Modeling, Stakeholder Communication,
+Retention Analysis.
+
+*Evidence* — concrete work proving a capability. "Designed Firebase event
+schema", "Built 15 Tableau dashboards", "Created LLM flat tables", "Established
+RBAC dashboard policy".
+
+*Artifact* — presentation. Résumé, portfolio, cover letter, interview answer.
+
+*Tool* — implementation detail. SQL, BigQuery, Tableau, Hex, Databricks,
+Firebase.
+
+**Rules.**
+
+- Job Fit compares business capability. Never tools directly, never raw keywords.
+- A tool may support several capabilities; a capability may be demonstrated by
+  several tools. The relationship is many-to-many and neither direction implies
+  the other.
+- Evidence belongs to exactly one primary capability, so a claim has one owner.
+- Artifacts never become knowledge. They are generated *from* knowledge, and the
+  arrow never reverses.
+
+**Reason:** Companies hire business capability. Tools are how a capability was
+exercised, not what was hired. Organizing Career around tools produced a model
+that could tell you the representative had used Tableau but not that they could
+build a decision-making environment — and a posting naming a tool the
+representative had never touched scored as a total mismatch even when the
+underlying capability was well evidenced. Ranking by tool overlap is the same
+failure as ranking by shared words, one level up.
+
+Capability is also the stable layer. Tools change every few years; "design a
+metric that survives contact with a product team" does not. A model keyed on
+tools has to be rebuilt each time the market's vocabulary moves.
+
+**Consequences.** The sequence becomes: capability matching → evidence selection
+→ artifact generation. Résumé, portfolio, and interview preparation each become a
+**view** over the same knowledge rather than stored documents. Knowledge itself
+is unchanged by generating any of them.
+
+**Caveat:** The current implementation contradicts this and must be migrated, not
+extended. Career Knowledge today records `skill` facts whose value is a tool name
+(`SQL`, `Tableau`, `Databricks`), and the Job Fit Analyst matches those tool names
+against the posting — exactly what this decision forbids. That code satisfied the
+constraint it was given (compare typed knowledge, never raw text) but is keyed on
+the wrong unit. Capability has to be introduced as a first-class fact type with
+evidence attached to it before Job Fit can be re-pointed; until then the analyst
+remains tool-keyed and its scores should be read as such.
+
+`prohibited_claim` survives this change unaltered. A claim the record forbids is
+a claim about what may be said, not about a capability, and it must keep blocking
+an Apply however well capabilities match.
