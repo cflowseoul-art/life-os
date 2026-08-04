@@ -32,6 +32,7 @@
  */
 
 import type { CareerKnowledge } from "./knowledge/index.ts";
+import type { CareerOntology, OntologyVersion } from "./ontology/index.ts";
 
 export type MatchKind = "strong" | "partial" | "gap";
 
@@ -89,6 +90,15 @@ export type FitReport = {
   risks: Risk[];
   recommendation: Recommendation;
   reason: string;
+  /**
+   * The vocabulary this reading was made against.
+   *
+   * The same posting read against a different vocabulary is a different
+   * reading. Recording the version is what keeps a score defensible after the
+   * ontology grows — and what makes "the same posting always produces the same
+   * result" a statement that can still be checked.
+   */
+  ontologyVersion: OntologyVersion;
 };
 
 /** A skill counts as strongly held once two experiences evidence it. */
@@ -151,8 +161,13 @@ export function yearsRequired(posting: string): number | null {
 export function analyseFit(
   input: { company: string; position: string; posting: string },
   knowledge: CareerKnowledge,
+  ontology?: CareerOntology,
 ): FitReport {
   const { company, position, posting } = input;
+
+  // Every term the vocabulary recognises in this posting, resolved by any of
+  // its labels — so `데이터 모델링` finds the same tool as `Data Modeling`.
+  const named = ontology?.mentionedIn(posting) ?? new Set<string>();
 
   const strong: RequirementMatch[] = [];
   const partial: RequirementMatch[] = [];
@@ -162,7 +177,9 @@ export function analyseFit(
   // Iteration is over knowledge, in its recorded order, so the report is stable
   // whatever order the posting happens to mention things in.
   for (const skill of knowledge.factsOfType("skill")) {
-    if (!asks(posting, skill.value.name)) continue;
+    // The ontology answers first; the skill's own name is the fallback for a
+    // representative whose vocabulary holds nothing yet.
+    if (!named.has(skill.id) && !asks(posting, skill.value.name)) continue;
 
     const evidence = skill.value.evidence;
     const match: RequirementMatch = {
@@ -250,6 +267,7 @@ export function analyseFit(
   return {
     company, position, percent, unscored, formula,
     strong, partial, gaps, risks, recommendation, reason,
+    ontologyVersion: ontology?.version() ?? 0,
   };
 }
 

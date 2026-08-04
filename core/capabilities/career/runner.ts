@@ -19,6 +19,7 @@ import { project } from "../../custody/engine.ts";
 import { employeeForResponsibility } from "../../company/employees.ts";
 import { analyseFit, RECOMMENDATION_LABEL, UNSCORED_LABEL } from "./job-fit.ts";
 import { careerKnowledgeFor } from "./knowledge/provider.ts";
+import { careerOntologyFor } from "./ontology/provider.ts";
 import type { FitReport, RequirementMatch } from "./job-fit.ts";
 import type { ArtifactSection } from "../../events/types.ts";
 
@@ -114,7 +115,11 @@ export const runner: ResponsibilityRunner = {
     // somebody else's — and the analysis says so in its own terms.
     const knowledge = careerKnowledgeFor(actor);
 
-    const report = analyseFit({ company, position: role, posting }, knowledge);
+    const report = analyseFit(
+      { company, position: role, posting },
+      knowledge,
+      careerOntologyFor(actor),
+    );
 
     // One fact per finding — bounded by what Career knows, never by how long the
     // posting is. `derivedFrom` points at the knowledge that supports it.
