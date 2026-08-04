@@ -18,6 +18,7 @@ import {
   BootstrapRepository,
   InMemoryRepository,
   careerKnowledge,
+  isKnowledgeFact,
 } from "./capabilities/career/knowledge/index.ts";
 import {
   careerKnowledgeFor,
@@ -307,11 +308,17 @@ describe("The analyst only evaluates", () => {
     run(log, STRONG_JD);
 
     expect(KNOWLEDGE.facts()).toHaveLength(before);
-    // Nothing it recorded is a knowledge fact; findings belong to the hold.
+
     const recorded = log.read().flatMap((e) =>
-      e.event.type === "KnowledgeFactRecorded" ? [e.event.fact.type] : [],
+      e.event.type === "KnowledgeFactRecorded" ? [e.event.fact] : [],
     );
-    expect(new Set(recorded)).toEqual(new Set(["fit_finding"]));
+
+    // Findings belong to the hold; candidates are queue state. Neither is
+    // knowledge about the representative, which is what `isKnowledgeFact` says.
+    expect(new Set(recorded.map((f) => f.type))).toEqual(
+      new Set(["fit_finding", "term_candidate"]),
+    );
+    expect(recorded.some((f) => isKnowledgeFact(f))).toBe(false);
   });
 
   it("stops after the decision instead of starting the next stage", () => {

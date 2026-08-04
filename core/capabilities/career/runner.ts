@@ -20,6 +20,9 @@ import { employeeForResponsibility } from "../../company/employees.ts";
 import { analyseFit, RECOMMENDATION_LABEL, UNSCORED_LABEL } from "./job-fit.ts";
 import { careerKnowledgeFor } from "./knowledge/provider.ts";
 import { careerOntologyFor } from "./ontology/provider.ts";
+import { postingId } from "./ontology/candidates.ts";
+import { ignoredIn, noteCandidates } from "./ontology/queue.ts";
+import { representativeOf } from "./knowledge/representative.ts";
 import type { FitReport, RequirementMatch } from "./job-fit.ts";
 import type { ArtifactSection } from "../../events/types.ts";
 
@@ -83,6 +86,13 @@ function sections(report: FitReport): ArtifactSection[] {
       body: "",
       derivedFrom: r.derivedFrom,
     })),
+    ...(report.unknown.length > 0
+      ? [{
+          heading: `아직 모르는 표현 ${String(report.unknown.length)}개`,
+          body: "",
+          derivedFrom: [],
+        }]
+      : []),
   ];
 }
 
@@ -115,10 +125,26 @@ export const runner: ResponsibilityRunner = {
     // somebody else's — and the analysis says so in its own terms.
     const knowledge = careerKnowledgeFor(actor);
 
+    const ontology = careerOntologyFor(actor);
+
     const report = analyseFit(
       { company, position: role, posting },
       knowledge,
-      careerOntologyFor(actor),
+      ontology,
+      // Terms the representative ruled out stay ruled out.
+      ignoredIn(log),
+    );
+
+    // Noticed, not learned. Nothing enters the vocabulary and nobody is asked.
+    noteCandidates(
+      {
+        log,
+        holdId,
+        representative: representativeOf(actor),
+        sourceId: postingId(company, role, posting),
+        sourceLabel: `${company} · ${role}`,
+      },
+      report.unknown,
     );
 
     // One fact per finding — bounded by what Career knows, never by how long the

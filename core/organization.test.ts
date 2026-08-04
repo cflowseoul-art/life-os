@@ -78,8 +78,10 @@ function runCareer(log: EventLog): {
   return {
     // Everything about a fact except when it was acquired — two runs happen at
     // two different moments, and that difference is not the department's doing.
+    // The analyst's own conclusions. Candidate sightings are authored by the
+    // posting, not by whoever read it, so they say nothing about replacement.
     facts: events.flatMap((e) =>
-      e.event.type === "KnowledgeFactRecorded"
+      e.event.type === "KnowledgeFactRecorded" && e.event.fact.type === "fit_finding"
         ? [{ value: e.event.fact.value, author: e.event.fact.author }]
         : [],
     ),

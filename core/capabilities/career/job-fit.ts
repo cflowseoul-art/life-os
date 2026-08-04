@@ -32,6 +32,8 @@
  */
 
 import type { CareerKnowledge } from "./knowledge/index.ts";
+import { detectUnknownTerms } from "./ontology/candidates.ts";
+import type { DetectedTerm } from "./ontology/candidates.ts";
 import type { CareerOntology, OntologyVersion } from "./ontology/index.ts";
 
 export type MatchKind = "strong" | "partial" | "gap";
@@ -90,6 +92,22 @@ export type FitReport = {
   risks: Risk[];
   recommendation: Recommendation;
   reason: string;
+  /**
+   * Requirement-like terms Career has no word for.
+   *
+   * They used to vanish: matching nothing, they were absent from the report and
+   * absent from the denominator, which flattered every score. They are carried
+   * now so the reading can say how sure of itself it is.
+   */
+  unknown: DetectedTerm[];
+  /**
+   * How much of what the posting asked for Career could even read, 0–1.
+   *
+   * Separate from `percent`, which still measures fit across what was
+   * recognised. A 100% fit against two of nine requirements is a different
+   * claim from a 100% fit against nine of nine, and one number cannot say both.
+   */
+  confidence: number;
   /**
    * The vocabulary this reading was made against.
    *
@@ -162,6 +180,7 @@ export function analyseFit(
   input: { company: string; position: string; posting: string },
   knowledge: CareerKnowledge,
   ontology?: CareerOntology,
+  ignored: ReadonlySet<string> = new Set(),
 ): FitReport {
   const { company, position, posting } = input;
 
@@ -249,6 +268,20 @@ export function analyseFit(
   const scored = strong.length + partial.length * 0.5;
   const percent = total === 0 ? null : Math.round((scored / total) * 100);
 
+  // Anything the posting asked for that no term names. Terms already accounted
+  // for as a match or a gap are not unknown — they were read, and counting them
+  // twice would understate the reading rather than describe it.
+  const accounted = new Set(
+    [...strong, ...partial, ...gaps].map((m) => m.requirement.toLowerCase().replace(/[\s/\-_.'’()]/g, "")),
+  );
+
+  const unknown = ontology
+    ? detectUnknownTerms(posting, ontology, ignored).filter((u) => !accounted.has(u.normalised))
+    : [];
+
+  const readable = total + unknown.length;
+  const confidence = readable === 0 ? 0 : Math.round((total / readable) * 100) / 100;
+
   // An empty record and an unrecognised posting both leave nothing to score,
   // and they are not the same problem to fix.
   const unscored: Unscored | null =
@@ -267,6 +300,7 @@ export function analyseFit(
   return {
     company, position, percent, unscored, formula,
     strong, partial, gaps, risks, recommendation, reason,
+    unknown, confidence,
     ontologyVersion: ontology?.version() ?? 0,
   };
 }
